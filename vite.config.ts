@@ -6,7 +6,7 @@ import { PrimeVueResolver } from '@primevue/auto-import-resolver'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
-  base: '/xsmartlive-frontend-prototype/',
+  base: '/xsmartlive-mall/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
