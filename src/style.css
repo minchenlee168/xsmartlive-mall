@@ -1,0 +1,118 @@
+/* 預先宣告 layer 順序：primevue 排在 Tailwind components/utilities 之前，
+   讓 Tailwind 佈局 utility 能覆蓋 PrimeVue 內部樣式。 */
+@layer theme, base, primevue, components, utilities;
+@import "tailwindcss";
+@import "primeicons/primeicons.css";
+
+* {
+  font-family: "Noto Sans TC", sans-serif;
+}
+
+:root {
+  /* 主色（純色）：用於文字、border、icon、spinner。品牌色 #7008e7 */
+  --primary:           #7008e7;
+  --primary-200:       #d3bbfb;
+  /* 主色（背景）：可為漸層，用於 button/tab/badge 背景 */
+  --primary-bg:        #7008e7;
+  --primary-hover-bg:  #5b06bd;
+  --tabs-bg:           #7008e7;
+
+  /* 品牌色 ramp（以 #7008e7 為 500）— 供 PrimeVue Aura preset 對應使用 */
+  --primary-50:        #f5f0fe;
+  --primary-100:       #e9ddfd;
+  --primary-300:       #b88ef7;
+  --primary-400:       #9a55f2;
+  --primary-700:       #5006a3;
+  --primary-800:       #3e0480;
+  --primary-900:       #2f0362;
+  --primary-950:       #1d013e;
+
+  /* Reserved brand color — used by category tabs, search button and custom
+     icons. Defaults to --primary; a theme may override it to keep these
+     elements a fixed hue while --primary drives everything else. */
+  --brand:             var(--primary);
+  --brand-bg:          var(--primary-bg);
+  --brand-hover-bg:    var(--primary-hover-bg);
+
+  --page-bg:     #f1f5f9;
+  --surface-100: #f1f5f9;
+  --surface-700: #334155;
+  --surface-950: #020617;
+  --rose-500:    #f43f5e;
+  --border-color:  #e5e5e5;
+  --border-light:  #e2e8f0;
+  --text-muted:    #64748b;
+
+  /* Custom icon shades — derived from --brand so icons keep the reserved
+     brand hue. For normal themes --brand === --primary. */
+  --icon-primary:        var(--brand);
+  --icon-primary-strong: color-mix(in srgb, var(--brand) 50%, #000);
+  --icon-primary-mid:    color-mix(in srgb, var(--brand) 78%, #fff);
+  --icon-primary-soft:   color-mix(in srgb, var(--brand) 45%, #fff);
+  --icon-primary-light:  color-mix(in srgb, var(--brand) 35%, #fff);
+  --icon-primary-bg:     color-mix(in srgb, var(--brand) 6%, #fff);
+
+  /* Light purple surface tint (cards/tags/active states) — tracks theme */
+  --primary-surface:     color-mix(in srgb, var(--primary) 12%, #fff);
+
+  /* Complementary accent (secondary buttons, badges, tags) — set per theme */
+  --accent:              #b8923f;
+  --accent-200:          #ead9b8;
+  --accent-hover:        #997636;
+
+  /* Spacing density tokens (defaults = wide; overridden by density store).
+     All equal so spacing is uniform. */
+  --page-pad-x:          16px;
+  --page-pad-y:          16px;
+  --stack-gap:           16px;
+  --card-pad:            16px;
+}
+
+/* Uniform card inner padding — tracks the density setting */
+.card-pad { padding: var(--card-pad); }
+
+/* 卡片陰影 token（來自設計系統 card.aura-overrides.shadow） */
+:root {
+  --card-shadow: 0px 1px 3px 0px rgba(0,0,0,0.1), 0px 1px 2px -1px rgba(0,0,0,0.1);
+}
+.shadow-card { box-shadow: var(--card-shadow); }
+
+/* 數量選擇器（InputNumber showButtons / horizontal）尺寸統一 —
+   PC 標準、.is-sm 為行動裝置商品卡用 */
+.qty-stepper.p-inputnumber { height: 34px; }
+.qty-stepper .p-inputnumber-input { width: 48px; text-align: center; }
+.qty-stepper .p-inputnumber-button { width: 35px; }
+.qty-stepper.is-sm.p-inputnumber { height: 26px; }
+.qty-stepper.is-sm .p-inputnumber-input { width: 36px; font-size: 11px; padding-top: 0; padding-bottom: 0; }
+.qty-stepper.is-sm .p-inputnumber-button { width: 26px; }
+
+/* 觸控友善：表單文字輸入框與下拉選單最小高度 44px（數量步進器維持自有尺寸） */
+.p-inputtext,
+.p-select {
+  min-height: 44px;
+}
+.qty-stepper .p-inputnumber-input { min-height: 0; }
+
+/* 視窗縮到手機寬時，所有 PrimeVue Dialog 對齊 viewport 寬（保留 PrimeVue 自身的置中 transform，
+   只覆寫 max-width 讓寬的彈窗自動縮到 viewport - 32px，原本就比 viewport 窄的彈窗不受影響）。 */
+@media (max-width: 768px) {
+  .p-dialog.p-component {
+    max-width: calc(100vw - 32px) !important;
+  }
+  /* PrimeVue Drawer：底部抽屜遮罩鋪滿整個視窗；drawer panel 由 mask flex 佈局自然撐到 100vw，
+     不再對 .p-drawer 強行加 left/width（在 position: relative 上會與 flex 對齊衝突） */
+  .p-drawer-mask {
+    left: 0 !important;
+    width: 100vw !important;
+  }
+}
+
+/* 模擬器 frame 模式（PC 視窗 + FloatingControls 手動選 mobile/tablet）：
+   只縮 PrimeVue Drawer 遮罩到 frame 區域，drawer panel 透過 mask flex（align-items: flex-end +
+   justify-content: center）自然貼齊 frame 底部。不再對 .p-drawer 設 left/bottom（position: relative
+   下會與 flex 對齊重複疊加，導致面板被推到 frame 範圍外）。 */
+html.frame-mode .p-drawer-mask {
+  left: var(--frame-left, 0) !important;
+  width: var(--frame-width, 100vw) !important;
+  height: calc(100vh - var(--frame-bottom, 0px)) !important;
+}

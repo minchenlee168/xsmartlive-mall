@@ -1,0 +1,43 @@
+<script setup lang="ts">
+const props = defineProps<{ tab: string }>()
+
+const subCategories: Record<string, string[]> = {
+  '大童童裝': ['上衣', '褲子', '裙子', '外套', '套裝'],
+  '小童童裝': ['上衣', '褲子', '裙子', '外套', '套裝'],
+  '寶寶包屁': ['短袖包屁', '長袖包屁', '親子裝', '禮盒組', '其他'],
+  '親子裝': ['親子上衣', '親子褲裝', '親子裙裝', '親子外套'],
+  '廠商出清': ['全部出清', '上衣特賣', '褲裝特賣', '套裝特賣', '配件特賣'],
+}
+
+const items = subCategories[props.tab] ?? []
+const active = defineModel<string>('active')
+</script>
+
+<template>
+  <div class="w-full @md:w-[160px] @xl:w-[244px] shrink-0 flex flex-col">
+    <!-- Header -->
+    <div
+      class="flex items-center px-3 py-2 rounded-t-lg"
+      style="background: var(--primary-bg)"
+    >
+      <span class="text-sm font-semibold text-white">依分類顯示</span>
+    </div>
+
+    <!-- Menu -->
+    <div class="bg-white border border-[#e2e8f0] rounded-b-lg p-1 flex flex-col gap-1">
+      <button
+        v-for="item in items"
+        :key="item"
+        class="w-full text-left flex items-center px-3 py-2 min-h-[40px] rounded text-sm transition-colors"
+        :style="active === item
+          ? { background: 'color-mix(in srgb, var(--primary) 10%, transparent)', color: 'var(--surface-950)' }
+          : { color: 'var(--surface-700)' }"
+        @click="active = item"
+        @mouseover="(e) => { if (active !== item) (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--primary) 5%, transparent)' }"
+        @mouseleave="(e) => { if (active !== item) (e.currentTarget as HTMLElement).style.background = '' }"
+      >
+        {{ item }}
+      </button>
+    </div>
+  </div>
+</template>

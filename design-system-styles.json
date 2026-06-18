@@ -1,0 +1,339 @@
+{
+  "$schema": "https://design-tokens.org/schema.json",
+  "meta": {
+    "source": "直播管家-商城",
+    "figmaFileKey": "xKSUqKiiOQQJSC40rmMwA1",
+    "figmaNodeId": "10222:44554",
+    "note": "PrimeVue 元件預設樣式由 Aura 主題提供，本檔案僅記錄需 override 的 Aura token、客製像素值與佈局用 Tailwind class",
+    "libraries": [
+      "🔸 直播管家-商城",
+      "PrimeOne-3.1.0",
+      "PrimeIcons (Community)"
+    ]
+  },
+  "global": {
+    "fontFamily": "Noto Sans TC, sans-serif",
+    "backgroundColor": "#f1f5f9",
+    "maxContentWidth": 1280,
+    "maxLayoutWidth": 1440,
+    "cssVar": "--surface-100"
+  },
+  "colors": {
+    "note": "主題色（primary 群組）透過 CSS variable 動態切換；其餘為固定色",
+    "primary": {
+      "note": "⬇ 以下三個值由 themeSystem.themes[active].cssVars 在 runtime 覆寫",
+      "500":     { "cssVar": "var(--primary)",       "defaultValue": "#7008e7", "usage": "NavBar 搜尋按鈕、CategoryTabs 背景、CTA 按鈕、Logo、spinner" },
+      "200":     { "cssVar": "var(--primary-200)",   "defaultValue": "#c29ffa", "usage": "ThemeBanner 背景、outlined button border、spinner track" },
+      "hover":   { "cssVar": "var(--primary-hover)", "defaultValue": "#5a06ba", "usage": "primary 按鈕 hover 狀態" },
+      "contrast": { "value": "#ffffff", "fixed": true, "usage": "primary 背景上的文字/icon，不隨主題變動" }
+    },
+    "surface": {
+      "100": { "value": "#f1f5f9", "cssVar": "--surface-100", "fixed": true, "usage": "全站頁面底色" },
+      "700": { "value": "#334155", "cssVar": "--surface-700", "fixed": true, "usage": "一般內文、次要按鈕文字" },
+      "950": { "value": "#020617", "cssVar": "--surface-950", "fixed": true, "usage": "商品標題、快速搜尋 tag 文字" }
+    },
+    "rose": {
+      "500": { "value": "#f43f5e", "cssVar": "--rose-500", "fixed": true, "usage": "商品售價" }
+    },
+    "brand": {
+      "secondary-200": { "value": "#e5e5e5", "cssVar": "--border-color",  "fixed": true, "usage": "NavBar 底線、Banner 外框" },
+      "secondary-002": { "value": "#ebedef", "fixed": true, "usage": "大型 banner 文字（placeholder）" }
+    },
+    "neutral": {
+      "border":      { "value": "#e2e8f0", "cssVar": "--border-light", "fixed": true, "usage": "分隔線、卡片外框、input border" },
+      "inputBorder": { "value": "#cbd5e1", "fixed": true, "usage": "InputText / InputNumber border" },
+      "muted":       { "value": "#64748b", "cssVar": "--text-muted",   "fixed": true, "usage": "原價劃線文字、input placeholder" }
+    }
+  },
+  "themeSystem": {
+    "note": "runtime 透過 useThemeStore.set() 寫入 document.documentElement 的 CSS variable，所有引用 var(--primary*) 的元件即時更新",
+    "cssVars": {
+      "--primary":          "主色（純色），用於文字色、border、spinner — 不可為漸層",
+      "--primary-200":      "主色淡版（純色），用於 outlined button border、spinner track、ThemeBanner 底色",
+      "--primary-bg":       "主色背景值，可為純色或 CSS gradient — 用於 button/badge/FAB 的 background 屬性",
+      "--primary-hover-bg": "hover 背景值，可為純色或 CSS gradient — 用於互動 hover/active 狀態的 background 屬性",
+      "--tabs-bg":          "分類標籤列背景值，可為純色或 CSS gradient — 預設同 --primary-bg，撞色主題可獨立設定不同色",
+      "--page-bg":          "頁面底色，可為純色或 CSS gradient — 套用於 HomePage 根元素與裝置框架外框底色"
+    },
+    "gradientNote": "漸層主題需額外提供 swatchGradient 供 FloatingControls 色票顯示；--primary 與 --primary-200 必須保持純色以支援 color / border-color / outline-color 使用",
+    "affectedComponents": [
+      "HomePage — 頁面根元素底色（--page-bg）",
+      "App — 裝置預覽框架外框底色（color-mix --page-bg + gray）",
+      "NavBar — Logo 背景（--primary-bg）、Logo 文字色（--primary）、搜尋按鈕背景（--primary-bg）",
+      "CategoryTabs — tab bar 整條背景（--tabs-bg；預設同 --primary-bg，柑橘撞色主題為綠色）",
+      "BannerCarousel — 分類 badge 背景（--primary-bg）",
+      "ThemeBanner — 區塊底色（--primary-200）、斜線紋路（--primary）",
+      "ProductCard — 加入購物車按鈕背景（--primary-bg）、hover（--primary-hover-bg）、選擇規格按鈕 border/文字（--primary）",
+      "ProductGrid — loading spinner border-top（--primary）、其餘 border（--primary-200）",
+      "FloatingControls — FAB 背景（--primary-bg）、選中裝置按鈕背景（--primary-bg）"
+    ],
+    "defaultTheme": "purple",
+    "themes": {
+      "purple": {
+        "label": "紫色",
+        "swatch": "#7008e7",
+        "cssVars": {
+          "--primary":          "#7008e7",
+          "--primary-200":      "#c29ffa",
+          "--primary-bg":       "#7008e7",
+          "--primary-hover-bg": "#5a06ba",
+          "--tabs-bg":          "#7008e7",
+          "--page-bg":          "#f1f5f9"
+        }
+      },
+      "red": {
+        "label": "紅色",
+        "swatch": "#e53935",
+        "cssVars": {
+          "--primary":          "#e53935",
+          "--primary-200":      "#ffcdd2",
+          "--primary-bg":       "#e53935",
+          "--primary-hover-bg": "#b71c1c",
+          "--tabs-bg":          "#e53935",
+          "--page-bg":          "#f1f5f9"
+        }
+      },
+      "blue": {
+        "label": "藍色",
+        "swatch": "#0284c7",
+        "cssVars": {
+          "--primary":          "#0284c7",
+          "--primary-200":      "#bae6fd",
+          "--primary-bg":       "#0284c7",
+          "--primary-hover-bg": "#0369a1",
+          "--tabs-bg":          "#0284c7",
+          "--page-bg":          "#f1f5f9"
+        }
+      },
+      "green": {
+        "label": "綠色",
+        "swatch": "#16a34a",
+        "cssVars": {
+          "--primary":          "#16a34a",
+          "--primary-200":      "#bbf7d0",
+          "--primary-bg":       "#16a34a",
+          "--primary-hover-bg": "#15803d",
+          "--tabs-bg":          "#16a34a",
+          "--page-bg":          "#f1f5f9"
+        }
+      },
+      "orange": {
+        "label": "橘色",
+        "swatch": "#ea580c",
+        "cssVars": {
+          "--primary":          "#ea580c",
+          "--primary-200":      "#fed7aa",
+          "--primary-bg":       "#ea580c",
+          "--primary-hover-bg": "#c2410c",
+          "--tabs-bg":          "#ea580c",
+          "--page-bg":          "#f1f5f9"
+        }
+      },
+      "milktea": {
+        "label": "奶茶",
+        "swatch": "#c8956c",
+        "swatchGradient": "linear-gradient(135deg, #e8c49a, #c8956c, #a06840)",
+        "cssVars": {
+          "--primary":          "#c8956c",
+          "--primary-200":      "#f5e6d3",
+          "--primary-bg":       "linear-gradient(135deg, #e8c49a 0%, #c8956c 55%, #a06840 100%)",
+          "--primary-hover-bg": "linear-gradient(135deg, #d4a880 0%, #a06840 100%)",
+          "--tabs-bg":          "linear-gradient(135deg, #e8c49a 0%, #c8956c 55%, #a06840 100%)",
+          "--page-bg":          "linear-gradient(160deg, #fdf6ee 0%, #f5e6d3 50%, #eeddc4 100%)"
+        }
+      },
+      "techblue": {
+        "label": "科技藍",
+        "swatch": "#0891b2",
+        "swatchGradient": "linear-gradient(135deg, #22d3ee, #0891b2, #0e7490)",
+        "cssVars": {
+          "--primary":          "#0891b2",
+          "--primary-200":      "#cffafe",
+          "--primary-bg":       "linear-gradient(135deg, #22d3ee 0%, #0891b2 55%, #0e7490 100%)",
+          "--primary-hover-bg": "linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)",
+          "--tabs-bg":          "linear-gradient(135deg, #22d3ee 0%, #0891b2 55%, #0e7490 100%)",
+          "--page-bg":          "linear-gradient(160deg, #ecfeff 0%, #e0f7fa 50%, #cffafe 100%)"
+        }
+      },
+      "citrus": {
+        "label": "柑橘撞色",
+        "swatch": "#f97316",
+        "swatchGradient": "linear-gradient(135deg, #84cc16 0%, #f97316 60%, #ea580c 100%)",
+        "cssVars": {
+          "--primary":          "#f97316",
+          "--primary-200":      "#fde8cc",
+          "--primary-bg":       "linear-gradient(135deg, #fb923c 0%, #f97316 55%, #ea580c 100%)",
+          "--primary-hover-bg": "linear-gradient(135deg, #f97316 0%, #c2410c 100%)",
+          "--tabs-bg":          "linear-gradient(135deg, #a3e635 0%, #65a30d 100%)",
+          "--page-bg":          "#f1f5f9"
+        }
+      }
+    },
+    "addingNewTheme": "1. 在 src/stores/theme.ts 的 themes 陣列新增物件（id/label/swatch/vars）；漸層主題需加 swatchGradient。2. 在此 JSON 的 themeSystem.themes 補上對應 entry。純色主題：--primary-bg 等於 --primary；漸層主題：--primary 必須為純色代表值"
+  },
+  "auraTokenOverrides": {
+    "note": "僅列出與 Aura 預設值不同的 token；primary 相關值應於 runtime 透過 useThemeStore 動態覆寫，此處記錄預設主題（purple）的靜態初始值",
+    "primitive": {
+      "purple": {
+        "500": "#7008e7",
+        "200": "#c29ffa"
+      }
+    },
+    "semantic": {
+      "primary": {
+        "color":         "var(--primary)",
+        "contrastColor": "#ffffff",
+        "hoverColor":    "var(--primary-hover)",
+        "activeColor":   "var(--primary-hover)"
+      }
+    },
+    "component": {
+      "button": {
+        "primaryBackground":    "#7008e7",
+        "primaryBorderColor":   "#7008e7",
+        "primaryColor":         "#ffffff",
+        "outlinedPrimaryColor": "#7008e7",
+        "outlinedPrimaryBorderColor": "#c29ffa",
+        "borderRadius":         "6px",
+        "gap":                  "7px",
+        "lg": {
+          "paddingX": "13.25px",
+          "paddingY": "9.75px",
+          "fontSize": "15.75px"
+        },
+        "labelFontWeight": 500
+      },
+      "inputtext": {
+        "background":      "#ffffff",
+        "borderColor":     "#cbd5e1",
+        "color":           "#334155",
+        "placeholderColor":"#64748b",
+        "shadow":          "0px 1px 1px rgba(18,18,23,0.05)",
+        "paddingX":        "11.5px",
+        "paddingY":        "8px"
+      },
+      "inputnumber": {
+        "buttonBackground":   "transparent",
+        "buttonBorderColor":  "#cbd5e1",
+        "buttonBorderRadius": "6px"
+      },
+      "card": {
+        "background":    "#ffffff",
+        "borderRadius":  "12px",
+        "bodyGap":       "7px",
+        "shadow":        "0px 1px 3px rgba(0,0,0,0.1), 0px 1px 2px rgba(0,0,0,0.06)"
+      },
+      "divider": {
+        "borderColor":          "#e2e8f0",
+        "horizontalPadding":    "0px"
+      },
+      "tabs": {
+        "tabGap": "7px"
+      }
+    }
+  },
+  "typography": {
+    "note": "對應 Figma 自定義文字樣式，佈局時使用下方 Tailwind class",
+    "textStyles": {
+      "text-xs":          { "tailwind": "text-xs",               "fontSize": 12, "fontWeight": 400 },
+      "text-sm":          { "tailwind": "text-sm",               "fontSize": 14, "fontWeight": 400 },
+      "text-sm-medium":   { "tailwind": "text-sm font-medium",   "fontSize": 14, "fontWeight": 500 },
+      "text-sm-bold":     { "tailwind": "text-sm font-bold",     "fontSize": 14, "fontWeight": 700 },
+      "text-base":        { "tailwind": "text-base",             "fontSize": 16, "fontWeight": 400 },
+      "text-base-medium": { "tailwind": "text-base font-medium", "fontSize": 16, "fontWeight": 500 },
+      "text-base-bold":   { "tailwind": "text-base font-bold",   "fontSize": 16, "fontWeight": 700 },
+      "text-lg":          { "tailwind": "text-lg",               "fontSize": 18, "fontWeight": 400 },
+      "text-lg-medium":   { "tailwind": "text-lg font-medium",   "fontSize": 18, "fontWeight": 500 },
+      "text-lg-bold":     { "tailwind": "text-lg font-bold",     "fontSize": 18, "fontWeight": 700 }
+    },
+    "figmaSpecific": {
+      "product-title":       { "fontSize": 20, "fontWeight": 500, "color": "#020617", "lineClamp": 3 },
+      "section-heading":     { "fontSize": 20, "fontWeight": 700, "color": "#334155" },
+      "price-original":      { "fontSize": 16, "fontWeight": 400, "color": "#64748b", "textDecoration": "line-through" },
+      "price-sale":          { "fontSize": 24, "fontWeight": 500, "color": "#f43f5e" },
+      "announcement-body":   { "fontSize": 18, "fontWeight": 500, "color": "#334155" },
+      "banner-placeholder":  { "fontSize": 50, "fontWeight": 700, "color": "#ebedef" },
+      "tab-label":           { "fontSize": 14, "fontWeight": 700, "color": "#ffffff" },
+      "nav-link":            { "fontSize": 14, "fontWeight": 500, "color": "#334155" },
+      "nav-link-active":     { "fontSize": 16, "fontWeight": 500, "color": "#334155" }
+    }
+  },
+  "spacing": {
+    "note": "佈局使用 Tailwind spacing class，對應 Figma Tailwind collection（base unit = 4px）",
+    "tokens": {
+      "p-0":  { "tailwind": "p-0",  "value": 0  },
+      "p-px": { "tailwind": "p-px", "value": 1  },
+      "p-1":  { "tailwind": "p-1",  "value": 4  },
+      "p-2":  { "tailwind": "p-2",  "value": 8  },
+      "p-3":  { "tailwind": "p-3",  "value": 12 },
+      "p-4":  { "tailwind": "p-4",  "value": 16 },
+      "p-5":  { "tailwind": "p-5",  "value": 20 },
+      "p-6":  { "tailwind": "p-6",  "value": 24 },
+      "p-7":  { "tailwind": "p-7",  "value": 28 },
+      "p-8":  { "tailwind": "p-8",  "value": 32 },
+      "p-9":  { "tailwind": "p-9",  "value": 36 },
+      "p-12": { "tailwind": "p-12", "value": 48 },
+      "p-14": { "tailwind": "p-14", "value": 56 },
+      "p-20": { "tailwind": "p-20", "value": 80 }
+    }
+  },
+  "layout": {
+    "note": "頁面各區塊的尺寸規格，來源為 Figma node 10222:44554",
+    "page": {
+      "background":     "#f1f5f9",
+      "outerMaxWidth":  1440,
+      "innerMaxWidth":  1280,
+      "horizontalPadding": 32
+    },
+    "navbar": {
+      "background":       "#ffffff",
+      "borderBottom":     "1px solid #e5e5e5",
+      "paddingX":         32,
+      "paddingY":         16,
+      "searchBarWidth":   512,
+      "searchBarHeight":  42
+    },
+    "categoryTabs": {
+      "background":    "var(--primary)",
+      "height":        46,
+      "tabPaddingX":   "15.75px",
+      "tabPaddingY":   "11px"
+    },
+    "banner": {
+      "width":         1280,
+      "height":        480,
+      "borderRadius":  8,
+      "border":        "1px solid #e5e5e5"
+    },
+    "announcementSection": {
+      "cardBackground": "#ffffff",
+      "cardBorder":     "1px solid #e2e8f0",
+      "cardBorderRadius": 8,
+      "cardPaddingX":   32,
+      "cardPaddingY":   28
+    },
+    "themeBanner": {
+      "height":        245,
+      "background":    "var(--primary-200)",
+      "borderRadius":  8
+    },
+    "productCard": {
+      "width":         243,
+      "padding":       "17.5px",
+      "borderRadius":  12,
+      "gap":           7,
+      "imageAspectRatio": "332/320",
+      "imageBorderRadius": 8,
+      "infoPaddingX":  8,
+      "infoPaddingY":  8,
+      "titleHeight":   87,
+      "priceGap":      8,
+      "sectionGap":    16
+    },
+    "productRow": {
+      "columns":   5,
+      "gap":       16,
+      "rowGap":    16
+    }
+  }
+}

@@ -1,0 +1,66 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # FontAwesome Pro kit 需要私有 registry token；token 從 GitHub Secret 注入。
+      # 本地 .npmrc 不會 commit，CI 在這步動態建立。
+      - name: Write FontAwesome npm token
+        env:
+          FONTAWESOME_NPM_TOKEN: ${{ secrets.FONTAWESOME_NPM_TOKEN }}
+        run: |
+          if [ -z "$FONTAWESOME_NPM_TOKEN" ]; then
+            echo "::error::missing FONTAWESOME_NPM_TOKEN secret"
+            exit 1
+          fi
+          cat > .npmrc <<EOF
+          @awesome.me:registry=https://npm.fontawesome.com/
+          @fortawesome:registry=https://npm.fontawesome.com/
+          //npm.fontawesome.com/:_authToken=$FONTAWESOME_NPM_TOKEN
+          EOF
+
+      - run: pnpm install --ignore-workspace --frozen-lockfile
+
+      - run: pnpm build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

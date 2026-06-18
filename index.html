@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>直播管家商城</title>
+    <script>
+      // GitHub Pages SPA fallback（採 rafrex/spa-github-pages 方案）：
+      // 404.html 把原 URL 編成 query string（如 /?/lottery/draw/L001）後 redirect 回根；
+      // 這裡偵測到該 query 就 history.replaceState 還原成原 path，再交給 vue-router 接手。
+      ;(function (l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search
+            .slice(1)
+            .split('&')
+            .map(function (s) { return s.replace(/~and~/g, '&') })
+            .join('?')
+          window.history.replaceState(null, '', l.pathname.slice(0, -1) + decoded + l.hash)
+        }
+      })(window.location)
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
