@@ -1,18 +1,18 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import HomePage from '../views/HomePage.vue'
-import ThemeHallPage from '../views/ThemeHallPage.vue'
-import CategoryPage from '../views/CategoryPage.vue'
-import ProductDetailPage from '../views/ProductDetailPage.vue'
-import CartPage from '../views/CartPage.vue'
-import LoginPage from '../views/LoginPage.vue'
-import CheckoutPage from '../views/CheckoutPage.vue'
-import SearchPage from '../views/SearchPage.vue'
-import MemberCenterPage from '../views/MemberCenterPage.vue'
-import RegisterPage from '../views/RegisterPage.vue'
-import ForgotPasswordPage from '../views/ForgotPasswordPage.vue'
-import InfoPage from '../views/InfoPage.vue'
-import { useUiStore } from '../stores/ui'
-import { useAuthStore } from '../stores/auth'
+import { createRouter, createWebHistory } from 'vue-router';
+import HomePage from '../views/HomePage.vue';
+import ThemeHallPage from '../views/ThemeHallPage.vue';
+import CategoryPage from '../views/CategoryPage.vue';
+import ProductDetailPage from '../views/ProductDetailPage.vue';
+import CartPage from '../views/CartPage.vue';
+import LoginPage from '../views/LoginPage.vue';
+import CheckoutPage from '../views/CheckoutPage.vue';
+import SearchPage from '../views/SearchPage.vue';
+import MemberCenterPage from '../views/MemberCenterPage.vue';
+import RegisterPage from '../views/RegisterPage.vue';
+import ForgotPasswordPage from '../views/ForgotPasswordPage.vue';
+import InfoPage from '../views/InfoPage.vue';
+import { useUiStore } from '../pinia/ui';
+import { useAuthStore } from '../pinia/auth';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -34,29 +34,29 @@ const router = createRouter({
     { path: '/help', component: InfoPage },
   ],
   scrollBehavior() {
-    return { top: 0 }
+    return { top: 0 };
   },
-})
+});
 
 // 需登入才能進入的頁面
-const AUTH_REQUIRED = ['/cart', '/checkout']
+const AUTH_REQUIRED = ['/cart', '/checkout'];
 
 // 換頁 loading：切換路徑時顯示載入畫面
-let loadingTimer: ReturnType<typeof setTimeout> | null = null
+let loadingTimer: ReturnType<typeof setTimeout> | null = null;
 router.beforeEach((to, from) => {
   if (AUTH_REQUIRED.includes(to.path) && !useAuthStore().isLoggedIn) {
-    useUiStore().toast('請先登入會員')
-    return { path: '/login', query: { redirect: to.fullPath } }
+    useUiStore().toast('請先登入會員');
+    return { path: '/login', query: { redirect: to.fullPath } };
   }
   if (to.path !== from.path) {
-    if (loadingTimer) clearTimeout(loadingTimer)
-    useUiStore().setRouteLoading(true)
+    if (loadingTimer) clearTimeout(loadingTimer);
+    useUiStore().setRouteLoading(true);
   }
-  return true
-})
+  return true;
+});
 router.afterEach(() => {
-  if (loadingTimer) clearTimeout(loadingTimer)
-  loadingTimer = setTimeout(() => useUiStore().setRouteLoading(false), 500)
-})
+  if (loadingTimer) clearTimeout(loadingTimer);
+  loadingTimer = setTimeout(() => useUiStore().setRouteLoading(false), 500);
+});
 
-export default router
+export default router;

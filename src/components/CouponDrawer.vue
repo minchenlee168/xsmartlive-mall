@@ -1,28 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useViewportStore } from '../stores/viewport'
+import { computed } from 'vue';
+import { useViewportStore } from '../pinia/viewport';
 
-const visible = defineModel<boolean>('visible', { default: false })
+const visible = defineModel<boolean>('visible', { default: false });
 
-const viewportStore = useViewportStore()
-const isMobile = computed(() => viewportStore.current.id === 'mobile')
+const viewportStore = useViewportStore();
+const isMobile = computed(() => viewportStore.current.id === 'mobile');
 
 // 平板與電腦版固定 680px；手機符合 frame 寬度（自動 RWD 時 current.width=null → 100vw）
 const drawerWidth = computed(() => {
-  if (!isMobile.value) return '680px'
-  const w = viewportStore.current.width
-  return w ? `${w}px` : '100vw'
-})
+  if (!isMobile.value) return '680px';
+  const w = viewportStore.current.width;
+  return w ? `${w}px` : '100vw';
+});
 
 interface Coupon {
-  id: number
-  discount: string
-  name: string
-  description: string
-  tagText: string
-  tagType: 'danger' | 'info' | 'secondary'
-  expiry: string
-  disabled?: boolean
+  id: number;
+  discount: string;
+  name: string;
+  description: string;
+  tagText: string;
+  tagType: 'danger' | 'info' | 'secondary';
+  expiry: string;
+  disabled?: boolean;
 }
 
 const coupons: Coupon[] = [
@@ -53,48 +53,79 @@ const coupons: Coupon[] = [
     tagType: 'secondary',
     expiry: '有效期限至 2026.01.20 23:00',
   },
-]
+];
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="drawer-fade">
-      <div v-if="visible" class="coupon-drawer-backdrop" @click="visible = false" />
+      <div
+        v-if="visible"
+        class="coupon-drawer-backdrop"
+        @click="visible = false"
+      />
     </Transition>
     <Transition name="drawer-slide">
-      <div v-if="visible" class="coupon-drawer-panel" :style="{ width: drawerWidth, maxWidth: '100vw' }">
+      <div
+        v-if="visible"
+        class="coupon-drawer-panel"
+        :style="{ width: drawerWidth, maxWidth: '100vw' }"
+      >
         <!-- Header -->
-        <div class="flex items-center justify-between px-4 py-3 border-b border-[#e2e8f0] sticky top-0 bg-white z-10">
-          <span class="font-bold text-[16px] text-[#020617]">可使用優惠券</span>
-          <button class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#f1f5f9]" @click="visible = false">
-            <i class="pi pi-times text-[14px] text-[#64748b]" />
+        <div
+          class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3"
+        >
+          <span class="text-base font-bold text-slate-950">可使用優惠券</span>
+          <button
+            class="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100"
+            @click="visible = false"
+          >
+            <i class="pi pi-times text-sm text-slate-500" />
           </button>
         </div>
 
         <!-- Coupon list -->
-        <div class="px-4 py-4 max-w-[680px] mx-auto flex flex-col gap-3">
+        <div class="mx-auto flex max-w-[680px] flex-col gap-3 px-4 py-4">
           <div
             v-for="coupon in coupons"
             :key="coupon.id"
-            class="flex border border-[#e2e8f0] rounded-[10px]"
+            class="flex rounded-[10px] border border-slate-200"
           >
             <div
-              class="shrink-0 flex items-center justify-center rounded-l-[10px] bg-[#ede9fe]"
-              :class="isMobile ? 'w-[76px] gap-1 px-2 py-3' : 'w-[140px] gap-2 px-3 py-4'"
+              class="flex shrink-0 items-center justify-center rounded-l-[10px] bg-[#ede9fe]"
+              :class="
+                isMobile
+                  ? 'w-[76px] gap-1 px-2 py-3'
+                  : 'w-[140px] gap-2 px-3 py-4'
+              "
             >
-              <i v-if="!isMobile" class="pi pi-gift text-[22px]" style="color: var(--primary)" />
+              <i
+                v-if="!isMobile"
+                class="pi pi-gift text-xl"
+                style="color: var(--primary)"
+              />
               <span
                 class="font-bold"
-                :class="isMobile ? 'text-[18px]' : 'text-[24px]'"
+                :class="isMobile ? 'text-lg' : 'text-2xl'"
                 style="color: var(--primary)"
-              >{{ coupon.discount }}</span>
+                >{{ coupon.discount }}</span
+              >
             </div>
 
-            <div class="flex-1 min-w-0 flex flex-col gap-1" :class="isMobile ? 'px-3 py-3' : 'px-4 py-4'">
-              <p class="font-medium text-[15px] text-[#334155]">{{ coupon.name }}</p>
-              <p class="text-[13px] text-[#475569]">{{ coupon.description }}</p>
-              <span class="self-start px-2 py-0.5 rounded text-[12px] break-words" style="background: #fce7f3; color: #be185d">{{ coupon.tagText }}</span>
-              <p class="text-[12px] text-[#64748b] mt-1">{{ coupon.expiry }}</p>
+            <div
+              class="flex min-w-0 flex-1 flex-col gap-1"
+              :class="isMobile ? 'px-3 py-3' : 'px-4 py-4'"
+            >
+              <p class="text-base font-medium text-slate-700">
+                {{ coupon.name }}
+              </p>
+              <p class="text-sm text-slate-600">{{ coupon.description }}</p>
+              <span
+                class="self-start rounded px-2 py-0.5 text-xs break-words"
+                style="background: #fce7f3; color: #be185d"
+                >{{ coupon.tagText }}</span
+              >
+              <p class="mt-1 text-xs text-slate-500">{{ coupon.expiry }}</p>
             </div>
           </div>
         </div>

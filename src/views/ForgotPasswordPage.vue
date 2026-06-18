@@ -1,249 +1,305 @@
 <script setup lang="ts">
-import { ref, computed, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUiStore } from '../stores/ui'
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useUiStore } from '../pinia/ui';
+import { useCountdown } from '../composables/useCountdown';
 
-const router = useRouter()
-const ui = useUiStore()
+type Step = 'phone' | 'verify' | 'reset' | 'success';
 
-type Step = 'phone' | 'verify' | 'reset' | 'success'
-const step = ref<Step>('phone')
+const COUNTRY_CODES = ['+886', '+852'];
+const RESEND_COOLDOWN_SEC = 60;
+const OTP_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 8;
 
-const countryCodes = ['+886', '+852']
-const countryCode = ref('+886')
-const phone = ref('')
-const code = ref('')
-const newPassword = ref('')
-const confirmPassword = ref('')
+const router = useRouter();
+const ui = useUiStore();
 
-const canSend = computed(() => !!phone.value)
-const canVerify = computed(() => code.value.length === 6)
+const step = ref<Step>('phone');
+const countryCode = ref('+886');
+const phone = ref('');
+const code = ref('');
+const newPassword = ref('');
+const confirmPassword = ref('');
+
+const {
+  remaining: resendCountdown,
+  start: startResendCountdown,
+  reset: resetResendCountdown,
+} = useCountdown();
+
+const canSend = computed(() => !!phone.value);
+const canVerify = computed(() => code.value.length === OTP_LENGTH);
 /** 強密碼：>= 8 碼且同時包含英文字母與數字；兩次輸入需一致。 */
-const isStrongPassword = computed(() =>
-  newPassword.value.length >= 8
-  && /[A-Za-z]/.test(newPassword.value)
-  && /\d/.test(newPassword.value),
-)
-const canReset = computed(() =>
-  isStrongPassword.value && newPassword.value === confirmPassword.value,
-)
-
-/** 重新獲取倒數秒數；> 0 時連結 disabled。 */
-const resendCountdown = ref(0)
-let countdownTimer: ReturnType<typeof setInterval> | null = null
-function startCountdown(): void {
-  resendCountdown.value = 60
-  if (countdownTimer) clearInterval(countdownTimer)
-  countdownTimer = setInterval(() => {
-    resendCountdown.value -= 1
-    if (resendCountdown.value <= 0 && countdownTimer) {
-      clearInterval(countdownTimer)
-      countdownTimer = null
-    }
-  }, 1000)
-}
-onBeforeUnmount(() => { if (countdownTimer) clearInterval(countdownTimer) })
-
+const isStrongPassword = computed(
+  () =>
+    newPassword.value.length >= MIN_PASSWORD_LENGTH &&
+    /[A-Za-z]/.test(newPassword.value) &&
+    /\d/.test(newPassword.value),
+);
+const canReset = computed(
+  () => isStrongPassword.value && newPassword.value === confirmPassword.value,
+);
+const hasPasswordMismatch = computed(
+  () => !!confirmPassword.value && confirmPassword.value !== newPassword.value,
+);
 /** 0912345678 → 0912***678 */
 const maskedPhone = computed(() => {
-  const p = phone.value
-  if (p.length < 7) return p
-  return `${p.slice(0, 4)}***${p.slice(-3)}`
-})
+  const value = phone.value;
+  if (value.length < 7) return value;
+  return `${value.slice(0, 4)}***${value.slice(-3)}`;
+});
 
-function sendCode(): void {
-  if (!canSend.value) return
-  step.value = 'verify'
-  code.value = ''
-  startCountdown()
-  ui.toast('驗證碼已發送（示意）')
-}
-function resendCode(): void {
-  if (resendCountdown.value > 0) return
-  code.value = ''
-  startCountdown()
-  ui.toast('已重新發送驗證碼（示意）')
-}
-function verifyCode(): void {
-  if (!canVerify.value) return
-  step.value = 'reset'
-  ui.toast('驗證成功，請設定新密碼')
-}
-function backToPhone(): void {
-  step.value = 'phone'
-  code.value = ''
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
-  resendCountdown.value = 0
-}
-function resetPassword(): void {
-  if (!canReset.value) return
-  step.value = 'success'
-}
+const handleSendCode = () => {
+  if (!canSend.value) return;
+  step.value = 'verify';
+  code.value = '';
+  startResendCountdown(RESEND_COOLDOWN_SEC);
+  ui.toast('驗證碼已發送（示意）');
+};
+
+const handleResendCode = () => {
+  if (resendCountdown.value > 0) return;
+  code.value = '';
+  startResendCountdown(RESEND_COOLDOWN_SEC);
+  ui.toast('已重新發送驗證碼（示意）');
+};
+
+const handleVerifyCode = () => {
+  if (!canVerify.value) return;
+  step.value = 'reset';
+  ui.toast('驗證成功，請設定新密碼');
+};
+
+const handleBackToPhone = () => {
+  step.value = 'phone';
+  code.value = '';
+  resetResendCountdown();
+};
+
+const handleResetPassword = () => {
+  if (!canReset.value) return;
+  step.value = 'success';
+};
+
 /** 「立即登入」按鈕：成功畫面導回登入。 */
-function goToLogin(): void {
-  router.push('/login')
-}
+const handleGoToLogin = () => {
+  router.push('/login');
+};
 </script>
 
 <template>
-  <div class="min-h-screen relative overflow-hidden" style="background: var(--surface-100)">
-    <header class="relative z-10 bg-white border-b border-[var(--border-light)]">
-      <div class="max-w-[1280px] mx-auto flex items-center justify-between px-8 py-2 h-14">
-        <button class="flex items-center gap-2 shrink-0" @click="router.push('/shop')">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--primary-bg)">
-            <span class="text-white font-bold text-base">X</span>
+  <div
+    class="relative min-h-screen overflow-hidden"
+    style="background: var(--surface-100)"
+  >
+    <header
+      class="relative z-10 border-b border-[var(--border-light)] bg-white"
+    >
+      <div
+        class="mx-auto flex h-14 max-w-7xl items-center justify-between px-8 py-2"
+      >
+        <button
+          class="flex shrink-0 items-center gap-2"
+          @click="router.push('/shop')"
+        >
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-lg"
+            style="background: var(--primary-bg)"
+          >
+            <span class="text-base font-bold text-white">X</span>
           </div>
-          <span class="font-bold text-xl leading-tight" style="color: var(--primary)">
+          <span
+            class="text-xl leading-tight font-bold"
+            style="color: var(--primary)"
+          >
             <span class="opacity-90">xSmart</span><span>Live</span>
           </span>
         </button>
-        <Button label="返回登入" severity="secondary" text @click="router.push('/login')" />
+        <Button
+          label="返回登入"
+          severity="secondary"
+          text
+          @click="router.push('/login')"
+        />
       </div>
     </header>
 
-    <main class="relative z-10 px-4 py-12 flex justify-center">
-      <div class="bg-white rounded-2xl p-8 w-full max-w-[520px] flex flex-col gap-5"
-           style="box-shadow: 0 2px 6px rgba(0,0,0,0.15)">
-
+    <main class="relative z-10 flex justify-center px-4 py-12">
+      <div
+        class="flex w-full max-w-[520px] flex-col gap-5 rounded-2xl bg-white p-8"
+        style="box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15)"
+      >
         <!-- Step 1: 輸入手機號碼 -->
         <template v-if="step === 'phone'">
-          <div class="text-center flex flex-col gap-2">
-            <h2 class="text-[28px] font-bold" style="color: var(--surface-950)">忘記密碼</h2>
+          <div class="flex flex-col gap-2 text-center">
+            <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
+              忘記密碼
+            </h2>
             <p class="text-base" style="color: var(--text-muted)">
               請輸入您註冊時使用的手機號碼，我們將為您發送驗證碼。
             </p>
           </div>
 
-          <div class="flex gap-3">
-            <div class="flex flex-col gap-1.5 w-[120px] shrink-0">
-              <label class="text-sm font-medium" style="color: var(--surface-700)">國碼</label>
-              <Select v-model="countryCode" :options="countryCodes" class="w-full" />
+          <div
+            class="flex gap-3 text-sm font-medium"
+            style="color: var(--surface-700)"
+          >
+            <div class="flex w-[120px] shrink-0 flex-col gap-1.5">
+              <label>國碼</label>
+              <Select
+                v-model="countryCode"
+                :options="COUNTRY_CODES"
+                class="w-full"
+              />
             </div>
-            <div class="flex flex-col gap-1.5 flex-1 min-w-0">
-              <label class="text-sm font-medium" style="color: var(--surface-700)">電話號碼</label>
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <label>電話號碼</label>
               <IconField icon-position="right" class="w-full">
-                <InputIcon><i class="pi pi-phone" style="color: var(--text-muted)" /></InputIcon>
-                <InputText v-model="phone" type="tel" placeholder="請輸入您的電話號碼" class="w-full" />
+                <InputIcon
+                  ><i class="pi pi-phone" style="color: var(--text-muted)"
+                /></InputIcon>
+                <InputText
+                  v-model="phone"
+                  type="tel"
+                  placeholder="請輸入您的電話號碼"
+                  class="w-full"
+                />
               </IconField>
             </div>
           </div>
 
-          <button
+          <Button
+            label="發送驗證碼"
             :disabled="!canSend"
-            class="w-full min-h-[52px] rounded-xl font-bold text-white text-base transition-opacity disabled:opacity-50"
-            :style="{ background: 'var(--primary-bg)' }"
-            @click="sendCode"
-          >發送驗證碼</button>
+            class="!min-h-13 w-full"
+            @click="handleSendCode"
+          />
 
           <div class="text-center">
-            <button
-              class="text-base font-medium underline underline-offset-4"
-              style="color: var(--primary)"
+            <Button
+              label="返回登入"
+              severity="primary"
+              text
+              class="!font-medium underline underline-offset-4"
               @click="router.push('/login')"
-            >返回登入</button>
+            />
           </div>
         </template>
 
         <!-- Step 2: 驗證身份（OTP） -->
         <template v-else-if="step === 'verify'">
-          <div class="text-center flex flex-col gap-2">
-            <h2 class="text-[28px] font-bold" style="color: var(--surface-950)">驗證身份</h2>
+          <div class="flex flex-col gap-2 text-center">
+            <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
+              驗證身份
+            </h2>
             <p class="text-base" style="color: var(--text-muted)">
               驗證碼已發送至 {{ maskedPhone }}
             </p>
           </div>
 
           <div class="flex justify-center">
-            <InputOtp v-model="code" :length="6" :pt="{ input: { class: '!w-[48px] !h-[56px] !text-[20px] !font-bold' } }" />
+            <InputOtp
+              v-model="code"
+              :length="OTP_LENGTH"
+              :pt="{ input: { class: '!w-12 !h-14 !text-xl !font-bold' } }"
+            />
           </div>
 
           <div class="text-center text-sm" style="color: var(--text-muted)">
             沒有收到驗證碼？
-            <button
-              class="font-medium underline underline-offset-4 disabled:no-underline disabled:opacity-60"
+            <Button
+              :label="`重新獲取${resendCountdown > 0 ? ` (${resendCountdown}s)` : ''}`"
               :disabled="resendCountdown > 0"
-              :style="{ color: 'var(--primary)' }"
-              @click="resendCode"
-            >
-              重新獲取{{ resendCountdown > 0 ? ` (${resendCountdown}s)` : '' }}
-            </button>
+              severity="primary"
+              text
+              class="!font-medium underline underline-offset-4"
+              @click="handleResendCode"
+            />
           </div>
 
-          <button
+          <Button
+            label="確認驗證"
             :disabled="!canVerify"
-            class="w-full min-h-[52px] rounded-xl font-bold text-white text-base transition-opacity disabled:opacity-50"
-            :style="{ background: 'var(--primary-bg)' }"
-            @click="verifyCode"
-          >確認驗證</button>
+            class="!min-h-13 w-full"
+            @click="handleVerifyCode"
+          />
 
           <div class="text-center">
-            <button
-              class="text-base font-medium underline underline-offset-4"
-              style="color: var(--surface-700)"
-              @click="backToPhone"
-            >修改電話號碼</button>
+            <Button
+              label="修改電話號碼"
+              severity="secondary"
+              text
+              class="!font-medium underline underline-offset-4"
+              @click="handleBackToPhone"
+            />
           </div>
         </template>
 
         <!-- Step 3: 設定新密碼 -->
         <template v-else-if="step === 'reset'">
-          <div class="text-center flex flex-col gap-2">
-            <h2 class="text-[28px] font-bold" style="color: var(--surface-950)">設定新密碼</h2>
+          <div class="flex flex-col gap-2 text-center">
+            <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
+              設定新密碼
+            </h2>
             <p class="text-base" style="color: var(--text-muted)">
               為了您的帳戶安全，請設置一個包含英文與數字的強密碼。
             </p>
           </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium" style="color: var(--surface-700)">新密碼</label>
-            <Password
-              v-model="newPassword"
-              :feedback="false"
-              toggle-mask
-              placeholder="請輸入新密碼"
-              fluid
-              input-class="w-full"
-            />
+
+          <div
+            class="flex flex-col gap-4 text-sm font-medium"
+            style="color: var(--surface-700)"
+          >
+            <div class="flex flex-col gap-1.5">
+              <label>新密碼</label>
+              <Password
+                v-model="newPassword"
+                :feedback="false"
+                toggle-mask
+                placeholder="請輸入新密碼"
+                fluid
+                input-class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label>確認新密碼</label>
+              <Password
+                v-model="confirmPassword"
+                :feedback="false"
+                toggle-mask
+                placeholder="請再次輸入新密碼"
+                fluid
+                input-class="w-full"
+              />
+              <p v-if="hasPasswordMismatch" class="text-xs text-red-500">
+                兩次輸入的密碼不一致
+              </p>
+            </div>
           </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium" style="color: var(--surface-700)">確認新密碼</label>
-            <Password
-              v-model="confirmPassword"
-              :feedback="false"
-              toggle-mask
-              placeholder="請再次輸入新密碼"
-              fluid
-              input-class="w-full"
-            />
-            <p
-              v-if="confirmPassword && confirmPassword !== newPassword"
-              class="text-xs font-medium"
-              style="color: #ef4444"
-            >兩次輸入的密碼不一致</p>
-          </div>
-          <button
+
+          <Button
+            label="確認儲存"
             :disabled="!canReset"
-            class="w-full min-h-[52px] rounded-xl font-bold text-white text-base transition-opacity disabled:opacity-50"
-            :style="{ background: 'var(--primary-bg)' }"
-            @click="resetPassword"
-          >確認儲存</button>
+            class="!min-h-13 w-full"
+            @click="handleResetPassword"
+          />
         </template>
 
         <!-- Step 4: 密碼重設成功 -->
         <template v-else>
-          <div class="text-center flex flex-col gap-2">
-            <h2 class="text-[28px] font-bold" style="color: var(--surface-950)">密碼重設成功！</h2>
+          <div class="flex flex-col gap-2 text-center">
+            <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
+              密碼重設成功！
+            </h2>
             <p class="text-base" style="color: var(--text-muted)">
               您的密碼已更新，現在您可以使用新密碼登入帳戶。
             </p>
           </div>
-          <button
-            class="w-full min-h-[52px] rounded-xl font-bold text-white text-base transition-opacity"
-            :style="{ background: 'var(--primary-bg)' }"
-            @click="goToLogin"
-          >立即登入</button>
+          <Button
+            label="立即登入"
+            class="!min-h-13 w-full"
+            @click="handleGoToLogin"
+          />
         </template>
       </div>
     </main>

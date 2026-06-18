@@ -1,27 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-import ProductCard from './ProductCard.vue'
-import { useViewportStore } from '../stores/viewport'
-import { products } from '../data/products'
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import ProductCard from './ProductCard.vue';
+import { useViewportStore } from '../pinia/viewport';
+import { products } from '../data/products';
 
 defineProps<{
   /** 簡易版商品卡：不顯示數量選擇器與「還剩X件」 */
-  simple?: boolean
-}>()
+  simple?: boolean;
+}>();
 
-const router = useRouter()
+const router = useRouter();
 
-const vp = computed(() => useViewportStore().current.id)
+const vp = computed(() => useViewportStore().current.id);
 const gridCols = computed(() => ({
   'grid-cols-2': vp.value === 'mobile',
   'grid-cols-3': vp.value === 'tablet',
   'grid-cols-5': vp.value === 'pc',
-}))
+}));
 
-const MAX_DISPLAY = 10
-const displayProducts = products.slice(0, MAX_DISPLAY)
-const hasMore = products.length > MAX_DISPLAY
+const MAX_DISPLAY = 10;
+const displayProducts = products.slice(0, MAX_DISPLAY);
+const hasMore = products.length > MAX_DISPLAY;
 </script>
 
 <template>

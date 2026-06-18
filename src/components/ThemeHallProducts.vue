@@ -1,61 +1,63 @@
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
-import ProductCard from './ProductCard.vue'
-import { useViewportStore } from '../stores/viewport'
-import { products } from '../data/products'
+import { computed, ref, watch, onBeforeUnmount } from 'vue';
+import ProductCard from './ProductCard.vue';
+import { useViewportStore } from '../pinia/viewport';
+import { products } from '../data/products';
 
 const props = defineProps<{
   /** 後台開啟輪播功能 → 商品自動輪播（固定時間）；否則僅手動左右切換 */
-  autoplay?: boolean
+  autoplay?: boolean;
   /** 精簡商品卡：不顯示數量選擇器與「還剩X件」 */
-  simple?: boolean
-}>()
+  simple?: boolean;
+}>();
 
-const vp = computed(() => useViewportStore().current.id)
+const vp = computed(() => useViewportStore().current.id);
 // 一排顯示張數（PC 5 / 平板 3 / 手機 2）；商品共 10 個，超過可顯示數即用左右箭頭切換
-const perView = computed(() => (vp.value === 'mobile' ? 2 : vp.value === 'tablet' ? 3 : 5))
-const items = products.slice(0, 10)
+const perView = computed(() =>
+  vp.value === 'mobile' ? 2 : vp.value === 'tablet' ? 3 : 5,
+);
+const items = products.slice(0, 10);
 
 // 手機改用 horizontal scroll（隱藏左右切換鈕），平板 / PC 維持 Carousel。
-const isMobile = computed(() => vp.value === 'mobile')
+const isMobile = computed(() => vp.value === 'mobile');
 
 // ── 手機版自動輪播：autoplay 為 true 時定時 scrollBy 一張卡寬，到底回頭 ──
-const scrollerRef = ref<HTMLElement | null>(null)
-let autoplayTimer: ReturnType<typeof setInterval> | null = null
+const scrollerRef = ref<HTMLElement | null>(null);
+let autoplayTimer: ReturnType<typeof setInterval> | null = null;
 
-function stopAutoplay(): void {
+const stopAutoplay = (): void => {
   if (autoplayTimer) {
-    clearInterval(autoplayTimer)
-    autoplayTimer = null
+    clearInterval(autoplayTimer);
+    autoplayTimer = null;
   }
-}
+};
 
-function startAutoplay(): void {
-  stopAutoplay()
+const startAutoplay = (): void => {
+  stopAutoplay();
   autoplayTimer = setInterval(() => {
-    const el = scrollerRef.value
-    if (!el) return
+    const el = scrollerRef.value;
+    if (!el) return;
     // 卡寬：45% × scroller width + gap-3 (12px)
-    const step = el.clientWidth * 0.45 + 12
+    const step = el.clientWidth * 0.45 + 12;
     // 接近底部 → 平滑回到 0
     if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 8) {
-      el.scrollTo({ left: 0, behavior: 'smooth' })
+      el.scrollTo({ left: 0, behavior: 'smooth' });
     } else {
-      el.scrollBy({ left: step, behavior: 'smooth' })
+      el.scrollBy({ left: step, behavior: 'smooth' });
     }
-  }, 3000)
-}
+  }, 3000);
+};
 
 watch(
   () => [isMobile.value, props.autoplay] as const,
   ([mob, auto]) => {
-    if (mob && auto) startAutoplay()
-    else stopAutoplay()
+    if (mob && auto) startAutoplay();
+    else stopAutoplay();
   },
   { immediate: true },
-)
+);
 
-onBeforeUnmount(stopAutoplay)
+onBeforeUnmount(stopAutoplay);
 </script>
 
 <template>
@@ -63,7 +65,7 @@ onBeforeUnmount(stopAutoplay)
   <div
     v-if="isMobile"
     ref="scrollerRef"
-    class="flex overflow-x-auto gap-3 px-1 pb-2 snap-x snap-mandatory hide-scrollbar"
+    class="hide-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2"
   >
     <div
       v-for="data in items"
@@ -95,7 +97,7 @@ onBeforeUnmount(stopAutoplay)
     :autoplay-interval="props.autoplay ? 3000 : undefined"
   >
     <template #item="{ data }">
-      <div class="px-2 h-full">
+      <div class="h-full px-2">
         <ProductCard
           :id="data.id"
           :name="data.name"
@@ -128,7 +130,10 @@ onBeforeUnmount(stopAutoplay)
   border: 1px solid #e2e8f0;
   color: var(--primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    box-shadow 0.2s;
 }
 :deep(.p-carousel-prev-button:hover),
 :deep(.p-carousel-next-button:hover) {

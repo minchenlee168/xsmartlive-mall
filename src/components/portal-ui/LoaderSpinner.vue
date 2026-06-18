@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import logoMark from '@/assets/logo-mark.svg'
+import { computed } from 'vue';
+import logoMark from '@/assets/logo-mark.svg';
 
 /**
  * 後台 loading 動畫：使用品牌 logo-mark 配合 Y 軸翻轉動畫。
  * 取代原本 12 條 bar 的 spinner，讓 loading 視覺有品牌感。
  */
 const props = defineProps<{
-  size?: string | number
-}>()
+  size?: string | number;
+}>();
 
-const DEFAULT_SIZE = '48px'
+const DEFAULT_SIZE = '48px';
 const sizeValue = computed(() =>
-  typeof props.size === 'number' ? `${props.size}px` : props.size || DEFAULT_SIZE,
-)
+  typeof props.size === 'number'
+    ? `${props.size}px`
+    : props.size || DEFAULT_SIZE,
+);
 </script>
 
 <template>
@@ -24,7 +26,7 @@ const sizeValue = computed(() =>
     <img
       :src="logoMark"
       alt="loading"
-      class="loader-logo block select-none pointer-events-none"
+      class="loader-logo pointer-events-none block select-none"
       :style="{ width: sizeValue, height: sizeValue }"
     />
   </div>

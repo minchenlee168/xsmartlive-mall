@@ -1,104 +1,128 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import { useUiStore } from '../stores/ui'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '../pinia/auth';
+import { useUiStore } from '../pinia/ui';
 
 declare global {
   interface Window {
     grecaptcha?: {
-      render: (el: HTMLElement, opts: Record<string, unknown>) => number
-      reset: (id?: number) => void
-      ready: (cb: () => void) => void
-    }
-    __recaptchaOnLoad?: () => void
+      render: (el: HTMLElement, opts: Record<string, unknown>) => number;
+      reset: (id?: number) => void;
+      ready: (cb: () => void) => void;
+    };
+    __recaptchaOnLoad?: () => void;
   }
 }
 
 // Google's official test sitekey — replace with your real key in production.
-// Docs: https://developers.google.com/recaptcha/docs/faq#id-like-to-run-automated-tests-with-recaptcha
-const RECAPTCHA_SITEKEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
-const RECAPTCHA_SCRIPT_ID = 'recaptcha-v2-script'
+const RECAPTCHA_SITEKEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+const RECAPTCHA_SCRIPT_ID = 'recaptcha-v2-script';
+const COUNTRY_CODES = ['+886', '+852', '+853', '+86'];
 
-const router = useRouter()
-const route = useRoute()
-const auth = useAuthStore()
-const ui = useUiStore()
+const router = useRouter();
+const route = useRoute();
+const auth = useAuthStore();
+const ui = useUiStore();
 
-// 登入成功後導向的目的地（由 redirect query 指定，預設首頁）
-const redirectTo = () => (route.query.redirect as string) || '/shop'
+const countryCode = ref('+886');
+const phone = ref('');
+const password = ref('');
+const captchaToken = ref('');
+const isAgreed = ref(false);
+const isSubmitted = ref(false);
 
-function socialLogin(provider: string) {
-  auth.login()
-  ui.toast(`已使用 ${provider} 登入`)
-  router.push(redirectTo())
-}
+const recaptchaContainer = ref<HTMLElement | null>(null);
+let widgetId: number | null = null;
 
-const countryCodes = ['+886', '+852', '+853', '+86']
-const countryCode = ref('+886')
-const phone = ref('')
-const password = ref('')
-const captchaToken = ref('')
-const agreed = ref(false)
-const submitted = ref(false)
+const canSubmit = computed(
+  () =>
+    isAgreed.value && !!phone.value && !!password.value && !!captchaToken.value,
+);
+const redirectTo = computed(() => (route.query.redirect as string) || '/shop');
 
-const recaptchaContainer = ref<HTMLElement | null>(null)
-let widgetId: number | null = null
-
-const canSubmit = computed(() => agreed.value && !!phone.value && !!password.value && !!captchaToken.value)
-
-function renderWidget() {
-  if (!window.grecaptcha || !recaptchaContainer.value || widgetId !== null) return
+const renderWidget = () => {
+  if (!window.grecaptcha || !recaptchaContainer.value || widgetId !== null)
+    return;
   widgetId = window.grecaptcha.render(recaptchaContainer.value, {
     sitekey: RECAPTCHA_SITEKEY,
-    callback: (token: string) => { captchaToken.value = token },
-    'expired-callback': () => { captchaToken.value = '' },
-    'error-callback': () => { captchaToken.value = '' },
-  })
-}
+    callback: (token: string) => {
+      captchaToken.value = token;
+    },
+    'expired-callback': () => {
+      captchaToken.value = '';
+    },
+    'error-callback': () => {
+      captchaToken.value = '';
+    },
+  });
+};
+
+const handleSocialLogin = (provider: string) => {
+  auth.login();
+  ui.toast(`已使用 ${provider} 登入`);
+  router.push(redirectTo.value);
+};
+
+const handleSubmit = () => {
+  isSubmitted.value = true;
+  if (!canSubmit.value) return;
+  auth.login();
+  router.push(redirectTo.value);
+};
 
 onMounted(() => {
   if (window.grecaptcha?.render) {
-    window.grecaptcha.ready(renderWidget)
-    return
+    window.grecaptcha.ready(renderWidget);
+    return;
   }
-  window.__recaptchaOnLoad = () => window.grecaptcha?.ready(renderWidget)
+  window.__recaptchaOnLoad = () => window.grecaptcha?.ready(renderWidget);
   if (!document.getElementById(RECAPTCHA_SCRIPT_ID)) {
-    const s = document.createElement('script')
-    s.id = RECAPTCHA_SCRIPT_ID
-    s.src = 'https://www.google.com/recaptcha/api.js?onload=__recaptchaOnLoad&render=explicit'
-    s.async = true
-    s.defer = true
-    document.head.appendChild(s)
+    const script = document.createElement('script');
+    script.id = RECAPTCHA_SCRIPT_ID;
+    script.src =
+      'https://www.google.com/recaptcha/api.js?onload=__recaptchaOnLoad&render=explicit';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
   }
-})
+});
 
 onBeforeUnmount(() => {
-  if (widgetId !== null && window.grecaptcha) window.grecaptcha.reset(widgetId)
-  delete window.__recaptchaOnLoad
-})
-
-function onSubmit() {
-  submitted.value = true
-  if (!canSubmit.value) return
-  auth.login()
-  router.push(redirectTo())
-}
+  if (widgetId !== null && window.grecaptcha) window.grecaptcha.reset(widgetId);
+  delete window.__recaptchaOnLoad;
+});
 </script>
 
 <template>
-  <div class="min-h-screen relative overflow-hidden" style="background: var(--surface-100)">
+  <div
+    class="relative min-h-screen overflow-hidden"
+    style="background: var(--surface-100)"
+  >
     <!-- Decorative background blob -->
     <div class="login-bg" aria-hidden="true"></div>
 
     <!-- Top bar -->
-    <header class="relative z-10 bg-white border-b border-[var(--border-light)]">
-      <div class="max-w-[1280px] mx-auto flex items-center justify-between px-8 py-2 h-14">
-        <button class="flex items-center gap-2 shrink-0" @click="router.push('/shop')">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--primary-bg)">
-            <span class="text-white font-bold text-base">X</span>
+    <header
+      class="relative z-10 border-b border-[var(--border-light)] bg-white"
+    >
+      <div
+        class="mx-auto flex h-14 max-w-7xl items-center justify-between px-8 py-2"
+      >
+        <button
+          class="flex shrink-0 items-center gap-2"
+          @click="router.push('/shop')"
+        >
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-lg"
+            style="background: var(--primary-bg)"
+          >
+            <span class="text-base font-bold text-white">X</span>
           </div>
-          <span class="font-bold text-xl leading-tight" style="color: var(--primary)">
+          <span
+            class="text-xl leading-tight font-bold"
+            style="color: var(--primary)"
+          >
             <span class="opacity-90">xSmart</span><span>Live</span>
           </span>
         </button>
@@ -116,41 +140,64 @@ function onSubmit() {
 
     <!-- Main content -->
     <main class="relative z-10 px-4 py-12">
-      <div class="max-w-[1280px] mx-auto flex flex-col @lg:flex-row items-center justify-center gap-12 @4xl:gap-28">
+      <div
+        class="mx-auto flex max-w-7xl flex-col items-center justify-center gap-12 @3xl:flex-row @4xl:gap-28"
+      >
         <!-- Left: welcome + illustration -->
-        <div class="flex flex-col items-center gap-10 shrink-0">
-          <h1 class="text-[24px] @3xl:text-[26px] @4xl:text-[36px] font-bold text-center leading-tight whitespace-nowrap" style="color: var(--surface-950)">
-            歡迎光臨！<br>直播好康等你來逛
+        <div class="flex shrink-0 flex-col items-center gap-10">
+          <h1
+            class="text-center text-2xl leading-tight font-bold whitespace-nowrap @3xl:text-3xl @4xl:text-4xl"
+            style="color: var(--surface-950)"
+          >
+            歡迎光臨！<br />直播好康等你來逛
           </h1>
           <img
             src="/login-illustration.png"
             alt="直播購物插圖"
-            class="hidden @3xl:block @3xl:w-[200px] @4xl:w-[476px] max-w-full h-auto select-none pointer-events-none"
+            class="pointer-events-none hidden h-auto max-w-full select-none @3xl:block @3xl:w-[200px] @4xl:w-[476px]"
             draggable="false"
           />
         </div>
 
         <!-- Right: login card -->
-        <div class="bg-white rounded-2xl p-6 w-full max-w-[440px] flex flex-col gap-4 items-center"
-             style="box-shadow: 0 2px 6px rgba(0,0,0,0.15)">
-          <h2 class="text-[28px] font-bold text-center" style="color: var(--surface-950)">登入</h2>
+        <div
+          class="flex w-full max-w-[440px] flex-col items-center gap-4 rounded-2xl bg-white p-6"
+          style="box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15)"
+        >
+          <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
+            登入
+          </h2>
 
-          <form class="w-full flex flex-col gap-4" @submit.prevent="onSubmit">
+          <!-- Form 父層統一 label / 文字基準（PrimeVue 元件內部不受繼承，會自行套用 size） -->
+          <form
+            class="flex w-full flex-col gap-4 text-base"
+            style="color: var(--surface-700)"
+            @submit.prevent="handleSubmit"
+          >
             <!-- Country code + phone -->
-            <div class="flex gap-2 items-start">
-              <div class="flex flex-col gap-2 w-[118px]">
-                <label class="text-base" style="color: var(--surface-700)">國碼</label>
-                <Select v-model="countryCode" :options="countryCodes" class="w-full" />
+            <div class="flex items-start gap-2">
+              <div class="flex w-[118px] flex-col gap-2">
+                <label>國碼</label>
+                <Select
+                  v-model="countryCode"
+                  :options="COUNTRY_CODES"
+                  class="w-full"
+                />
               </div>
-              <div class="flex-1 flex flex-col gap-2">
-                <label class="text-base" style="color: var(--surface-700)">電話號碼</label>
-                <InputText v-model="phone" type="tel" placeholder="請輸入您的電話號碼" class="w-full" />
+              <div class="flex flex-1 flex-col gap-2">
+                <label>電話號碼</label>
+                <InputText
+                  v-model="phone"
+                  type="tel"
+                  placeholder="請輸入您的電話號碼"
+                  class="w-full"
+                />
               </div>
             </div>
 
             <!-- Password -->
             <div class="flex flex-col gap-2">
-              <label class="text-base" style="color: var(--surface-700)">密碼</label>
+              <label>密碼</label>
               <Password
                 v-model="password"
                 :feedback="false"
@@ -159,29 +206,55 @@ function onSubmit() {
                 fluid
                 input-class="w-full"
               />
-              <a class="self-end text-base underline cursor-pointer" style="color: var(--primary)" @click="router.push('/forgot')">忘記密碼</a>
+              <a
+                class="cursor-pointer self-end underline"
+                style="color: var(--primary)"
+                @click="router.push('/forgot')"
+              >
+                忘記密碼
+              </a>
             </div>
 
             <!-- reCaptcha -->
             <div class="flex flex-col gap-2">
-              <label class="text-base" style="color: var(--surface-700)">驗證碼</label>
+              <label>驗證碼</label>
               <div ref="recaptchaContainer" class="recaptcha-host"></div>
-              <p v-if="submitted && !captchaToken" class="text-sm" style="color: #ef4444">
+              <p
+                v-if="isSubmitted && !captchaToken"
+                class="text-sm text-red-500"
+              >
                 請先完成人機驗證
               </p>
             </div>
 
             <!-- Terms agreement -->
-            <div class="flex gap-2 items-start">
-              <Checkbox v-model="agreed" binary input-id="login-agree" class="mt-[2px] shrink-0" />
-              <div class="flex flex-col gap-2 flex-1">
-                <p class="text-base leading-[1.4]" style="color: var(--surface-700)">
+            <div class="flex items-start gap-2">
+              <Checkbox
+                v-model="isAgreed"
+                binary
+                input-id="login-agree"
+                class="mt-0.5 shrink-0"
+              />
+              <div class="flex flex-1 flex-col gap-2">
+                <p class="leading-[1.4]">
                   我同意直播管家購物小幫手
-                  <a class="underline cursor-pointer" style="color: var(--primary)" @click="router.push('/terms')">服務政策</a>
+                  <a
+                    class="cursor-pointer underline"
+                    style="color: var(--primary)"
+                    @click="router.push('/terms')"
+                  >
+                    服務政策
+                  </a>
                   與
-                  <a class="underline cursor-pointer" style="color: var(--primary)" @click="router.push('/privacy')">隱私權政策</a>
+                  <a
+                    class="cursor-pointer underline"
+                    style="color: var(--primary)"
+                    @click="router.push('/privacy')"
+                  >
+                    隱私權政策
+                  </a>
                 </p>
-                <p v-if="submitted && !agreed" class="text-base" style="color: #ef4444">
+                <p v-if="isSubmitted && !isAgreed" class="text-red-500">
                   為保障您的權益，請先同意服務條款與隱私政策
                 </p>
               </div>
@@ -192,40 +265,71 @@ function onSubmit() {
               type="submit"
               :disabled="!canSubmit"
               label="使用電話號碼登入"
-              class="w-full mt-1 !min-h-[48px]"
+              class="mt-1 !min-h-12 w-full"
             />
           </form>
 
           <!-- Divider -->
-          <div class="flex items-center gap-4 w-full">
-            <div class="flex-1 h-px bg-[var(--border-light)]"></div>
-            <span class="text-base whitespace-nowrap" style="color: var(--text-muted)">或透過以下方式快速登入</span>
-            <div class="flex-1 h-px bg-[var(--border-light)]"></div>
+          <div class="flex w-full items-center gap-4">
+            <div class="h-px flex-1 bg-[var(--border-light)]"></div>
+            <span
+              class="text-base whitespace-nowrap"
+              style="color: var(--text-muted)"
+            >
+              或透過以下方式快速登入
+            </span>
+            <div class="h-px flex-1 bg-[var(--border-light)]"></div>
           </div>
 
           <!-- Social login -->
-          <div class="w-full flex flex-col gap-2">
-            <button class="social-btn" @click="socialLogin('Facebook')">
-              <i class="pi pi-facebook text-[22px]" style="color: #1877f2" />
+          <div class="flex w-full flex-col gap-2">
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleSocialLogin('Facebook')"
+            >
+              <i class="pi pi-facebook text-xl" style="color: #1877f2" />
               <span>Facebook</span>
-            </button>
-            <button class="social-btn" @click="socialLogin('Google')">
+            </Button>
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleSocialLogin('Google')"
+            >
               <span class="google-icon" aria-hidden="true">G</span>
               <span>Google</span>
-            </button>
-            <button class="social-btn" @click="socialLogin('Line')">
+            </Button>
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleSocialLogin('Line')"
+            >
               <span class="line-icon" aria-hidden="true">LINE</span>
               <span>Line</span>
-            </button>
-            <button class="social-btn" @click="socialLogin('Tiktok')">
-              <i class="pi pi-tiktok text-[22px]" />
+            </Button>
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleSocialLogin('Tiktok')"
+            >
+              <i class="pi pi-tiktok text-xl" />
               <span>Tiktok</span>
-            </button>
+            </Button>
           </div>
 
-          <p class="text-base text-center" style="color: var(--text-muted)">
+          <p class="text-center text-base" style="color: var(--text-muted)">
             尚未建立帳戶，即刻
-            <a class="underline cursor-pointer ml-1" style="color: var(--primary)" @click="router.push('/register')">註冊</a>
+            <a
+              class="ml-1 cursor-pointer underline"
+              style="color: var(--primary)"
+              @click="router.push('/register')"
+            >
+              註冊
+            </a>
           </p>
         </div>
       </div>
@@ -239,8 +343,16 @@ function onSubmit() {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 30% 35%, rgba(112, 8, 231, 0.55) 0%, rgba(112, 8, 231, 0) 38%),
-    radial-gradient(circle at 65% 70%, rgba(96, 165, 250, 0.45) 0%, rgba(96, 165, 250, 0) 40%);
+    radial-gradient(
+      circle at 30% 35%,
+      rgba(112, 8, 231, 0.55) 0%,
+      rgba(112, 8, 231, 0) 38%
+    ),
+    radial-gradient(
+      circle at 65% 70%,
+      rgba(96, 165, 250, 0.45) 0%,
+      rgba(96, 165, 250, 0) 40%
+    );
   filter: blur(10px);
 }
 
@@ -251,13 +363,13 @@ function onSubmit() {
   width: 100% !important;
 }
 
+/* PrimeVue Button 內部結構不吃 Tailwind class 繼承，這層樣式靠 pt 套到 root */
 .social-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 24px;
   min-height: 48px;
   border-radius: 6px;
   border: 1px solid var(--surface-700);
@@ -266,7 +378,6 @@ function onSubmit() {
   font-weight: 700;
   font-size: 16px;
   transition: background-color 0.15s;
-  cursor: pointer;
 }
 .social-btn:hover {
   background: #f8fafc;
@@ -279,7 +390,13 @@ function onSubmit() {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: conic-gradient(from -45deg, #ea4335 0deg 90deg, #fbbc05 90deg 180deg, #34a853 180deg 270deg, #4285f4 270deg 360deg);
+  background: conic-gradient(
+    from -45deg,
+    #ea4335 0deg 90deg,
+    #fbbc05 90deg 180deg,
+    #34a853 180deg 270deg,
+    #4285f4 270deg 360deg
+  );
   color: white;
   font-weight: 700;
   font-size: 12px;

@@ -1,7 +1,8 @@
-import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { defineStore } from 'pinia';
+import { ref, watch } from 'vue';
+import type { DensityMode } from '../types/density';
 
-export type DensityMode = 'wide' | 'compact'
+export type { DensityMode } from '../types/density';
 
 // Spacing tokens per mode. 'wide' matches the current (pre-feature) layout.
 // One consistent spacing value per mode — page padding, block gaps and card
@@ -19,24 +20,24 @@ const PRESETS: Record<DensityMode, Record<string, string>> = {
     '--stack-gap': '8px',
     '--card-pad': '8px',
   },
-}
+};
 
 function applyDensity(mode: DensityMode) {
-  const root = document.documentElement
+  const root = document.documentElement;
   for (const [k, v] of Object.entries(PRESETS[mode])) {
-    root.style.setProperty(k, v)
+    root.style.setProperty(k, v);
   }
 }
 
 export const useDensityStore = defineStore('density', () => {
-  const mode = ref<DensityMode>('wide')
+  const mode = ref<DensityMode>('wide');
 
   function set(m: DensityMode) {
-    mode.value = m
-    applyDensity(m)
+    mode.value = m;
+    applyDensity(m);
   }
 
-  watch(mode, applyDensity, { immediate: true })
+  watch(mode, applyDensity, { immediate: true });
 
-  return { mode, set }
-})
+  return { mode, set };
+});
