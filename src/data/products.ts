@@ -40,6 +40,95 @@ export interface Product {
 }
 
 export const products: Product[] = [
+  // ─── 生鮮類（低溫配送）──────────────────────────────
+  {
+    id: 100,
+    name: '新春海陸雙享套組',
+    price: 1280,
+    original: 1580,
+    stock: 12,
+    category: '生鮮',
+    image:
+      'https://images.unsplash.com/photo-1485921325833-c519f76c4927?w=600&fit=crop',
+    isBundle: true,
+    noCoupon: true,
+    bundleItems: [
+      {
+        name: '挪威生鮮鮭魚切片',
+        image:
+          'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=400&fit=crop',
+        spec: '300g',
+        qty: 1,
+      },
+      {
+        name: '美國安格斯牛小排',
+        image:
+          'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&fit=crop',
+        spec: '500g',
+        qty: 1,
+      },
+    ],
+  },
+  {
+    id: 101,
+    name: '新手主廚三件組（固定組合）',
+    price: 899,
+    original: 1290,
+    stock: 6,
+    category: '生鮮',
+    image:
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&fit=crop',
+    isBundle: true,
+    noCoupon: true,
+    bundleItems: [
+      {
+        name: '北海道生食級帆立貝',
+        image:
+          'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&fit=crop',
+        spec: '12顆',
+        qty: 1,
+      },
+      {
+        name: '法國頂級櫻桃鴨胸',
+        image:
+          'https://images.unsplash.com/photo-1572441713132-c542fc4fe282?w=400&fit=crop',
+        spec: '300g',
+        qty: 1,
+      },
+      {
+        name: '西班牙伊比利豬肋排',
+        image:
+          'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&fit=crop',
+        spec: '500g',
+        qty: 1,
+      },
+    ],
+  },
+  {
+    id: 102,
+    name: '挪威生鮮鮭魚切片 厚切真空包裝',
+    price: 380,
+    original: 480,
+    stock: 30,
+    category: '生鮮',
+    image:
+      'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600&fit=crop',
+    hasVariant: true,
+    sizes: ['300g', '500g', '1kg'],
+  },
+  {
+    id: 103,
+    name: '古早味手工冷凍水餃 高麗菜豬肉口味',
+    price: 199,
+    original: 250,
+    stock: 50,
+    category: '生鮮',
+    image:
+      'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=600&fit=crop',
+    hasVariant: true,
+    sizes: ['30顆/盒', '60顆/盒', '100顆/盒'],
+  },
+
   {
     id: 15,
     name: '新生兒入門必備三件組（固定組合）',
@@ -313,7 +402,7 @@ export const products: Product[] = [
     stock: 5,
     category: '寶寶包屁',
     image:
-      'https://images.unsplash.com/photo-1518830411533-cdf1d0517f47?w=600&fit=crop',
+      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600&fit=crop',
     isBundle: true,
     isPickBundle: true,
     pickCount: 3,
@@ -366,6 +455,144 @@ export const products: Product[] = [
           'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=400&fit=crop',
         spec: '藍',
         specOptions: ['藍', '粉', '黃'],
+      },
+    ],
+  },
+
+  // ─── 廠商出清 ──────────────────────────────────────
+  {
+    id: 200,
+    name: '【出清】童裝鋪棉外套 不挑款福袋',
+    price: 299,
+    original: 990,
+    stock: 12,
+    category: '廠商出清',
+    image:
+      'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=600&fit=crop',
+    hasVariant: true,
+    sizes: ['100cm', '110cm', '120cm', '130cm'],
+  },
+  {
+    id: 201,
+    name: '【出清】經典素色棉T 三件組（固定組合）',
+    price: 399,
+    original: 870,
+    stock: 8,
+    category: '廠商出清',
+    image:
+      'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=600&fit=crop',
+    isBundle: true,
+    noCoupon: true,
+    bundleItems: [
+      {
+        name: '純棉短袖 T 男童',
+        image:
+          'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
+        spec: '白-110cm',
+        qty: 1,
+      },
+      {
+        name: '純棉短袖 T 女童',
+        image:
+          'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
+        spec: '粉-110cm',
+        qty: 1,
+      },
+      {
+        name: '純棉短袖 T 中性款',
+        image:
+          'https://images.unsplash.com/photo-1571513722275-4b41940f54b8?w=400&fit=crop',
+        spec: '灰-110cm',
+        qty: 1,
+      },
+    ],
+  },
+  {
+    id: 202,
+    name: '【出清】男女童冬季毛帽 限量花色',
+    price: 99,
+    original: 280,
+    stock: 24,
+    category: '廠商出清',
+    image:
+      'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=600&fit=crop',
+    hasVariant: true,
+    sizes: ['F'],
+  },
+  {
+    id: 203,
+    name: '【出清】童襪 12 雙超值組 隨機混色',
+    price: 199,
+    original: 480,
+    stock: 30,
+    category: '廠商出清',
+    image:
+      'https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=600&fit=crop',
+  },
+  {
+    id: 204,
+    name: '【出清】兒童透明雨衣 最後 6 件',
+    price: 149,
+    original: 350,
+    stock: 6,
+    category: '廠商出清',
+    image:
+      'https://images.unsplash.com/photo-1519074069390-98277fc02a5d?w=600&fit=crop',
+    hasVariant: true,
+    sizes: ['S', 'M', 'L'],
+  },
+  {
+    id: 205,
+    name: '【出清】寶寶配件福袋 任選 3 件',
+    price: 199,
+    original: 690,
+    stock: 4,
+    category: '廠商出清',
+    image:
+      'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=600&fit=crop',
+    isBundle: true,
+    isPickBundle: true,
+    pickCount: 3,
+    noCoupon: true,
+    pickOptions: [
+      {
+        id: 301,
+        name: '寶寶純棉手帕',
+        image:
+          'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
+        spec: '白',
+        specOptions: ['白', '黃', '粉'],
+      },
+      {
+        id: 302,
+        name: '寶寶印花圍兜',
+        image:
+          'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=400&fit=crop',
+        spec: '藍',
+        specOptions: ['藍', '粉', '黃'],
+      },
+      {
+        id: 303,
+        name: '寶寶安撫奶嘴',
+        image:
+          'https://images.unsplash.com/photo-1517242810446-cc8951b2be40?w=400&fit=crop',
+        spec: '粉色',
+        specOptions: ['粉色', '藍色', '黃色'],
+      },
+      {
+        id: 304,
+        name: '寶寶柔嫩濕紙巾 80 抽',
+        image:
+          'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?w=400&fit=crop',
+        spec: '預設',
+      },
+      {
+        id: 305,
+        name: '寶寶嬰兒鞋襪 兩雙裝',
+        image:
+          'https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&fit=crop',
+        spec: '0-12M',
+        specOptions: ['0-12M', '12-24M'],
       },
     ],
   },

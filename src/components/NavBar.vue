@@ -159,22 +159,22 @@ const handlePickKeyword = (kw: string) => {
       class="mx-auto max-w-7xl px-4 py-3 @4xl:flex @4xl:h-full @4xl:flex-col @4xl:justify-center @4xl:py-[4px]"
     >
       <div class="flex items-center justify-between gap-3">
-        <!-- Logo -->
+        <!-- Logo：手機顯示 X 圖示、桌機顯示完整 logo -->
         <button
-          class="flex shrink-0 items-center gap-2"
+          class="flex shrink-0 items-center"
+          aria-label="xSmartLive"
           @click="router.push('/shop')"
         >
-          <div
-            class="flex h-9 w-9 items-center justify-center rounded-lg @4xl:h-10 @4xl:w-10"
-            style="background: var(--primary-bg)"
-          >
-            <span class="text-sm font-bold text-white">X</span>
-          </div>
-          <span
-            class="hidden text-base leading-tight font-bold @sm:block @4xl:text-lg"
-            style="color: var(--primary)"
-            >xSmartLive</span
-          >
+          <img
+            src="/logo.png"
+            alt="xSmartLive"
+            class="block h-9 w-auto @4xl:hidden"
+          />
+          <img
+            src="/logo-xl.png"
+            alt="xSmartLive"
+            class="hidden h-8 w-auto @4xl:block"
+          />
         </button>
 
         <!-- Search bar — PC only -->

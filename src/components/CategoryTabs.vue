@@ -10,7 +10,7 @@ import {
 import { useRoute, useRouter } from 'vue-router';
 import { useViewportStore } from '../pinia/viewport';
 
-const tabs = ['大童童裝', '小童童裝', '寶寶包屁', '親子裝', '廠商出清'];
+const tabs = ['大童童裝', '小童童裝', '寶寶包屁', '親子裝', '生鮮', '廠商出清'];
 
 const route = useRoute();
 const router = useRouter();

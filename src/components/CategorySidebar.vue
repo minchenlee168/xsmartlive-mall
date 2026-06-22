@@ -1,15 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 const props = defineProps<{ tab: string }>();
 
-const subCategories: Record<string, string[]> = {
+const SUB_CATEGORIES: Record<string, string[]> = {
   大童童裝: ['上衣', '褲子', '裙子', '外套', '套裝'],
   小童童裝: ['上衣', '褲子', '裙子', '外套', '套裝'],
   寶寶包屁: ['短袖包屁', '長袖包屁', '親子裝', '禮盒組', '其他'],
   親子裝: ['親子上衣', '親子褲裝', '親子裙裝', '親子外套'],
+  生鮮: ['海鮮', '肉品', '蔬果', '冷凍熟食', '組合特惠'],
   廠商出清: ['全部出清', '上衣特賣', '褲裝特賣', '套裝特賣', '配件特賣'],
 };
 
-const items = subCategories[props.tab] ?? [];
+// 切換大分類時 props.tab 會變，items 跟著 reactivity 重算
+const items = computed(() => SUB_CATEGORIES[props.tab] ?? []);
 const active = defineModel<string>('active');
 </script>
 

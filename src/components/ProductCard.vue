@@ -236,24 +236,7 @@ const handleConfirmBundleAdd = () => {
       class="aspect-square w-full overflow-hidden bg-gray-100"
       :class="isPC ? 'rounded-lg' : 'rounded-md'"
     >
-      <img
-        v-if="image"
-        :src="image"
-        :alt="name"
-        class="h-full w-full object-cover"
-      />
-      <div
-        v-else
-        class="flex h-full w-full flex-col items-center justify-center gap-1.5"
-      >
-        <i
-          class="pi pi-hammer text-gray-300"
-          :class="isPC ? 'text-4xl' : 'text-3xl'"
-        />
-        <span class="text-gray-400" :class="isPC ? 'text-sm' : 'text-xs'"
-          >圖片施工中</span
-        >
-      </div>
+      <ProductImage :src="image" :alt="name" :size="isPC ? 'lg' : 'md'" />
     </div>
 
     <!-- Product info -->
@@ -358,15 +341,9 @@ const handleConfirmBundleAdd = () => {
       <!-- 商品圖 + 名稱 -->
       <div class="flex gap-3">
         <div
-          class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-100"
+          class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100"
         >
-          <img
-            v-if="image"
-            :src="image"
-            :alt="name"
-            class="h-full w-full object-cover"
-          />
-          <i v-else class="pi pi-hammer text-xl text-gray-300" />
+          <ProductImage :src="image" :alt="name" size="sm" />
         </div>
         <div class="flex min-w-0 flex-1 flex-col gap-1">
           <p class="line-clamp-2 text-base font-semibold text-slate-700">
@@ -444,15 +421,9 @@ const handleConfirmBundleAdd = () => {
       <!-- 商品圖 + 名稱 + 主數量 -->
       <div class="flex gap-3">
         <div
-          class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-100"
+          class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100"
         >
-          <img
-            v-if="image"
-            :src="image"
-            :alt="name"
-            class="h-full w-full object-cover"
-          />
-          <i v-else class="pi pi-hammer text-xl text-gray-300" />
+          <ProductImage :src="image" :alt="name" size="sm" />
         </div>
         <div class="flex min-w-0 flex-1 flex-col gap-1">
           <p class="line-clamp-2 text-base font-semibold text-slate-700">
@@ -498,14 +469,9 @@ const handleConfirmBundleAdd = () => {
           "
         >
           <div
-            class="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]"
+            class="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-slate-200"
           >
-            <img
-              v-if="opt.image"
-              :src="opt.image"
-              :alt="opt.name"
-              class="h-full w-full object-cover"
-            />
+            <ProductImage :src="opt.image" :alt="opt.name" size="sm" />
           </div>
           <div class="flex min-w-0 flex-1 flex-col gap-1.5">
             <p class="line-clamp-2 text-sm leading-snug text-slate-950">
@@ -560,14 +526,9 @@ const handleConfirmBundleAdd = () => {
           class="flex gap-3 rounded-lg border border-slate-200 p-2"
         >
           <div
-            class="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]"
+            class="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-slate-200"
           >
-            <img
-              v-if="item.image"
-              :src="item.image"
-              :alt="item.name"
-              class="h-full w-full object-cover"
-            />
+            <ProductImage :src="item.image" :alt="item.name" size="sm" />
           </div>
           <div class="flex min-w-0 flex-1 flex-col gap-1.5">
             <p class="line-clamp-2 text-sm leading-snug text-slate-950">

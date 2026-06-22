@@ -82,18 +82,16 @@ const handleGoToShop = () => {
           class="flex shrink-0 items-center gap-2"
           @click="router.push('/shop')"
         >
-          <div
-            class="flex h-10 w-10 items-center justify-center rounded-lg"
-            style="background: var(--primary-bg)"
-          >
-            <span class="text-base font-bold text-white">X</span>
-          </div>
-          <span
-            class="text-xl leading-tight font-bold"
-            style="color: var(--primary)"
-          >
-            <span class="opacity-90">xSmart</span><span>Live</span>
-          </span>
+          <img
+            src="/logo.png"
+            alt="xSmartLive"
+            class="block h-10 w-auto @4xl:hidden"
+          />
+          <img
+            src="/logo-xl.png"
+            alt="xSmartLive"
+            class="hidden h-8 w-auto @4xl:block"
+          />
         </button>
         <Button
           label="已有帳號？登入"

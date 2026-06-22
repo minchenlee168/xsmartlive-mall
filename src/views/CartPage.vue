@@ -360,32 +360,20 @@ const handleGoProduct = (productId?: number) => {
         >
           <!-- Item row -->
           <div
-            class="flex items-center gap-3 px-[var(--card-pad)] py-[var(--card-pad)] @7xl:gap-4"
+            class="flex items-start gap-3 px-[var(--card-pad)] py-[var(--card-pad)] @7xl:gap-4"
           >
-            <Checkbox v-model="item.checked" binary class="shrink-0" />
+            <Checkbox v-model="item.checked" binary class="mt-1 shrink-0" />
 
             <!-- Image -->
             <div
               class="aspect-square w-16 shrink-0 overflow-hidden rounded @3xl:w-20 @7xl:w-[100px]"
             >
-              <img
-                v-if="item.image"
-                :src="item.image"
-                :alt="item.name"
-                class="h-full w-full object-cover"
-              />
-              <div
-                v-else
-                class="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-gray-100"
-              >
-                <i class="pi pi-hammer text-lg text-gray-300" />
-                <span class="text-xs text-gray-400">圖片施工中</span>
-              </div>
+              <ProductImage :src="item.image" :alt="item.name" size="md" />
             </div>
 
             <!-- Info -->
             <div
-              class="flex min-w-0 flex-1 flex-col gap-1 @7xl:flex-row @7xl:items-center @7xl:gap-4"
+              class="flex min-w-0 flex-1 flex-col gap-1 @7xl:flex-row @7xl:items-start @7xl:gap-4"
             >
               <div class="flex min-w-0 flex-1 flex-col gap-1">
                 <p
@@ -429,13 +417,13 @@ const handleGoProduct = (productId?: number) => {
                     v-if="item.original"
                     class="text-sm text-slate-500 line-through"
                   >
-                    ${{ (item.original * item.qty).toLocaleString() }}
+                    ${{ item.original.toLocaleString() }}
                   </span>
                   <span
                     class="text-base leading-none font-medium @7xl:text-2xl"
                     style="color: var(--primary)"
                   >
-                    ${{ (item.price * item.qty).toLocaleString() }}
+                    ${{ item.price.toLocaleString() }}
                   </span>
                 </div>
                 <Button
@@ -496,14 +484,9 @@ const handleGoProduct = (productId?: number) => {
                   "
                 >
                   <div
-                    class="h-20 w-20 shrink-0 overflow-hidden rounded bg-[#d9d9d9]"
+                    class="h-20 w-20 shrink-0 overflow-hidden rounded bg-slate-200"
                   >
-                    <img
-                      v-if="sub.image"
-                      :src="sub.image"
-                      :alt="sub.name"
-                      class="h-full w-full object-cover"
-                    />
+                    <ProductImage :src="sub.image" :alt="sub.name" size="md" />
                   </div>
                   <div class="flex min-w-0 flex-1 flex-col gap-1">
                     <p class="truncate text-base font-semibold text-slate-700">
@@ -601,14 +584,9 @@ const handleGoProduct = (productId?: number) => {
             class="flex flex-col gap-[7px] rounded-lg p-2"
           >
             <div
-              class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]"
+              class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
             >
-              <img
-                :src="p.image"
-                :alt="p.name"
-                class="h-full w-full object-cover"
-                loading="lazy"
-              />
+              <ProductImage :src="p.image" :alt="p.name" size="md" />
             </div>
             <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
               <p

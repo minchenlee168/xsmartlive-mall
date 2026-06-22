@@ -62,25 +62,6 @@ const thumbCount = computed(() => {
 const isCouponDrawerVisible = ref(false);
 const isLoginPromptOpen = ref(false);
 
-/** 商品詳情 mock：規格表（讓所有商品都有相同詳情區塊）。 */
-const detailSpecs = computed(() => [
-  {
-    label: '商品編號',
-    value: `P-${String(product.value.id).padStart(5, '0')}`,
-  },
-  { label: '商品分類', value: product.value.category ?? '—' },
-  { label: '商品材質', value: '純棉 / 棉混紡' },
-  { label: '產地', value: '台灣' },
-  { label: '適用年齡', value: '0~12 歲' },
-  { label: '洗滌方式', value: '機洗 / 手洗皆可，請翻面洗滌' },
-  {
-    label: product.value.isBundle ? '組合內容' : '尺碼資訊',
-    value: product.value.isBundle
-      ? `${product.value.bundleItems?.length ?? 0} 件組合`
-      : (product.value.sizes?.join(' / ') ?? '單一尺寸'),
-  },
-]);
-
 /** 單一選項的上限：單組 maxQty × 購買組數（qty）。預設 maxQty=1。 */
 const optMaxQty = (opt: { maxQty?: number }): number =>
   (opt.maxQty ?? 1) * qty.value;
@@ -253,23 +234,13 @@ const handleNextThumb = () => {
               >
                 <!-- Main image -->
                 <div
-                  class="flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg bg-[#d9d9d9] @3xl:aspect-[4/5] @7xl:aspect-square"
+                  class="aspect-square w-full overflow-hidden rounded-lg bg-slate-200 @3xl:aspect-[4/5] @7xl:aspect-square"
                 >
-                  <img
-                    v-if="product.image"
+                  <ProductImage
                     :src="product.image"
                     :alt="product.name"
-                    class="h-full w-full object-cover"
+                    size="lg"
                   />
-                  <div
-                    v-else
-                    class="flex flex-col items-center justify-center gap-2"
-                  >
-                    <i
-                      class="pi pi-hammer text-5xl text-gray-400 @7xl:text-6xl"
-                    />
-                    <span class="text-sm text-gray-400">圖片施工中</span>
-                  </div>
                 </div>
 
                 <!-- Thumbnails -->
@@ -299,11 +270,11 @@ const handleNextThumb = () => {
                       "
                       @click="activeThumb = i - 1"
                     >
-                      <img
-                        v-if="i === 1 && product.image"
+                      <ProductImage
+                        v-if="i === 1"
                         :src="product.image"
                         :alt="product.name"
-                        class="h-full w-full object-cover"
+                        size="sm"
                       />
                     </div>
                   </div>
@@ -502,14 +473,9 @@ const handleNextThumb = () => {
                   "
                 >
                   <div
-                    class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-[#d9d9d9]"
+                    class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
                   >
-                    <img
-                      v-if="opt.image"
-                      :src="opt.image"
-                      :alt="opt.name"
-                      class="h-full w-full object-cover"
-                    />
+                    <ProductImage :src="opt.image" :alt="opt.name" size="sm" />
                   </div>
 
                   <div class="flex flex-col gap-1.5">
@@ -589,20 +555,9 @@ const handleNextThumb = () => {
                   class="flex w-[calc((100%-1rem)/2)] flex-col gap-2 rounded-lg p-2 @3xl:w-[180px] @7xl:w-[243px]"
                 >
                   <div
-                    class="aspect-square w-full overflow-hidden rounded-lg bg-[#d9d9d9]"
+                    class="aspect-square w-full overflow-hidden rounded-lg bg-slate-200"
                   >
-                    <img
-                      v-if="item.image"
-                      :src="item.image"
-                      :alt="item.name"
-                      class="h-full w-full object-cover"
-                    />
-                    <div
-                      v-else
-                      class="flex h-full w-full items-center justify-center text-gray-300"
-                    >
-                      <i class="pi pi-image text-2xl" />
-                    </div>
+                    <ProductImage :src="item.image" :alt="item.name" size="md" />
                   </div>
                   <div class="flex flex-col gap-1.5">
                     <p
@@ -653,39 +608,8 @@ const handleNextThumb = () => {
           </div>
 
           <div class="flex flex-col gap-4 p-4 @7xl:gap-6 @7xl:p-6">
-            <!-- 規格表 -->
-            <section class="flex flex-col gap-2">
-              <h3 class="text-sm font-bold text-slate-950 @7xl:text-base">
-                商品規格
-              </h3>
-              <div
-                class="grid grid-cols-1 overflow-hidden rounded-md border border-slate-200 @7xl:grid-cols-2"
-              >
-                <div
-                  v-for="(s, i) in detailSpecs"
-                  :key="s.label"
-                  class="flex border-b border-slate-200 last:border-b-0"
-                  :class="i % 2 === 0 ? '@7xl:border-r' : ''"
-                >
-                  <span
-                    class="w-[110px] shrink-0 bg-gray-50 px-3 py-2 text-sm text-slate-500"
-                  >
-                    {{ s.label }}
-                  </span>
-                  <span
-                    class="flex-1 px-3 py-2 text-sm break-words text-slate-700"
-                  >
-                    {{ s.value }}
-                  </span>
-                </div>
-              </div>
-            </section>
-
             <!-- 商品介紹（圖文交錯） -->
             <section class="flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-950 @7xl:text-base">
-                商品介紹
-              </h3>
               <div
                 class="flex flex-col gap-4 text-sm leading-relaxed text-slate-700"
               >
@@ -694,11 +618,10 @@ const handleNextThumb = () => {
                   <div
                     class="aspect-[4/3] w-full overflow-hidden rounded-lg bg-slate-100 @7xl:aspect-video"
                   >
-                    <img
+                    <ProductImage
                       src="https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1200&fit=crop"
                       alt="情境照"
-                      class="h-full w-full object-cover"
-                      loading="lazy"
+                      size="lg"
                     />
                   </div>
                   <figcaption class="text-center text-xs text-slate-500">
@@ -716,11 +639,10 @@ const handleNextThumb = () => {
                     <div
                       class="aspect-square overflow-hidden rounded-lg bg-slate-100"
                     >
-                      <img
+                      <ProductImage
                         src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&fit=crop"
                         alt="細節照 1"
-                        class="h-full w-full object-cover"
-                        loading="lazy"
+                        size="md"
                       />
                     </div>
                     <figcaption class="text-center text-xs text-slate-500">
@@ -731,11 +653,10 @@ const handleNextThumb = () => {
                     <div
                       class="aspect-square overflow-hidden rounded-lg bg-slate-100"
                     >
-                      <img
+                      <ProductImage
                         src="https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=800&fit=crop"
                         alt="細節照 2"
-                        class="h-full w-full object-cover"
-                        loading="lazy"
+                        size="md"
                       />
                     </div>
                     <figcaption class="text-center text-xs text-slate-500">
@@ -759,11 +680,10 @@ const handleNextThumb = () => {
                   <div
                     class="aspect-[4/3] w-full overflow-hidden rounded-lg bg-slate-100 @7xl:aspect-video"
                   >
-                    <img
+                    <ProductImage
                       src="https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=1200&fit=crop"
                       alt="材質特寫"
-                      class="h-full w-full object-cover"
-                      loading="lazy"
+                      size="lg"
                     />
                   </div>
                   <figcaption class="text-center text-xs text-slate-500">

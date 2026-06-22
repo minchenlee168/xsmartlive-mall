@@ -9,6 +9,7 @@ import CheckoutPage from '../views/CheckoutPage.vue';
 import SearchPage from '../views/SearchPage.vue';
 import MemberCenterPage from '../views/MemberCenterPage.vue';
 import RegisterPage from '../views/RegisterPage.vue';
+import SocialSignupPage from '../views/SocialSignupPage.vue';
 import ForgotPasswordPage from '../views/ForgotPasswordPage.vue';
 import InfoPage from '../views/InfoPage.vue';
 import { useUiStore } from '../pinia/ui';
@@ -28,6 +29,7 @@ const router = createRouter({
     { path: '/member', component: MemberCenterPage },
     { path: '/login', component: LoginPage },
     { path: '/register', component: RegisterPage },
+    { path: '/social-signup', component: SocialSignupPage },
     { path: '/forgot', component: ForgotPasswordPage },
     { path: '/terms', component: InfoPage },
     { path: '/privacy', component: InfoPage },

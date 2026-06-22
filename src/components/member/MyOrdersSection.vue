@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { useViewportStore } from '../../pinia/viewport';
 import { useOrdersStore } from '../../pinia/orders';
+import { useUiStore } from '../../pinia/ui';
 import type {
   OrderRecord,
   OrderItem,
@@ -30,6 +31,7 @@ const isTopInfoOpen = ref(false);
 const isBottomInfoOpen = ref(false);
 
 const ordersStore = useOrdersStore();
+const ui = useUiStore();
 
 // 主 tab（退貨 / 退款相關 tab 已移除）
 type StatusTab = 'all' | OrderStatus;
@@ -247,6 +249,57 @@ const isChangeAddressVisible = ref(false);
 const handleOpenChangeAddress = (): void => {
   isChangeAddressVisible.value = true;
 };
+
+// ── 退貨申請 dialog（對齊 Figma 6045-3985）──
+const RETURN_REASONS = [
+  '商品瑕疵 / 破損',
+  '尺寸不合 / 規格錯誤',
+  '與商品描述不符',
+];
+const RETURN_NOTE_MAX = 30;
+const isReturnDialogVisible = ref(false);
+const returnTargetItem = ref<OrderItem | null>(null);
+const returnReason = ref<string | null>(null);
+const returnNote = ref('');
+
+/** 商品是否可退貨：任一包裹的 currentStep 落在可退貨階段（shipped / delivered） */
+const itemCanRefund = (item: OrderItem): boolean =>
+  item.packages.some((p) => canRefundStep(p.currentStep));
+
+const handleOpenReturnDialog = (item: OrderItem): void => {
+  returnTargetItem.value = item;
+  returnReason.value = null;
+  returnNote.value = '';
+  isReturnDialogVisible.value = true;
+};
+
+const handleSubmitReturn = (): void => {
+  if (!returnReason.value) return;
+  ui.toast('退貨申請已送出（示意）');
+  isReturnDialogVisible.value = false;
+};
+
+// ── 訂單提問 drawer（右側抽出，內容為 AI 客服待開發提示） ──
+const isInquiryDrawerVisible = ref(false);
+/**
+ * 手機版 Select 用：選到 'inquiry' 時要把 Select 視覺重置回原本選項。
+ * PrimeVue Select 即使 :model-value 為單向綁定，內部仍可能 cache 顯示值；
+ * bump 這個 key 強制 remount 才會重讀 model-value。
+ */
+const inquirySelectKey = ref(0);
+/**
+ * 攔截 detail tab 切換：
+ * - 'inquiry' → 不切換 tab，改開右側 drawer
+ * - 其他 tab → 正常切換
+ */
+const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
+  if (key === 'inquiry') {
+    isInquiryDrawerVisible.value = true;
+    inquirySelectKey.value++;
+    return;
+  }
+  order.detailTab = key;
+};
 </script>
 
 <template>
@@ -337,7 +390,7 @@ const handleOpenChangeAddress = (): void => {
               v-model="keyword"
               placeholder="請輸入訂單ID或商品名稱"
               class="min-w-0 flex-1"
-              @keyup.enter="applyQuery"
+              @keyup.enter="handleApplyQuery"
             />
             <Button label="查詢" class="shrink-0" @click="handleApplyQuery" />
           </div>
@@ -498,11 +551,13 @@ const handleOpenChangeAddress = (): void => {
               ></i>
             </button>
             <Select
-              v-model="order.detailTab"
+              :key="`detail-tab-${order.id}-${inquirySelectKey}`"
+              :model-value="order.detailTab"
               :options="detailTabs"
               option-label="label"
               option-value="key"
               class="min-w-0 flex-1"
+              @update:model-value="(key) => handleSelectDetailTab(order, key)"
             />
           </div>
           <div v-else class="flex items-center gap-2 px-4">
@@ -527,11 +582,11 @@ const handleOpenChangeAddress = (): void => {
                   :key="dt.key"
                   class="-mb-px border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors"
                   :style="
-                    order.detailTab === dt.key
+                    order.detailTab === dt.key && dt.key !== 'inquiry'
                       ? 'color: var(--primary); border-color: var(--primary)'
                       : 'color: #64748b; border-color: transparent'
                   "
-                  @click="order.detailTab = dt.key"
+                  @click="handleSelectDetailTab(order, dt.key)"
                 >
                   {{ dt.label }}
                 </button>
@@ -594,12 +649,7 @@ const handleOpenChangeAddress = (): void => {
               <div
                 class="h-[48px] w-[48px] shrink-0 overflow-hidden rounded-md bg-slate-100"
               >
-                <img
-                  v-if="item.image"
-                  :src="item.image"
-                  :alt="item.name"
-                  class="h-full w-full object-cover"
-                />
+                <ProductImage :src="item.image" :alt="item.name" size="sm" />
               </div>
               <div class="min-w-0 flex-1">
                 <p class="line-clamp-1 text-sm leading-snug text-slate-700">
@@ -607,10 +657,23 @@ const handleOpenChangeAddress = (): void => {
                 </p>
                 <p class="mt-1 text-xs text-slate-500">規格：{{ item.spec }}</p>
               </div>
-              <div class="shrink-0 text-right">
+              <div class="flex shrink-0 flex-col items-end gap-2">
                 <p class="text-sm font-bold text-slate-950">
                   ${{ item.price.toLocaleString() }} / {{ item.qty }}件
                 </p>
+                <!-- 退貨 tab + 商品可退貨 → 顯示退貨按鈕 -->
+                <Button
+                  v-if="
+                    order.detailTab === 'return' &&
+                    itemCanRefund(item) &&
+                    !refundReasonText(order)
+                  "
+                  label="退貨"
+                  severity="danger"
+                  outlined
+                  size="small"
+                  @click="handleOpenReturnDialog(item)"
+                />
               </div>
             </div>
 
@@ -824,5 +887,141 @@ const handleOpenChangeAddress = (): void => {
 
     <!-- 更換配送地址 dialog -->
     <ChangeAddressDialog v-model:visible="isChangeAddressVisible" />
+
+    <!-- 退貨申請 dialog（對齊 Figma 6045-3985） -->
+    <Dialog
+      v-model:visible="isReturnDialogVisible"
+      modal
+      :draggable="false"
+      header="退貨申請"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '640px' }"
+    >
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-slate-700">商品名稱</label>
+          <p class="line-clamp-1 text-sm text-slate-950">
+            {{ returnTargetItem?.name }}
+          </p>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-sm font-medium text-slate-700">退貨原因</label>
+          <Select
+            v-model="returnReason"
+            :options="RETURN_REASONS"
+            placeholder="請選擇退貨原因"
+            class="w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium text-slate-700">備註</label>
+          <InputText
+            v-model="returnNote"
+            :maxlength="RETURN_NOTE_MAX"
+            class="w-full"
+          />
+          <p class="text-xs text-slate-500">
+            最多可輸入 {{ RETURN_NOTE_MAX }} 個字
+          </p>
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="取消"
+          severity="secondary"
+          outlined
+          @click="isReturnDialogVisible = false"
+        />
+        <Button
+          label="確認提交申請"
+          :disabled="!returnReason"
+          @click="handleSubmitReturn"
+        />
+      </template>
+    </Dialog>
+
+    <!-- 訂單提問 drawer：從右側滑入，點遮罩關閉。
+         Teleport 到 body 以脫離 App.vue 的 @container（同 Checkout 抽屜處理方式）。 -->
+    <Teleport to="body">
+      <Transition name="inquiry-fade">
+        <div
+          v-if="isInquiryDrawerVisible"
+          class="inquiry-backdrop"
+          @click="isInquiryDrawerVisible = false"
+        />
+      </Transition>
+      <Transition name="inquiry-slide">
+        <aside v-if="isInquiryDrawerVisible" class="inquiry-drawer">
+          <header
+            class="flex items-center justify-between border-b border-slate-200 px-5 py-4"
+          >
+            <h3 class="text-lg font-bold text-slate-950">訂單提問</h3>
+            <Button
+              icon="pi pi-times"
+              severity="secondary"
+              text
+              rounded
+              class="!min-h-11 !min-w-11"
+              @click="isInquiryDrawerVisible = false"
+            />
+          </header>
+          <div
+            class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10 text-center"
+          >
+            <div
+              class="flex h-32 w-32 items-center justify-center rounded-full bg-slate-100"
+            >
+              <i class="pi pi-headphones text-6xl text-slate-400" />
+            </div>
+            <p class="text-base font-medium text-slate-700">
+              導入 AI 智能客服
+              <span class="block text-slate-500">（待開發）</span>
+            </p>
+          </div>
+        </aside>
+      </Transition>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+/* ===== 訂單提問 Drawer =====
+ * 右側滑入式抽屜；遮罩鋪滿視窗，抽屜寬度手機 100vw、桌機 420px。
+ */
+.inquiry-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+.inquiry-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100vw);
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+}
+
+.inquiry-fade-enter-active,
+.inquiry-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.inquiry-fade-enter-from,
+.inquiry-fade-leave-to {
+  opacity: 0;
+}
+
+.inquiry-slide-enter-active,
+.inquiry-slide-leave-active {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.inquiry-slide-enter-from,
+.inquiry-slide-leave-to {
+  transform: translateX(100%);
+}
+</style>

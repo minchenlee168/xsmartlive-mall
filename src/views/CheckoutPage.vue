@@ -510,19 +510,7 @@ const handlePlaceOrder = () => {
         >
           <div class="flex items-start gap-4 px-4 py-3">
             <div class="h-14 w-14 shrink-0 overflow-hidden rounded">
-              <img
-                v-if="item.image"
-                :src="item.image"
-                :alt="item.name"
-                class="h-full w-full object-cover"
-              />
-              <div
-                v-else
-                class="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-slate-100"
-              >
-                <i class="pi pi-hammer text-lg text-slate-300" />
-                <span class="text-xs text-slate-400">圖片施工中</span>
-              </div>
+              <ProductImage :src="item.image" :alt="item.name" size="sm" />
             </div>
             <div class="flex min-w-0 flex-1 flex-col gap-1">
               <p class="truncate text-base font-semibold text-slate-700">
@@ -730,10 +718,12 @@ const handlePlaceOrder = () => {
             <span>使用</span>
             <InputNumber v-model="rewardPoints" :min="0" class="w-40" />
             <span>點</span>
-            <span class="text-slate-500"
-              >/ 尚有紅利點數
-              <span style="color: var(--primary)">100</span> 點可使用</span
-            >
+            <span class="text-slate-500">
+              <span aria-hidden="true">/</span>
+              尚有紅利點數
+              <span style="color: var(--primary)">100</span>
+              點可使用
+            </span>
           </div>
         </div>
       </section>
@@ -781,7 +771,8 @@ const handlePlaceOrder = () => {
             >- $ {{ Math.abs(MULTI_ITEM_DISCOUNT).toLocaleString() }}</span
           >
 
-          <!-- 符合『滿千免運』提示：手機獨佔一列、桌機與運費折抵同列 -->
+          <!-- 符合『滿千免運』提示 -->
+          <!-- 手機：col-span-3 整列顯示在運費折抵上方 -->
           <div
             class="col-span-3 flex items-center justify-end gap-1 text-sm @3xl:hidden"
             style="color: var(--primary)"
@@ -789,19 +780,21 @@ const handlePlaceOrder = () => {
             <i class="pi pi-truck text-xs" />
             符合『滿千免運』
           </div>
-          <span
-            class="hidden items-center gap-1 justify-self-end text-sm @3xl:flex"
+          <!-- PC：與運費折抵同一行；放在 col 1 並 justify-self-end 靠右。
+               用 invisible @3xl:visible 確保手機也佔 grid cell（讓欄位對齊上方） -->
+          <div
+            class="invisible flex items-center justify-self-end gap-1 text-sm @3xl:visible"
             style="color: var(--primary)"
           >
             <i class="pi pi-truck text-xs" />
             符合『滿千免運』
-          </span>
+          </div>
           <span class="text-slate-700">運費折抵</span>
           <span class="text-right text-red-500"
             >- $ {{ Math.abs(SHIPPING_DISCOUNT).toLocaleString() }}</span
           >
 
-          <!-- 已套用優惠券提示：手機獨佔一列、桌機與優惠券折扣同列 -->
+          <!-- 已套用優惠券提示 -->
           <template v-if="appliedCoupon">
             <div
               class="col-span-3 flex items-center justify-end gap-1 text-sm @3xl:hidden"
@@ -810,13 +803,13 @@ const handlePlaceOrder = () => {
               <i class="pi pi-ticket text-xs" />
               已套用『{{ appliedCoupon.title }}』
             </div>
-            <span
-              class="hidden items-center gap-1 justify-self-end text-sm @3xl:flex"
+            <div
+              class="invisible flex items-center justify-self-end gap-1 text-sm @3xl:visible"
               style="color: var(--primary)"
             >
               <i class="pi pi-ticket text-xs" />
               已套用『{{ appliedCoupon.title }}』
-            </span>
+            </div>
             <span class="text-slate-700">優惠券折扣</span>
             <span class="text-right text-red-500"
               >- $ {{ Math.abs(couponDiscount).toLocaleString() }}</span
@@ -937,491 +930,512 @@ const handlePlaceOrder = () => {
     </Dialog>
 
     <!-- ============== Coupon Drawer ============== -->
-    <Transition name="drawer-fade">
-      <div
-        v-if="isCouponDrawerVisible"
-        class="drawer-backdrop"
-        @click="isCouponDrawerVisible = false"
-      />
-    </Transition>
-    <Transition name="drawer-slide">
-      <div v-if="isCouponDrawerVisible" class="drawer-panel">
-        <div class="mx-auto max-w-[680px] px-4 pt-5 pb-5">
-          <!-- Header -->
-          <div class="mb-4 flex items-center justify-between">
-            <h3 class="text-lg font-bold text-slate-950">可使用優惠券</h3>
-            <Button
-              icon="pi pi-times"
-              severity="secondary"
-              text
-              rounded
-              class="!min-h-11 !min-w-11"
-              @click="isCouponDrawerVisible = false"
-            />
-          </div>
+    <!-- Teleport 到 body：避開 App.vue 的 @container（會把 fixed 子節點變成
+         以 frame 為 containing block），讓抽屜 / 遮罩用真正的 viewport 座標。 -->
+    <Teleport to="body">
+      <Transition name="drawer-fade">
+        <div
+          v-if="isCouponDrawerVisible"
+          class="drawer-backdrop"
+          @click="isCouponDrawerVisible = false"
+        />
+      </Transition>
+      <Transition name="drawer-slide">
+        <div v-if="isCouponDrawerVisible" class="drawer-panel">
+          <div class="mx-auto max-w-[680px] px-4 pt-5 pb-5">
+            <!-- Header -->
+            <div class="mb-4 flex items-center justify-between">
+              <h3 class="text-lg font-bold text-slate-950">可使用優惠券</h3>
+              <Button
+                icon="pi pi-times"
+                severity="secondary"
+                text
+                rounded
+                class="!min-h-11 !min-w-11"
+                @click="isCouponDrawerVisible = false"
+              />
+            </div>
 
-          <!-- Coupon list -->
-          <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
-            <label
-              v-for="c in sortedCoupons"
-              :key="c.id"
-              class="flex rounded-[10px] border border-slate-200"
-              :class="
-                !isCouponUsable(c)
-                  ? 'cursor-not-allowed'
-                  : 'cursor-pointer hover:border-[var(--primary)]'
-              "
-            >
-              <!-- Amount block -->
-              <div
-                class="flex w-[76px] shrink-0 items-center justify-center gap-1 rounded-l-[10px] px-2 py-3 @3xl:w-[140px] @3xl:gap-2 @3xl:px-3 @3xl:py-4"
-                :class="isCouponUsable(c) ? '' : 'bg-slate-100'"
-                :style="
-                  isCouponUsable(c) ? 'background: var(--primary-surface)' : ''
+            <!-- Coupon list -->
+            <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+              <label
+                v-for="c in sortedCoupons"
+                :key="c.id"
+                class="flex rounded-[10px] border border-slate-200"
+                :class="
+                  !isCouponUsable(c)
+                    ? 'cursor-not-allowed'
+                    : 'cursor-pointer hover:border-[var(--primary)]'
                 "
               >
-                <i
-                  class="pi pi-gift hidden text-xl @3xl:inline"
-                  :class="isCouponUsable(c) ? '' : 'text-slate-400'"
-                  :style="isCouponUsable(c) ? 'color: var(--primary)' : ''"
-                />
-                <span
-                  class="text-lg font-bold @3xl:text-2xl"
-                  :class="isCouponUsable(c) ? '' : 'text-slate-400'"
-                  :style="isCouponUsable(c) ? 'color: var(--primary)' : ''"
-                  >{{ c.amount }}</span
+                <!-- Amount block -->
+                <div
+                  class="flex w-[76px] shrink-0 items-center justify-center gap-1 rounded-l-[10px] px-2 py-3 @3xl:w-[140px] @3xl:gap-2 @3xl:px-3 @3xl:py-4"
+                  :class="isCouponUsable(c) ? '' : 'bg-slate-100'"
+                  :style="
+                    isCouponUsable(c)
+                      ? 'background: var(--primary-surface)'
+                      : ''
+                  "
                 >
-              </div>
-              <!-- Detail block -->
-              <div
-                class="flex min-w-0 flex-1 flex-col gap-1 px-3 py-3 @3xl:px-4 @3xl:py-4"
-              >
-                <span
-                  v-if="!isCouponUsable(c)"
-                  class="text-xs font-medium text-red-500 @3xl:hidden"
-                  >{{ couponUnusableReason(c) }}</span
+                  <i
+                    class="pi pi-gift hidden text-xl @3xl:inline"
+                    :class="isCouponUsable(c) ? '' : 'text-slate-400'"
+                    :style="isCouponUsable(c) ? 'color: var(--primary)' : ''"
+                  />
+                  <span
+                    class="text-lg font-bold @3xl:text-2xl"
+                    :class="isCouponUsable(c) ? '' : 'text-slate-400'"
+                    :style="isCouponUsable(c) ? 'color: var(--primary)' : ''"
+                    >{{ c.amount }}</span
+                  >
+                </div>
+                <!-- Detail block -->
+                <div
+                  class="flex min-w-0 flex-1 flex-col gap-1 px-3 py-3 @3xl:px-4 @3xl:py-4"
                 >
-                <p class="text-base font-medium text-slate-700">
-                  {{ c.title }}
-                </p>
-                <p class="text-sm text-slate-600">{{ c.desc }}</p>
-                <span
-                  class="self-start rounded bg-pink-100 px-2 py-0.5 text-xs break-words text-pink-700"
-                  >{{ c.scope }}</span
+                  <span
+                    v-if="!isCouponUsable(c)"
+                    class="text-xs font-medium text-red-500 @3xl:hidden"
+                    >{{ couponUnusableReason(c) }}</span
+                  >
+                  <p class="text-base font-medium text-slate-700">
+                    {{ c.title }}
+                  </p>
+                  <p class="text-sm text-slate-600">{{ c.desc }}</p>
+                  <span
+                    class="self-start rounded bg-pink-100 px-2 py-0.5 text-xs break-words text-pink-700"
+                    >{{ c.scope }}</span
+                  >
+                  <p class="mt-1 text-xs text-slate-500">{{ c.expiry }}</p>
+                </div>
+                <!-- Right side: radio / disabled note；手機版未達門檻則只在名稱上方顯示，這欄改用 hidden -->
+                <div
+                  class="flex w-[60px] shrink-0 items-center justify-center py-2 text-center @3xl:w-24"
+                  :class="!isCouponUsable(c) ? 'hidden @3xl:flex' : ''"
                 >
-                <p class="mt-1 text-xs text-slate-500">{{ c.expiry }}</p>
-              </div>
-              <!-- Right side: radio / disabled note；手機版未達門檻則只在名稱上方顯示，這欄改用 hidden -->
-              <div
-                class="flex w-[60px] shrink-0 items-center justify-center py-2 text-center @3xl:w-24"
-                :class="!isCouponUsable(c) ? 'hidden @3xl:flex' : ''"
-              >
-                <span v-if="!isCouponUsable(c)" class="text-sm text-red-500">{{
-                  couponUnusableReason(c)
-                }}</span>
-                <RadioButton
-                  v-else
-                  v-model="couponDrawerSelected"
-                  :value="c.id"
-                />
-              </div>
-            </label>
-          </div>
+                  <span
+                    v-if="!isCouponUsable(c)"
+                    class="text-sm text-red-500"
+                    >{{ couponUnusableReason(c) }}</span
+                  >
+                  <RadioButton
+                    v-else
+                    v-model="couponDrawerSelected"
+                    :value="c.id"
+                  />
+                </div>
+              </label>
+            </div>
 
-          <!-- Footer -->
-          <div class="mt-4 flex justify-end gap-2">
-            <Button
-              label="取消"
-              severity="secondary"
-              outlined
-              @click="isCouponDrawerVisible = false"
-            />
-            <Button label="確認" @click="handleConfirmCouponDrawer" />
+            <!-- Footer -->
+            <div class="mt-4 flex justify-end gap-2">
+              <Button
+                label="取消"
+                severity="secondary"
+                outlined
+                @click="isCouponDrawerVisible = false"
+              />
+              <Button label="確認" @click="handleConfirmCouponDrawer" />
+            </div>
           </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
 
     <!-- ============== Shipping Drawer ============== -->
-    <Transition name="drawer-fade">
-      <div
-        v-if="isShipDrawerVisible"
-        class="drawer-backdrop"
-        @click="isShipDrawerVisible = false"
-      />
-    </Transition>
-    <Transition name="drawer-slide">
-      <div v-if="isShipDrawerVisible" class="drawer-panel">
-        <div class="mx-auto max-w-[680px] px-4 pt-5 pb-5">
-          <!-- ===== View: list ===== -->
-          <template v-if="shipDrawerView === 'list'">
-            <div class="mb-4 flex items-center justify-between">
-              <h3 class="text-lg font-bold text-slate-950">選擇運送方式</h3>
-              <Button
-                icon="pi pi-times"
-                severity="secondary"
-                text
-                rounded
-                class="!min-h-11 !min-w-11"
-                @click="isShipDrawerVisible = false"
-              />
-            </div>
-
-            <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
-              <!-- Home -->
-              <div>
+    <Teleport to="body">
+      <Transition name="drawer-fade">
+        <div
+          v-if="isShipDrawerVisible"
+          class="drawer-backdrop"
+          @click="isShipDrawerVisible = false"
+        />
+      </Transition>
+      <Transition name="drawer-slide">
+        <div v-if="isShipDrawerVisible" class="drawer-panel">
+          <div class="mx-auto max-w-[680px] px-4 pt-5 pb-5">
+            <!-- ===== View: list ===== -->
+            <template v-if="shipDrawerView === 'list'">
+              <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-950">選擇運送方式</h3>
                 <Button
+                  icon="pi pi-times"
                   severity="secondary"
-                  class="!min-h-11 !w-full !justify-between"
-                  :pt="{
-                    root: {
-                      class: '!bg-slate-100 !border-none !text-slate-700',
-                    },
-                  }"
-                  @click="shipMethod = 'home'"
-                >
-                  <span class="font-medium">宅配</span>
-                  <span class="flex items-center gap-2">
-                    $150
-                    <i
-                      v-if="shipMethod === 'home'"
-                      class="pi pi-check text-green-600"
-                    />
-                  </span>
-                </Button>
-
-                <div
-                  v-if="shipMethod === 'home'"
-                  class="mt-3 flex flex-col gap-2"
-                >
-                  <div
-                    v-for="addr in homeAddresses"
-                    :key="addr.id"
-                    class="flex items-start gap-3 px-2 py-2"
-                  >
-                    <RadioButton
-                      v-model="selectedHomeId"
-                      :value="addr.id"
-                      :disabled="addr.unavailable"
-                      class="mt-1"
-                    />
-                    <div class="min-w-0 flex-1">
-                      <div
-                        class="flex items-center gap-2 text-sm text-slate-700"
-                      >
-                        <span class="font-medium">{{ addr.name }}</span>
-                        <span>{{ addr.phone }}</span>
-                        <span
-                          v-if="addr.isDefault"
-                          class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                          style="background: var(--primary)"
-                          >預設</span
-                        >
-                      </div>
-                      <div
-                        class="mt-1 flex items-center gap-1 text-sm text-slate-700"
-                      >
-                        <i class="pi pi-map-marker text-xs" />
-                        {{ addr.address }}
-                        <span v-if="addr.unavailable" class="ml-1 text-red-500"
-                          >(目前不提供配送至此地區)</span
-                        >
-                      </div>
-                    </div>
-                    <div class="flex shrink-0 items-center gap-2">
-                      <Button
-                        v-if="!addr.isDefault"
-                        label="設為預設"
-                        outlined
-                        size="small"
-                        @click="handleSetDefaultHome(addr.id)"
-                      />
-                      <Button
-                        label="刪除"
-                        severity="danger"
-                        outlined
-                        size="small"
-                        @click="handleDeleteHome(addr.id)"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    label="新增宅配地址"
-                    icon="pi pi-plus"
-                    severity="secondary"
-                    outlined
-                    class="!min-h-11 w-full"
-                    @click="shipDrawerView = 'add-home'"
-                  />
-                </div>
-              </div>
-
-              <!-- Store -->
-              <div>
-                <Button
-                  severity="secondary"
-                  class="!min-h-11 !w-full !justify-between"
-                  :pt="{
-                    root: {
-                      class: '!bg-slate-100 !border-none !text-slate-700',
-                    },
-                  }"
-                  @click="shipMethod = 'store'"
-                >
-                  <span class="font-medium">超商配送</span>
-                  <span class="flex items-center gap-2">
-                    $60
-                    <i
-                      v-if="shipMethod === 'store'"
-                      class="pi pi-check text-green-600"
-                    />
-                  </span>
-                </Button>
-
-                <div
-                  v-if="shipMethod === 'store'"
-                  class="mt-3 flex flex-col gap-2"
-                >
-                  <div
-                    v-for="addr in storeAddresses"
-                    :key="addr.id"
-                    class="flex items-start gap-3 px-2 py-2"
-                  >
-                    <RadioButton
-                      v-model="selectedStoreId"
-                      :value="addr.id"
-                      class="mt-1"
-                    />
-                    <div class="min-w-0 flex-1">
-                      <div
-                        class="flex items-center gap-2 text-sm text-slate-700"
-                      >
-                        <span class="font-medium">{{ addr.name }}</span>
-                        <span>{{ addr.phone }}</span>
-                        <span
-                          v-if="addr.isDefault"
-                          class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                          style="background: var(--primary)"
-                          >預設</span
-                        >
-                      </div>
-                      <div
-                        class="mt-1 flex items-center gap-2 text-sm text-slate-700"
-                      >
-                        <span
-                          class="inline-flex h-6 w-9 items-center justify-center rounded text-xs font-bold text-white"
-                          :style="
-                            addr.chain === '7-11'
-                              ? 'background: #ee1c25'
-                              : 'background: #00a040'
-                          "
-                          >{{ addr.chain === '7-11' ? '7-11' : 'FAMI' }}</span
-                        >
-                        <span class="font-medium">{{ addr.storeName }}</span>
-                      </div>
-                      <div
-                        class="mt-1 ml-11 flex items-center gap-1 text-sm text-slate-700"
-                      >
-                        <i class="pi pi-map-marker text-xs" />
-                        {{ addr.address }}
-                      </div>
-                    </div>
-                    <div class="flex shrink-0 items-center gap-2">
-                      <Button
-                        v-if="!addr.isDefault"
-                        label="設為預設"
-                        outlined
-                        size="small"
-                        @click="handleSetDefaultStore(addr.id)"
-                      />
-                      <Button
-                        label="刪除"
-                        severity="danger"
-                        outlined
-                        size="small"
-                        @click="handleDeleteStore(addr.id)"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    label="新增超商地址"
-                    icon="pi pi-plus"
-                    severity="secondary"
-                    outlined
-                    class="!min-h-11 w-full"
-                    @click="shipDrawerView = 'add-store'"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-4 flex justify-end gap-2">
-              <Button
-                label="取消"
-                severity="secondary"
-                outlined
-                @click="isShipDrawerVisible = false"
-              />
-              <Button label="確認" @click="isShipDrawerVisible = false" />
-            </div>
-          </template>
-
-          <!-- ===== View: add-home ===== -->
-          <template v-else-if="shipDrawerView === 'add-home'">
-            <div class="mb-4 flex items-center justify-between">
-              <h3 class="text-lg font-bold text-slate-950">新增宅配地址</h3>
-              <Button
-                icon="pi pi-times"
-                severity="secondary"
-                text
-                rounded
-                class="!min-h-11 !min-w-11"
-                @click="shipDrawerView = 'list'"
-              />
-            </div>
-
-            <div class="mx-auto flex max-w-[440px] flex-col gap-3">
-              <div class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">收件人姓名</label>
-                <InputText v-model="newHomeName" class="w-full" />
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">收件人電話</label>
-                <div class="flex gap-2">
-                  <Select
-                    v-model="newHomeCountryCode"
-                    :options="DRAWER_COUNTRY_CODES"
-                    class="w-[120px]"
-                  />
-                  <InputText v-model="newHomePhone" type="tel" class="flex-1" />
-                </div>
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">國別</label>
-                <Select
-                  v-model="newHomeCountry"
-                  :options="DRAWER_COUNTRIES"
-                  class="w-full"
+                  text
+                  rounded
+                  class="!min-h-11 !min-w-11"
+                  @click="isShipDrawerVisible = false"
                 />
               </div>
-              <div v-if="newHomeCountry === '台灣'" class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">城市/區</label>
-                <div class="flex gap-2">
-                  <Select
-                    v-model="newHomeCity"
-                    :options="DRAWER_CITIES"
-                    class="flex-1"
-                  />
-                  <Select
-                    v-model="newHomeDistrict"
-                    :options="DRAWER_DISTRICTS"
-                    class="flex-1"
-                  />
-                </div>
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">詳細收件地址</label>
-                <InputText v-model="newHomeAddress" class="w-full" />
-              </div>
-            </div>
 
-            <div class="mt-4 flex justify-end gap-2">
-              <Button
-                label="取消"
-                severity="secondary"
-                outlined
-                @click="shipDrawerView = 'list'"
-              />
-              <Button label="確認新增" @click="handleSubmitAddHome" />
-            </div>
-          </template>
-
-          <!-- ===== View: add-store ===== -->
-          <template v-else-if="shipDrawerView === 'add-store'">
-            <div class="mb-4 flex items-center justify-between">
-              <h3 class="text-lg font-bold text-slate-950">新增超商門市</h3>
-              <Button
-                icon="pi pi-times"
-                severity="secondary"
-                text
-                rounded
-                class="!min-h-11 !min-w-11"
-                @click="shipDrawerView = 'list'"
-              />
-            </div>
-
-            <div class="mx-auto flex max-w-[440px] flex-col gap-4">
-              <div class="flex flex-col gap-2">
-                <label class="text-sm text-slate-700">選擇超商</label>
-                <div class="flex gap-3">
-                  <button
-                    class="flex h-12 w-16 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-all"
-                    :style="
-                      newStoreChain === '7-11'
-                        ? 'border-color: var(--primary); background: #ee1c25'
-                        : 'border-color: transparent; background: #ee1c25'
-                    "
-                    @click="handlePickChain('7-11')"
+              <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+                <!-- Home -->
+                <div>
+                  <Button
+                    severity="secondary"
+                    class="!min-h-11 !w-full !justify-between"
+                    :pt="{
+                      root: {
+                        class: '!bg-slate-100 !border-none !text-slate-700',
+                      },
+                    }"
+                    @click="shipMethod = 'home'"
                   >
-                    7-ELEVEN
-                  </button>
-                  <button
-                    class="flex h-12 w-16 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-all"
-                    :style="
-                      newStoreChain === 'FamilyMart'
-                        ? 'border-color: var(--primary); background: #00a040'
-                        : 'border-color: transparent; background: #00a040'
-                    "
-                    @click="handlePickChain('FamilyMart')"
-                  >
-                    Family
-                  </button>
-                </div>
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">選擇取件門市</label>
-                <div v-if="!newStoreChain" class="font-bold text-slate-700">
-                  請先選擇超商
-                </div>
-                <div v-else>
-                  <p class="font-bold text-slate-700">{{ pickedStoreName }}</p>
-                  <p class="text-sm text-slate-600">{{ pickedStoreAddr }}</p>
-                </div>
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">收件人姓名</label>
-                <InputText v-model="newStoreName" class="w-full" />
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-sm text-slate-700">收件人電話</label>
-                <div class="flex gap-2">
-                  <Select
-                    v-model="newHomeCountryCode"
-                    :options="DRAWER_COUNTRY_CODES"
-                    class="w-[120px]"
-                  />
-                  <InputText
-                    v-model="newStorePhone"
-                    type="tel"
-                    class="flex-1"
-                  />
-                </div>
-              </div>
-            </div>
+                    <span class="font-medium">宅配</span>
+                    <span class="flex items-center gap-2">
+                      $150
+                      <i
+                        v-if="shipMethod === 'home'"
+                        class="pi pi-check text-green-600"
+                      />
+                    </span>
+                  </Button>
 
-            <div class="mt-4 flex justify-end gap-2">
-              <Button
-                label="取消"
-                severity="secondary"
-                outlined
-                @click="shipDrawerView = 'list'"
-              />
-              <Button label="確認新增" @click="handleSubmitAddStore" />
-            </div>
-          </template>
+                  <div
+                    v-if="shipMethod === 'home'"
+                    class="mt-3 flex flex-col gap-2"
+                  >
+                    <div
+                      v-for="addr in homeAddresses"
+                      :key="addr.id"
+                      class="flex items-start gap-3 px-2 py-2"
+                    >
+                      <RadioButton
+                        v-model="selectedHomeId"
+                        :value="addr.id"
+                        :disabled="addr.unavailable"
+                        class="mt-1"
+                      />
+                      <div class="min-w-0 flex-1">
+                        <div
+                          class="flex items-center gap-2 text-sm text-slate-700"
+                        >
+                          <span class="font-medium">{{ addr.name }}</span>
+                          <span>{{ addr.phone }}</span>
+                          <span
+                            v-if="addr.isDefault"
+                            class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                            style="background: var(--primary)"
+                            >預設</span
+                          >
+                        </div>
+                        <div
+                          class="mt-1 flex items-center gap-1 text-sm text-slate-700"
+                        >
+                          <i class="pi pi-map-marker text-xs" />
+                          {{ addr.address }}
+                          <span
+                            v-if="addr.unavailable"
+                            class="ml-1 text-red-500"
+                            >(目前不提供配送至此地區)</span
+                          >
+                        </div>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-2">
+                        <Button
+                          v-if="!addr.isDefault"
+                          label="設為預設"
+                          outlined
+                          size="small"
+                          @click="handleSetDefaultHome(addr.id)"
+                        />
+                        <Button
+                          label="刪除"
+                          severity="danger"
+                          outlined
+                          size="small"
+                          @click="handleDeleteHome(addr.id)"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      label="新增宅配地址"
+                      icon="pi pi-plus"
+                      severity="secondary"
+                      outlined
+                      class="!min-h-11 w-full"
+                      @click="shipDrawerView = 'add-home'"
+                    />
+                  </div>
+                </div>
+
+                <!-- Store -->
+                <div>
+                  <Button
+                    severity="secondary"
+                    class="!min-h-11 !w-full !justify-between"
+                    :pt="{
+                      root: {
+                        class: '!bg-slate-100 !border-none !text-slate-700',
+                      },
+                    }"
+                    @click="shipMethod = 'store'"
+                  >
+                    <span class="font-medium">超商配送</span>
+                    <span class="flex items-center gap-2">
+                      $60
+                      <i
+                        v-if="shipMethod === 'store'"
+                        class="pi pi-check text-green-600"
+                      />
+                    </span>
+                  </Button>
+
+                  <div
+                    v-if="shipMethod === 'store'"
+                    class="mt-3 flex flex-col gap-2"
+                  >
+                    <div
+                      v-for="addr in storeAddresses"
+                      :key="addr.id"
+                      class="flex items-start gap-3 px-2 py-2"
+                    >
+                      <RadioButton
+                        v-model="selectedStoreId"
+                        :value="addr.id"
+                        class="mt-1"
+                      />
+                      <div class="min-w-0 flex-1">
+                        <div
+                          class="flex items-center gap-2 text-sm text-slate-700"
+                        >
+                          <span class="font-medium">{{ addr.name }}</span>
+                          <span>{{ addr.phone }}</span>
+                          <span
+                            v-if="addr.isDefault"
+                            class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                            style="background: var(--primary)"
+                            >預設</span
+                          >
+                        </div>
+                        <div
+                          class="mt-1 flex items-center gap-2 text-sm text-slate-700"
+                        >
+                          <span
+                            class="inline-flex h-6 w-9 items-center justify-center rounded text-xs font-bold text-white"
+                            :style="
+                              addr.chain === '7-11'
+                                ? 'background: #ee1c25'
+                                : 'background: #00a040'
+                            "
+                            >{{ addr.chain === '7-11' ? '7-11' : 'FAMI' }}</span
+                          >
+                          <span class="font-medium">{{ addr.storeName }}</span>
+                        </div>
+                        <div
+                          class="mt-1 ml-11 flex items-center gap-1 text-sm text-slate-700"
+                        >
+                          <i class="pi pi-map-marker text-xs" />
+                          {{ addr.address }}
+                        </div>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-2">
+                        <Button
+                          v-if="!addr.isDefault"
+                          label="設為預設"
+                          outlined
+                          size="small"
+                          @click="handleSetDefaultStore(addr.id)"
+                        />
+                        <Button
+                          label="刪除"
+                          severity="danger"
+                          outlined
+                          size="small"
+                          @click="handleDeleteStore(addr.id)"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      label="新增超商地址"
+                      icon="pi pi-plus"
+                      severity="secondary"
+                      outlined
+                      class="!min-h-11 w-full"
+                      @click="shipDrawerView = 'add-store'"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 flex justify-end gap-2">
+                <Button
+                  label="取消"
+                  severity="secondary"
+                  outlined
+                  @click="isShipDrawerVisible = false"
+                />
+                <Button label="確認" @click="isShipDrawerVisible = false" />
+              </div>
+            </template>
+
+            <!-- ===== View: add-home ===== -->
+            <template v-else-if="shipDrawerView === 'add-home'">
+              <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-950">新增宅配地址</h3>
+                <Button
+                  icon="pi pi-times"
+                  severity="secondary"
+                  text
+                  rounded
+                  class="!min-h-11 !min-w-11"
+                  @click="shipDrawerView = 'list'"
+                />
+              </div>
+
+              <div class="mx-auto flex max-w-[440px] flex-col gap-3">
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">收件人姓名</label>
+                  <InputText v-model="newHomeName" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">收件人電話</label>
+                  <div class="flex gap-2">
+                    <Select
+                      v-model="newHomeCountryCode"
+                      :options="DRAWER_COUNTRY_CODES"
+                      class="w-[120px]"
+                    />
+                    <InputText
+                      v-model="newHomePhone"
+                      type="tel"
+                      class="flex-1"
+                    />
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">國別</label>
+                  <Select
+                    v-model="newHomeCountry"
+                    :options="DRAWER_COUNTRIES"
+                    class="w-full"
+                  />
+                </div>
+                <div
+                  v-if="newHomeCountry === '台灣'"
+                  class="flex flex-col gap-1"
+                >
+                  <label class="text-sm text-slate-700">城市/區</label>
+                  <div class="flex gap-2">
+                    <Select
+                      v-model="newHomeCity"
+                      :options="DRAWER_CITIES"
+                      class="flex-1"
+                    />
+                    <Select
+                      v-model="newHomeDistrict"
+                      :options="DRAWER_DISTRICTS"
+                      class="flex-1"
+                    />
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">詳細收件地址</label>
+                  <InputText v-model="newHomeAddress" class="w-full" />
+                </div>
+              </div>
+
+              <div class="mt-4 flex justify-end gap-2">
+                <Button
+                  label="取消"
+                  severity="secondary"
+                  outlined
+                  @click="shipDrawerView = 'list'"
+                />
+                <Button label="確認新增" @click="handleSubmitAddHome" />
+              </div>
+            </template>
+
+            <!-- ===== View: add-store ===== -->
+            <template v-else-if="shipDrawerView === 'add-store'">
+              <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-950">新增超商門市</h3>
+                <Button
+                  icon="pi pi-times"
+                  severity="secondary"
+                  text
+                  rounded
+                  class="!min-h-11 !min-w-11"
+                  @click="shipDrawerView = 'list'"
+                />
+              </div>
+
+              <div class="mx-auto flex max-w-[440px] flex-col gap-4">
+                <div class="flex flex-col gap-2">
+                  <label class="text-sm text-slate-700">選擇超商</label>
+                  <div class="flex gap-3">
+                    <button
+                      class="flex h-12 w-16 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-all"
+                      :style="
+                        newStoreChain === '7-11'
+                          ? 'border-color: var(--primary); background: #ee1c25'
+                          : 'border-color: transparent; background: #ee1c25'
+                      "
+                      @click="handlePickChain('7-11')"
+                    >
+                      7-ELEVEN
+                    </button>
+                    <button
+                      class="flex h-12 w-16 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-all"
+                      :style="
+                        newStoreChain === 'FamilyMart'
+                          ? 'border-color: var(--primary); background: #00a040'
+                          : 'border-color: transparent; background: #00a040'
+                      "
+                      @click="handlePickChain('FamilyMart')"
+                    >
+                      Family
+                    </button>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">選擇取件門市</label>
+                  <div v-if="!newStoreChain" class="font-bold text-slate-700">
+                    請先選擇超商
+                  </div>
+                  <div v-else>
+                    <p class="font-bold text-slate-700">
+                      {{ pickedStoreName }}
+                    </p>
+                    <p class="text-sm text-slate-600">{{ pickedStoreAddr }}</p>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">收件人姓名</label>
+                  <InputText v-model="newStoreName" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">收件人電話</label>
+                  <div class="flex gap-2">
+                    <Select
+                      v-model="newHomeCountryCode"
+                      :options="DRAWER_COUNTRY_CODES"
+                      class="w-[120px]"
+                    />
+                    <InputText
+                      v-model="newStorePhone"
+                      type="tel"
+                      class="flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 flex justify-end gap-2">
+                <Button
+                  label="取消"
+                  severity="secondary"
+                  outlined
+                  @click="shipDrawerView = 'list'"
+                />
+                <Button label="確認新增" @click="handleSubmitAddStore" />
+              </div>
+            </template>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -1483,7 +1497,9 @@ const handlePlaceOrder = () => {
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
 }
 
-/* 視窗縮到手機寬時，--frame-* 可能尚未就緒；遮罩 / 抽屜先以視窗為準，
+/* 視窗縮到手機寬時，--frame-* 可能尚未就緒或值不準，
+   強制抽屜貼在視窗底部（bottom: 0）、固定 390px（手機設計稿寬度），
+   視窗更窄就跟著縮，避免水平 overflow。
    抽屜本體已 translateX(-50%) 置中，遮罩鋪滿不影響定位。 */
 @media (max-width: 768px) {
   .drawer-backdrop {
@@ -1492,7 +1508,8 @@ const handlePlaceOrder = () => {
   }
   .drawer-panel {
     left: 50vw !important;
-    width: 100vw !important;
+    bottom: 0 !important;
+    width: min(390px, 100vw) !important;
   }
 }
 

@@ -17,18 +17,29 @@ const tab = computed(() => decodeURIComponent(route.params.tab as string));
 const activeSubCategory = ref((route.query.sub as string) ?? '');
 const isSidebarOpen = ref(false);
 
-// 完整商品 feed — 原型用既有資料堆出較長列表方便展示動態載入
-const feed = Array.from({ length: 5 }, (_, page) =>
-  products.map((p) => ({ ...p, key: `${p.id}-${page}` })),
-).flat();
+/**
+ * 依目前選擇的大分類過濾商品；對應 product.category。
+ * 商品不足時，原型用既有資料重複堆疊出較長列表方便展示動態載入。
+ */
+const filteredProducts = computed(() =>
+  products.filter((p) => p.category === tab.value),
+);
+const feed = computed(() =>
+  Array.from({ length: 5 }, (_, page) =>
+    filteredProducts.value.map((p) => ({ ...p, key: `${p.id}-${page}` })),
+  ).flat(),
+);
 
 const visibleCount = ref(PAGE_SIZE);
-const visibleProducts = computed(() => feed.slice(0, visibleCount.value));
-const hasMore = computed(() => visibleCount.value < feed.length);
+const visibleProducts = computed(() => feed.value.slice(0, visibleCount.value));
+const hasMore = computed(() => visibleCount.value < feed.value.length);
 
 const { sentinelRef } = useInfiniteScroll(
   () => {
-    visibleCount.value = Math.min(visibleCount.value + PAGE_SIZE, feed.length);
+    visibleCount.value = Math.min(
+      visibleCount.value + PAGE_SIZE,
+      feed.value.length,
+    );
   },
   () => hasMore.value,
 );
@@ -86,13 +97,23 @@ watch([() => route.params.tab, activeSubCategory], () => {
         <div class="@3xl:hidden">
           <Button
             :icon="`pi pi-${isSidebarOpen ? 'chevron-up' : 'filter'}`"
-            :label="`依分類篩選${isSidebarOpen ? ' （收合）' : ''}`"
+            label="依分類篩選"
             class="!min-h-11"
             @click="isSidebarOpen = !isSidebarOpen"
           />
 
           <div v-if="isSidebarOpen" class="mt-2">
-            <CategorySidebar :tab="tab" v-model:active="activeSubCategory" />
+            <CategorySidebar
+              :tab="tab"
+              :active="activeSubCategory"
+              @update:active="
+                (value) => {
+                  activeSubCategory = value;
+                  // 手機版選了子分類後自動收合
+                  isSidebarOpen = false;
+                }
+              "
+            />
           </div>
         </div>
 

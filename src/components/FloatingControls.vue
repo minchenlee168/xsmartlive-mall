@@ -4,6 +4,8 @@ import { useThemeStore } from '../pinia/theme';
 import { useViewportStore, viewports } from '../pinia/viewport';
 import { useDensityStore, type DensityMode } from '../pinia/density';
 
+declare const __BUILD_TIME__: string;
+
 const themeStore = useThemeStore();
 const viewportStore = useViewportStore();
 const densityStore = useDensityStore();
@@ -14,6 +16,13 @@ const densities: { id: DensityMode; label: string; icon: string }[] = [
 ];
 
 const isOpen = ref(false);
+
+/** vite.config 在 build/dev 啟動時注入 ISO 字串，轉成 YYYY/MM/DD HH:mm 顯示。 */
+const buildTimeDisplay = (() => {
+  const d = new Date(__BUILD_TIME__);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+})();
 </script>
 
 <template>
@@ -152,6 +161,13 @@ const isOpen = ref(false);
             </button>
           </div>
         </div>
+
+        <div class="h-px bg-slate-200" />
+
+        <!-- Prototype 識別 + 更新時間 -->
+        <p class="text-center text-xs leading-relaxed text-slate-400">
+          此為 prototype 展示<br />更新時間：{{ buildTimeDisplay }}
+        </p>
       </div>
     </Transition>
 
