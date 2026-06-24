@@ -2,6 +2,7 @@ export type TimelineStepKey =
   | 'unpaid'
   | 'to_ship'
   | 'shipped'
+  | 'to_receive'
   | 'delivered'
   | 'completed';
 
@@ -9,7 +10,6 @@ export type DetailTab =
   | 'progress'
   | 'cancel'
   | 'return'
-  | 'exchange'
   | 'inquiry'
   | 'address'
   | 'payment';
@@ -17,9 +17,9 @@ export type DetailTab =
 export type OrderStatus =
   | 'unpaid'
   | 'to_ship'
-  | 'to_receive'
-  | 'to_complete'
-  | 'cancelled';
+  | 'completed'
+  | 'cancelled'
+  | 'returned';
 
 export interface PackageInfo {
   no: string;

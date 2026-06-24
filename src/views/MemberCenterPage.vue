@@ -3,7 +3,6 @@ import { ref, reactive, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MemberIcon from '../components/MemberIcon.vue';
 import MyOrdersSection from '../components/member/MyOrdersSection.vue';
-import TransactionRecordsSection from '../components/member/TransactionRecordsSection.vue';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
 import { useAuthStore } from '../pinia/auth';
@@ -57,7 +56,6 @@ const MEMBER_ID = '422519347308064';
 const NAV_ITEMS = [
   { key: 'orders', label: '我的訂單' },
   { key: 'points', label: '紅利點數' },
-  { key: 'transactions', label: '交易記錄查詢' },
   { key: 'account', label: '個人帳號' },
 ];
 const ACCOUNT_SUB_ITEMS = [
@@ -66,13 +64,7 @@ const ACCOUNT_SUB_ITEMS = [
   { key: 'address', label: '收件地址' },
   { key: 'password', label: '更改密碼' },
 ];
-const VALID_NAVS = new Set([
-  'orders',
-  'points',
-  'transactions',
-  'account',
-  'coupons',
-]);
+const VALID_NAVS = new Set(['orders', 'points', 'account', 'coupons']);
 const PHONE_CODES = ['+886', '+852'];
 const CITIES = ['台北市', '新北市', '桃園市', '台中市', '高雄市'];
 const DISTRICT_MAP: Record<string, string[]> = {
@@ -363,7 +355,6 @@ const handleUsePoints = () => {
   ui.toast('已前往購物車，可於結帳折抵紅利點數');
   router.push('/cart');
 };
-const transactions = computed(() => ordersStore.transactions);
 
 // Coupons
 const couponTab = ref<'all' | 'unused' | 'used' | 'expired'>('all');
@@ -753,9 +744,7 @@ const handleSaveAddr = () => {
               @click="activeNav = item.key"
             >
               <MemberIcon
-                :name="
-                  item.key as 'orders' | 'points' | 'transactions' | 'account'
-                "
+                :name="item.key as 'orders' | 'points' | 'account'"
                 :size="20"
                 class="shrink-0"
               />
@@ -900,9 +889,6 @@ const handleSaveAddr = () => {
             </div>
           </section>
         </template>
-
-        <!-- 交易記錄查詢（對齊附圖排版） -->
-        <TransactionRecordsSection v-else-if="activeNav === 'transactions'" />
 
         <!-- 優惠券 — full width, no card wrapper -->
         <section v-else-if="activeNav === 'coupons'">
@@ -1483,7 +1469,7 @@ const handleSaveAddr = () => {
       </div>
     </main>
 
-    <!-- 手機底部固定 bar：4 個主分頁（我的訂單 / 紅利點數 / 交易記錄查詢 / 個人帳號） -->
+    <!-- 手機底部固定 bar：3 個主分頁（我的訂單 / 紅利點數 / 個人帳號） -->
     <nav
       class="sticky bottom-0 z-30 flex border-t border-slate-200 bg-white @4xl:hidden"
     >
@@ -1499,7 +1485,7 @@ const handleSaveAddr = () => {
         "
       >
         <MemberIcon
-          :name="item.key as 'orders' | 'points' | 'transactions' | 'account'"
+          :name="item.key as 'orders' | 'points' | 'account'"
           :size="22"
         />
         <span class="text-xs font-medium">{{ item.label }}</span>

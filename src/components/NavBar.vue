@@ -28,7 +28,7 @@ const handleGoMember = () => {
 
 /** 從下拉選單跳到會員中心特定分頁（紅利點數 / 優惠券）。 */
 const handleGoMemberTab = (
-  tab: 'points' | 'coupons' | 'orders' | 'transactions' | 'account',
+  tab: 'points' | 'coupons' | 'orders' | 'account',
 ) => {
   isUserMenuOpen.value = false;
   router.push({ path: '/member', query: { tab } });

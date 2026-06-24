@@ -17,6 +17,7 @@ const SAMPLE_TIMES = {
   unpaid: '02/01 07:20',
   to_ship: '02/02 08:30',
   shipped: '02/01 11:18',
+  to_receive: '02/02 16:45',
   delivered: '02/03 08:00',
   completed: '02/04 18:00',
 };
@@ -85,7 +86,7 @@ export const useOrdersStore = defineStore('orders', () => {
       invoice: '線上列印',
       status: 'to_ship',
       detailTab: 'progress',
-      expanded: false,
+      expanded: true,
       items: [
         {
           image: IMG_PJ,
@@ -128,9 +129,9 @@ export const useOrdersStore = defineStore('orders', () => {
       payment: '線上刷卡',
       delivery: '超商取貨',
       invoice: '線上列印',
-      status: 'to_receive',
+      status: 'completed',
       detailTab: 'progress',
-      expanded: false,
+      expanded: true,
       items: [
         {
           image: IMG_PJ,
@@ -142,7 +143,7 @@ export const useOrdersStore = defineStore('orders', () => {
             {
               no: 'F2026020301',
               qty: 2,
-              currentStep: 'shipped',
+              currentStep: 'to_receive',
               stepTimes: SAMPLE_TIMES,
             },
           ],
@@ -158,9 +159,9 @@ export const useOrdersStore = defineStore('orders', () => {
       payment: '貨到付款',
       delivery: '宅配',
       invoice: '線上列印',
-      status: 'to_complete',
+      status: 'completed',
       detailTab: 'progress',
-      expanded: false,
+      expanded: true,
       items: [
         {
           image: IMG_BIB,
@@ -188,9 +189,9 @@ export const useOrdersStore = defineStore('orders', () => {
       payment: '線上刷卡',
       delivery: '宅配',
       invoice: '線上列印',
-      status: 'to_complete',
+      status: 'completed',
       detailTab: 'progress',
-      expanded: false,
+      expanded: true,
       items: [
         {
           image: IMG_PJ,
@@ -239,9 +240,9 @@ export const useOrdersStore = defineStore('orders', () => {
       payment: '線上刷卡',
       delivery: '宅配',
       invoice: '線上列印',
-      status: 'to_receive',
+      status: 'completed',
       detailTab: 'progress',
-      expanded: false,
+      expanded: true,
       items: [
         {
           image: IMG_PJ,
@@ -259,7 +260,7 @@ export const useOrdersStore = defineStore('orders', () => {
             {
               no: 'F2026012502',
               qty: 1,
-              currentStep: 'to_ship',
+              currentStep: 'to_receive',
               stepTimes: SAMPLE_TIMES,
             },
           ],
@@ -277,7 +278,7 @@ export const useOrdersStore = defineStore('orders', () => {
       invoice: '—',
       status: 'cancelled',
       detailTab: 'progress',
-      expanded: false,
+      expanded: true,
       items: [
         {
           image: IMG_BIB,
@@ -290,6 +291,36 @@ export const useOrdersStore = defineStore('orders', () => {
               no: 'F2026012001',
               qty: 1,
               currentStep: 'unpaid',
+              stepTimes: SAMPLE_TIMES,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: '8',
+      date: '2026/01/15 09:21',
+      orderNo: '1000000000',
+      qty: 1,
+      total: 450,
+      payment: '線上刷卡',
+      delivery: '宅配',
+      invoice: '線上列印',
+      status: 'returned',
+      detailTab: 'progress',
+      expanded: true,
+      items: [
+        {
+          image: IMG_PJ,
+          name: '寶寶長袖包屁衣親子裝',
+          spec: '白，66cm',
+          price: 450,
+          qty: 1,
+          packages: [
+            {
+              no: 'F2026011501',
+              qty: 1,
+              currentStep: 'delivered',
               stepTimes: SAMPLE_TIMES,
             },
           ],

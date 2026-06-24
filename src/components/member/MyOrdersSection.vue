@@ -34,16 +34,42 @@ const ordersStore = useOrdersStore();
 const ui = useUiStore();
 
 // 主 tab（退貨 / 退款相關 tab 已移除）
-type StatusTab = 'all' | OrderStatus;
+/**
+ * 頁籤狀態：除了 OrderStatus 之外，再加 timeline 階段 key（shipped / to_receive / delivered）。
+ * - 出貨中、待收貨：兩個 tab 都顯示「任一包裹 currentStep === 'shipped'」的訂單（賣家 / 買家觀點）
+ * - 已送達：任一包裹 currentStep === 'delivered'
+ */
+type StatusTab =
+  | 'all'
+  | OrderStatus
+  | 'shipped'
+  | 'to_receive'
+  | 'delivered';
 const statusTabs: Array<{ key: StatusTab; label: string }> = [
   { key: 'all', label: '所有訂單' },
   { key: 'unpaid', label: '待付款' },
   { key: 'to_ship', label: '待出貨' },
+  { key: 'shipped', label: '出貨中' },
   { key: 'to_receive', label: '待收貨' },
-  { key: 'to_complete', label: '待完成' },
+  { key: 'delivered', label: '已送達' },
+  { key: 'completed', label: '已完成' },
   { key: 'cancelled', label: '取消' },
 ];
 const activeTab = ref<StatusTab>('all');
+/**
+ * 進度狀態 tab 全部用包裹 currentStep 過濾，不再依賴 order.status
+ * （避免 mock 資料 status 與包裹階段不一致時跑錯 tab）。
+ * 只要訂單有任一包裹 currentStep 命中即列入。
+ * 註：cancelled 仍走 order.status，因為取消是訂單層級事件，不在 timeline 流程中。
+ */
+const TIMELINE_TABS: Record<string, TimelineStepKey> = {
+  unpaid: 'unpaid',
+  to_ship: 'to_ship',
+  shipped: 'shipped',
+  to_receive: 'to_receive',
+  delivered: 'delivered',
+  completed: 'completed',
+};
 
 // 日期 / 搜尋（appliedXxx 為「按下查詢」後才更新的快照，
 // 篩選邏輯只看 applied 值，輸入過程不會即時 refresh） */
@@ -66,8 +92,7 @@ const handleApplyQuery = (): void => {
 const detailTabs: Array<{ key: DetailTab; label: string }> = [
   { key: 'progress', label: '配送進度/明細' },
   { key: 'cancel', label: '取消訂單' },
-  { key: 'return', label: '退貨' },
-  { key: 'exchange', label: '換貨' },
+  { key: 'return', label: '退換貨' },
   { key: 'inquiry', label: '訂單提問' },
   { key: 'address', label: '更換地址' },
   { key: 'payment', label: '訂購/付款資訊' },
@@ -82,7 +107,8 @@ interface TimelineStep {
 const TIMELINE_STEPS: TimelineStep[] = [
   { key: 'unpaid', label: '待付款', icon: 'pi-credit-card' },
   { key: 'to_ship', label: '待出貨', icon: 'pi-box' },
-  { key: 'shipped', label: '已出貨', icon: 'pi-truck' },
+  { key: 'shipped', label: '出貨中', icon: 'pi-truck' },
+  { key: 'to_receive', label: '待收貨', icon: 'pi-inbox' },
   { key: 'delivered', label: '已送達', icon: 'pi-check-circle' },
   { key: 'completed', label: '已完成', icon: 'pi-verified' },
 ];
@@ -91,8 +117,20 @@ const orders = computed(() => ordersStore.orders);
 
 const filteredOrders = computed(() => {
   let list = orders.value;
-  if (activeTab.value !== 'all')
-    list = list.filter((o) => o.status === activeTab.value);
+  if (activeTab.value !== 'all') {
+    const timelineStep = TIMELINE_TABS[activeTab.value];
+    if (timelineStep) {
+      // timeline 階段 tab：任一包裹 currentStep 命中即列入
+      list = list.filter((o) =>
+        o.items.some((it) =>
+          it.packages.some((p) => p.currentStep === timelineStep),
+        ),
+      );
+    } else {
+      // OrderStatus tab：直接比 status
+      list = list.filter((o) => o.status === activeTab.value);
+    }
+  }
   const [from, to] = appliedDateRange.value;
   if (from || to) {
     const fromTs = from
@@ -167,40 +205,35 @@ const itemDisplayStatus = (item: OrderItem): string => {
 
 /**
  * 動作可否：依包裹階段判斷
- * - unpaid / to_ship：僅可取消
- * - shipped：可取消、可退貨
+ * - unpaid / to_ship：僅可取消（待收貨前）
+ * - shipped：可退貨
  * - delivered：可換貨、可退貨
  * - completed / cancelled：皆不可
  */
 const canCancelStep = (step: TimelineStep['key']): boolean => {
-  return step === 'unpaid' || step === 'to_ship' || step === 'shipped';
+  return step === 'unpaid' || step === 'to_ship';
 };
 const canRefundStep = (step: TimelineStep['key']): boolean => {
-  return step === 'shipped' || step === 'delivered';
+  return step === 'shipped' || step === 'to_receive' || step === 'delivered';
 };
 const canExchangeStep = (step: TimelineStep['key']): boolean => {
   return step === 'delivered';
 };
 
 /** 任一包裹可退貨 / 換貨 → 整筆可操作 */
-const orderCanRefund = (order: OrderRecord): boolean => {
-  return allPackageSteps(order).some(canRefundStep);
-};
-const orderCanExchange = (order: OrderRecord): boolean => {
-  return allPackageSteps(order).some(canExchangeStep);
-};
-
-/** 不能退貨 / 換貨時的原因文案：`{狀態}訂單，無法退貨/換貨` */
-const refundReasonText = (order: OrderRecord): string => {
-  if (orderCanRefund(order)) return '';
-  return `${orderDisplayStatus(order)}訂單，無法退貨`;
-};
-const exchangeReasonText = (order: OrderRecord): string => {
-  if (orderCanExchange(order)) return '';
-  return `${orderDisplayStatus(order)}訂單，無法換貨`;
+const orderCanReturnOrExchange = (order: OrderRecord): boolean => {
+  return allPackageSteps(order).some(
+    (s) => canRefundStep(s) || canExchangeStep(s),
+  );
 };
 
-/** 整筆訂單是否可取消：所有包裹都還在可取消階段（unpaid / to_ship / shipped） */
+/** 不能退換貨時的原因文案：`{狀態}訂單，無法退換貨` */
+const returnReasonText = (order: OrderRecord): string => {
+  if (orderCanReturnOrExchange(order)) return '';
+  return `${orderDisplayStatus(order)}訂單，無法退換貨`;
+};
+
+/** 整筆訂單是否可取消：所有包裹都還在可取消階段（unpaid / to_ship，即待收貨前） */
 const orderCanCancel = (order: OrderRecord): boolean => {
   const steps = allPackageSteps(order);
   return steps.length > 0 && steps.every(canCancelStep);
@@ -250,24 +283,33 @@ const handleOpenChangeAddress = (): void => {
   isChangeAddressVisible.value = true;
 };
 
-// ── 退貨申請 dialog（對齊 Figma 6045-3985）──
+// ── 退換貨申請 dialog（對齊 Figma 6045-3985）──
 const RETURN_REASONS = [
   '商品瑕疵 / 破損',
   '尺寸不合 / 規格錯誤',
   '與商品描述不符',
 ];
 const RETURN_NOTE_MAX = 30;
+type ReturnType = 'return' | 'exchange';
+const RETURN_TYPE_OPTIONS: Array<{ label: string; value: ReturnType }> = [
+  { label: '退貨', value: 'return' },
+  { label: '換貨', value: 'exchange' },
+];
 const isReturnDialogVisible = ref(false);
 const returnTargetItem = ref<OrderItem | null>(null);
+const returnType = ref<ReturnType>('return');
 const returnReason = ref<string | null>(null);
 const returnNote = ref('');
 
-/** 商品是否可退貨：任一包裹的 currentStep 落在可退貨階段（shipped / delivered） */
-const itemCanRefund = (item: OrderItem): boolean =>
-  item.packages.some((p) => canRefundStep(p.currentStep));
+/** 商品是否可退換貨：任一包裹的 currentStep 落在可退/換貨階段（shipped / delivered） */
+const itemCanReturnOrExchange = (item: OrderItem): boolean =>
+  item.packages.some(
+    (p) => canRefundStep(p.currentStep) || canExchangeStep(p.currentStep),
+  );
 
 const handleOpenReturnDialog = (item: OrderItem): void => {
   returnTargetItem.value = item;
+  returnType.value = 'return';
   returnReason.value = null;
   returnNote.value = '';
   isReturnDialogVisible.value = true;
@@ -275,8 +317,16 @@ const handleOpenReturnDialog = (item: OrderItem): void => {
 
 const handleSubmitReturn = (): void => {
   if (!returnReason.value) return;
-  ui.toast('退貨申請已送出（示意）');
+  ui.toast(
+    `${returnType.value === 'return' ? '退貨' : '換貨'}申請已送出（示意）`,
+  );
   isReturnDialogVisible.value = false;
+};
+
+const handleCancelOrder = (order: OrderRecord): void => {
+  if (!orderCanCancel(order)) return;
+  order.status = 'cancelled';
+  ui.toast('訂單已取消（示意）');
 };
 
 // ── 訂單提問 drawer（右側抽出，內容為 AI 客服待開發提示） ──
@@ -536,30 +586,59 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
 
         <!-- 子 tab：手機改用 Select 下拉、其他用橫式 tabs -->
         <div class="border-b border-slate-200">
-          <div v-if="isMobile" class="flex items-center gap-2 px-4 py-2">
+          <template v-if="isMobile">
+            <!-- 展開 / 收合：全寬橫條按鈕 -->
             <button
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
-              :aria-label="order.expanded ? '收合明細' : '展開明細'"
+              class="flex min-h-11 w-full items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100"
+              :aria-expanded="order.expanded"
               @click="order.expanded = !order.expanded"
             >
+              <span>{{
+                order.expanded ? '收合訂單明細' : '查看訂單明細'
+              }}</span>
               <i
                 :class="[
                   'pi',
                   order.expanded ? 'pi-chevron-up' : 'pi-chevron-down',
+                  'text-slate-500',
                 ]"
                 style="font-size: 14px"
-              ></i>
+              />
             </button>
-            <Select
-              :key="`detail-tab-${order.id}-${inquirySelectKey}`"
-              :model-value="order.detailTab"
-              :options="detailTabs"
-              option-label="label"
-              option-value="key"
-              class="min-w-0 flex-1"
-              @update:model-value="(key) => handleSelectDetailTab(order, key)"
-            />
-          </div>
+            <!-- 子 tab Select + 動作按鈕：展開時才顯示 -->
+            <div
+              v-if="order.expanded"
+              class="flex flex-col gap-2 border-t border-slate-200 px-4 py-2"
+            >
+              <Select
+                :key="`detail-tab-${order.id}-${inquirySelectKey}`"
+                :model-value="order.detailTab"
+                :options="detailTabs"
+                option-label="label"
+                option-value="key"
+                class="w-full"
+                @update:model-value="(key) => handleSelectDetailTab(order, key)"
+              />
+              <!-- 取消訂單 tab：全寬「取消訂單」按鈕 -->
+              <Button
+                v-if="order.detailTab === 'cancel'"
+                label="取消訂單"
+                outlined
+                severity="danger"
+                :disabled="!orderCanCancel(order)"
+                class="w-full"
+                @click="handleCancelOrder(order)"
+              />
+              <!-- 更換地址 tab：全寬「更換配送地址」按鈕 -->
+              <Button
+                v-if="order.detailTab === 'address'"
+                label="更換配送地址"
+                outlined
+                class="w-full"
+                @click="handleOpenChangeAddress"
+              />
+            </div>
+          </template>
           <div v-else class="flex items-center gap-2 px-4">
             <!-- 收合 / 展開 -->
             <button
@@ -598,8 +677,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               label="取消訂單"
               outlined
               size="small"
+              severity="danger"
               :disabled="!orderCanCancel(order)"
               class="shrink-0"
+              @click="handleCancelOrder(order)"
             />
             <!-- 更換地址 tab：右側「更換配送地址」按鈕 -->
             <Button
@@ -615,28 +696,18 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
 
         <!-- 商品列 + 多包裹 timeline（對齊 Figma 9645-29876）；收合時整段隱藏 -->
         <div v-if="order.expanded" class="flex flex-col">
-          <!-- 退貨 tab：不可退貨時顯示原因 -->
+          <!-- 退換貨 tab：不可退/換貨時顯示原因 -->
           <div
-            v-if="order.detailTab === 'return' && refundReasonText(order)"
+            v-if="order.detailTab === 'return' && returnReasonText(order)"
             class="px-4 py-4 text-sm text-slate-950"
           >
-            {{ refundReasonText(order) }}
-          </div>
-          <!-- 換貨 tab：不可換貨時顯示原因 -->
-          <div
-            v-if="order.detailTab === 'exchange' && exchangeReasonText(order)"
-            class="px-4 py-4 text-sm text-slate-950"
-          >
-            {{ exchangeReasonText(order) }}
+            {{ returnReasonText(order) }}
           </div>
 
           <div
             v-for="(item, ii) in order.items"
             v-show="
-              !(
-                (order.detailTab === 'return' && refundReasonText(order)) ||
-                (order.detailTab === 'exchange' && exchangeReasonText(order))
-              )
+              !(order.detailTab === 'return' && returnReasonText(order))
             "
             :key="ii"
             class="px-4 py-4"
@@ -661,14 +732,14 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <p class="text-sm font-bold text-slate-950">
                   ${{ item.price.toLocaleString() }} / {{ item.qty }}件
                 </p>
-                <!-- 退貨 tab + 商品可退貨 → 顯示退貨按鈕 -->
+                <!-- 退換貨 tab + 商品可退換貨 → 顯示按鈕 -->
                 <Button
                   v-if="
                     order.detailTab === 'return' &&
-                    itemCanRefund(item) &&
-                    !refundReasonText(order)
+                    itemCanReturnOrExchange(item) &&
+                    !returnReasonText(order)
                   "
-                  label="退貨"
+                  label="退換貨"
                   severity="danger"
                   outlined
                   size="small"
@@ -688,11 +759,14 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 class="rounded-[10px] px-4 py-2"
                 style="background: #f1f5f9"
               >
-                <!-- Package header -->
+                <!-- Package header：待付款階段尚未配箱，不顯示包裹編號 -->
                 <div class="mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5 text-sm text-slate-700">
                     <i class="pi pi-box" style="font-size: 14px"></i>
-                    <span class="font-medium">包裹編號：{{ pkg.no }}</span>
+                    <span v-if="pkg.currentStep !== 'unpaid'" class="font-medium"
+                      >包裹編號：{{ pkg.no }}</span
+                    >
+                    <span v-else class="text-slate-500">尚未配箱</span>
                   </div>
                   <span class="text-sm text-slate-700">{{ pkg.qty }}件</span>
                 </div>
@@ -888,12 +962,12 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
     <!-- 更換配送地址 dialog -->
     <ChangeAddressDialog v-model:visible="isChangeAddressVisible" />
 
-    <!-- 退貨申請 dialog（對齊 Figma 6045-3985） -->
+    <!-- 退換貨申請 dialog（對齊 Figma 6045-3985） -->
     <Dialog
       v-model:visible="isReturnDialogVisible"
       modal
       :draggable="false"
-      header="退貨申請"
+      header="退換貨申請"
       :breakpoints="{ '768px': '90vw' }"
       :style="{ width: '640px' }"
     >
@@ -904,12 +978,33 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             {{ returnTargetItem?.name }}
           </p>
         </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium text-slate-700">申請類型</label>
+          <div class="flex items-center gap-6">
+            <div
+              v-for="opt in RETURN_TYPE_OPTIONS"
+              :key="opt.value"
+              class="flex items-center gap-2 text-sm text-slate-700"
+            >
+              <RadioButton
+                v-model="returnType"
+                :value="opt.value"
+                :input-id="`return-type-${opt.value}`"
+              />
+              <label :for="`return-type-${opt.value}`" class="cursor-pointer">
+                {{ opt.label }}
+              </label>
+            </div>
+          </div>
+        </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-sm font-medium text-slate-700">退貨原因</label>
+          <label class="text-sm font-medium text-slate-700">
+            {{ returnType === 'return' ? '退貨原因' : '換貨原因' }}
+          </label>
           <Select
             v-model="returnReason"
             :options="RETURN_REASONS"
-            placeholder="請選擇退貨原因"
+            :placeholder="`請選擇${returnType === 'return' ? '退貨' : '換貨'}原因`"
             class="w-full"
           />
         </div>
