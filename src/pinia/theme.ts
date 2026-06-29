@@ -17,8 +17,7 @@ export const themes: Theme[] = [
       '--accent': '#b8923f',
       '--accent-200': '#ead9b8',
       '--accent-hover': '#997636',
-      '--tabs-bg':
-        'linear-gradient(135deg, #7008e7 0%, #7008e7 55%, #3B82F6 100%)',
+      '--tabs-bg': '#7008e7',
       '--page-bg': '#f1f5f9',
     },
   },
