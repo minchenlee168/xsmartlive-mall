@@ -9,6 +9,7 @@ import {
 } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 import FloatingControls from './components/FloatingControls.vue';
+import AppFooter from './components/AppFooter.vue';
 import PageLoading from './components/PageLoading.vue';
 import { useViewportStore } from './pinia/viewport';
 import { useUiStore } from './pinia/ui';
@@ -20,6 +21,11 @@ const frameRef = ref<HTMLElement | null>(null);
 // 商城前台：所有頁面都允許 frame；入口頁外都顯示 FloatingControls
 const isFullscreen = computed(() => false);
 const showControls = computed(() => route.path !== '/');
+// Footer 只在主商城頁出現；auth / 入口頁不顯示，避免破壞自訂全頁版型。
+const AUTH_PATHS = ['/login', '/register', '/forgot', '/social-signup'];
+const showFooter = computed(
+  () => route.path !== '/' && !AUTH_PATHS.includes(route.path),
+);
 
 const frameStyle = computed(() => {
   if (isFullscreen.value) return {};
@@ -110,6 +116,7 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
     <!-- viewport frame -->
     <div ref="frameRef" :style="frameStyle" class="@container">
       <RouterView />
+      <AppFooter v-if="showFooter" />
     </div>
   </div>
 

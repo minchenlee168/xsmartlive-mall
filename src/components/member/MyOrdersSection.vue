@@ -190,8 +190,10 @@ const allPackageSteps = (order: OrderRecord): TimelineStep['key'][] => {
   return steps;
 };
 
-/** 訂單狀態：所有包裹同一階段 → 顯示該階段；不同階段 → 顯示「處理中」。 */
+/** 訂單狀態：訂單級狀態（取消 / 已退貨）優先；其餘看包裹 currentStep。 */
 const orderDisplayStatus = (order: OrderRecord): string => {
+  if (order.status === 'cancelled') return '已取消';
+  if (order.status === 'returned') return '已退貨';
   const steps = allPackageSteps(order);
   const uniq = new Set(steps);
   if (uniq.size === 0) return '—';
@@ -307,6 +309,10 @@ const returnTargetItem = ref<OrderItem | null>(null);
 const returnType = ref<ReturnType>('return');
 const returnReason = ref<string | null>(null);
 const returnNote = ref('');
+/** 已送出退換貨申請的商品集合；用 reactive Set 追蹤，避免改動 OrderItem 型別。 */
+const returnAppliedItems = ref(new Set<OrderItem>());
+const isReturnApplied = (item: OrderItem) =>
+  returnAppliedItems.value.has(item);
 
 /** 商品是否可退換貨：任一包裹的 currentStep 落在可退/換貨階段（shipped / delivered） */
 const itemCanReturnOrExchange = (item: OrderItem): boolean =>
@@ -324,6 +330,9 @@ const handleOpenReturnDialog = (item: OrderItem): void => {
 
 const handleSubmitReturn = (): void => {
   if (!returnReason.value) return;
+  if (returnTargetItem.value) {
+    returnAppliedItems.value.add(returnTargetItem.value);
+  }
   ui.toast(
     `${returnType.value === 'return' ? '退貨' : '換貨'}申請已送出（示意）`,
   );
@@ -846,15 +855,16 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <p class="text-sm font-bold text-slate-950">
                   ${{ item.price.toLocaleString() }} / {{ item.qty }}件
                 </p>
-                <!-- 退換貨 tab + 商品可退換貨 → 顯示按鈕 -->
+                <!-- 退換貨 tab + 商品可退換貨 → 顯示按鈕；送出申請後變「退換貨申請中」並 disabled -->
                 <Button
                   v-if="
                     order.detailTab === 'return' &&
                     itemCanReturnOrExchange(item) &&
                     !returnReasonText(order)
                   "
-                  label="退換貨"
-                  severity="danger"
+                  :label="isReturnApplied(item) ? '退換貨申請中' : '退換貨'"
+                  :severity="isReturnApplied(item) ? 'secondary' : 'danger'"
+                  :disabled="isReturnApplied(item)"
                   outlined
                   size="small"
                   @click="handleOpenReturnDialog(item)"

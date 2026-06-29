@@ -73,6 +73,58 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
   },
 ];
 
+// 直播回放加購區：使用者看過往場次回放時可補加購的商品（區隔於即時直播加購）
+const REPLAY_ADD_ON_PRODUCTS: AddOnProduct[] = [
+  {
+    id: 9101,
+    name: '寶寶有機棉襪 3 雙組',
+    price: 79,
+    original: 150,
+    image:
+      'https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&fit=crop',
+  },
+  {
+    id: 9102,
+    name: '幼兒矽膠學習餐具組',
+    price: 199,
+    original: 320,
+    image:
+      'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?w=400&fit=crop',
+  },
+  {
+    id: 9103,
+    name: '嬰兒抗 UV 遮陽帽',
+    price: 159,
+    original: 280,
+    image:
+      'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
+  },
+  {
+    id: 9104,
+    name: '寶寶印花圍兜口水巾',
+    price: 69,
+    original: 120,
+    image:
+      'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=400&fit=crop',
+  },
+  {
+    id: 9105,
+    name: '寶寶柔嫩沐浴乳 300ml',
+    price: 169,
+    original: 250,
+    image:
+      'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&fit=crop',
+  },
+  {
+    id: 9106,
+    name: '嬰兒益生菌粉 30 包',
+    price: 459,
+    original: 680,
+    image:
+      'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&fit=crop',
+  },
+];
+
 const router = useRouter();
 const ui = useUiStore();
 const cart = useCartStore();
@@ -561,7 +613,7 @@ const handleGoProduct = (productId?: number) => {
         </div>
       </div>
 
-      <!-- 加價購區塊 -->
+      <!-- 直播商品加購區 -->
       <section class="shadow-card rounded-xl bg-white">
         <div
           class="flex items-center border-b-2 px-4 py-2"
@@ -571,7 +623,9 @@ const handleGoProduct = (productId?: number) => {
             border-radius: 12px 12px 0 0;
           "
         >
-          <span class="text-lg font-semibold text-slate-700">加價購</span>
+          <span class="text-lg font-semibold text-slate-700"
+            >直播商品加購區</span
+          >
         </div>
 
         <!-- 加價購卡片 — auto-fill grid -->
@@ -581,6 +635,60 @@ const handleGoProduct = (productId?: number) => {
         >
           <div
             v-for="p in ADD_ON_PRODUCTS"
+            :key="p.id"
+            class="flex flex-col gap-[7px] rounded-lg p-2"
+          >
+            <div
+              class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
+            >
+              <ProductImage :src="p.image" :alt="p.name" size="md" />
+            </div>
+            <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
+              <p
+                class="line-clamp-2 min-h-9 overflow-hidden text-sm leading-snug text-slate-950 @7xl:min-h-11 @7xl:text-base"
+              >
+                {{ p.name }}
+              </p>
+              <span
+                class="text-base font-bold @7xl:text-lg"
+                style="color: var(--primary)"
+              >
+                ${{ p.price }}
+              </span>
+              <Button
+                label="加入購物車"
+                icon="pi pi-plus"
+                size="small"
+                class="mt-auto whitespace-nowrap"
+                @click="handleAddAddOn(p)"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Livebuy 直播回放加購區 -->
+      <section class="shadow-card rounded-xl bg-white">
+        <div
+          class="flex items-center border-b-2 px-4 py-2"
+          style="
+            background: color-mix(in srgb, var(--primary) 8%, transparent);
+            border-color: var(--primary);
+            border-radius: 12px 12px 0 0;
+          "
+        >
+          <span class="text-lg font-semibold text-slate-700"
+            >Livebuy 直播回放加購區</span
+          >
+        </div>
+
+        <!-- 直播回放加購卡片 -->
+        <div
+          class="grid gap-2 p-[var(--card-pad)]"
+          style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr))"
+        >
+          <div
+            v-for="p in REPLAY_ADD_ON_PRODUCTS"
             :key="p.id"
             class="flex flex-col gap-[7px] rounded-lg p-2"
           >
