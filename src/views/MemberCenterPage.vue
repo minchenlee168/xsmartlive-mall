@@ -56,8 +56,15 @@ const MEMBER_ID = '422519347308064';
 const NAV_ITEMS = [
   { key: 'orders', label: '我的訂單' },
   { key: 'points', label: '紅利點數' },
+  { key: 'coupons', label: '優惠券' },
   { key: 'account', label: '個人帳號' },
 ];
+
+/** NAV_ITEMS key 映射到 MemberIcon 接受的 name（coupons → coupon 單複數差異） */
+const navIconName = (
+  key: string,
+): 'orders' | 'points' | 'account' | 'coupon' =>
+  key === 'coupons' ? 'coupon' : (key as 'orders' | 'points' | 'account');
 const ACCOUNT_SUB_ITEMS = [
   { key: 'profile', label: '會員資料' },
   { key: 'binding', label: '更改綁定帳號' },
@@ -449,6 +456,8 @@ const handleClaimCoupon = (c: ClaimableCoupon) => {
     status: 'unused',
   });
   claimableCoupons.value = claimableCoupons.value.filter((x) => x.id !== c.id);
+  // 領取後自動切到「未使用」tab，方便看到剛入手的優惠券
+  couponTab.value = 'unused';
   ui.toast('已領取優惠券');
 };
 
@@ -744,7 +753,7 @@ const handleSaveAddr = () => {
               @click="activeNav = item.key"
             >
               <MemberIcon
-                :name="item.key as 'orders' | 'points' | 'account'"
+                :name="navIconName(item.key)"
                 :size="20"
                 class="shrink-0"
               />
@@ -1469,7 +1478,7 @@ const handleSaveAddr = () => {
       </div>
     </main>
 
-    <!-- 手機底部固定 bar：3 個主分頁（我的訂單 / 紅利點數 / 個人帳號） -->
+    <!-- 手機底部固定 bar：4 個主分頁（我的訂單 / 紅利點數 / 優惠券 / 個人帳號） -->
     <nav
       class="sticky bottom-0 z-30 flex border-t border-slate-200 bg-white @4xl:hidden"
     >
@@ -1484,10 +1493,7 @@ const handleSaveAddr = () => {
           if (item.key === 'account' && !activeSub) activeSub = 'profile';
         "
       >
-        <MemberIcon
-          :name="item.key as 'orders' | 'points' | 'account'"
-          :size="22"
-        />
+        <MemberIcon :name="navIconName(item.key)" :size="22" />
         <span class="text-xs font-medium">{{ item.label }}</span>
       </button>
     </nav>
