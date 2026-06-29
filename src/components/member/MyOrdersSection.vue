@@ -17,10 +17,9 @@ import ChangeAddressDialog from './ChangeAddressDialog.vue';
 /**
  * 我的訂單 section（會員中心右側內容）。
  * 對齊 Figma 8845:44643：
- * - 上方「購物權益與售後說明」可收合面板
- * - 標題 + 7 個 tab + 日期區間 + 搜尋 + 查詢結果摘要
+ * - 上方「購物權益與售後說明」 — 桌機可收合 Panel、手機是單行 + info icon → Dialog
+ * - 標題 + 多 tab + 日期區間 + 搜尋 + 查詢結果摘要
  * - 訂單卡（header table + 子 tab + 商品列 + timeline）
- * - 下方「配送、退款與發票說明」可收合面板
  */
 
 const vp = computed(() => useViewportStore().current.id);
@@ -28,7 +27,8 @@ const isMobile = computed(() => vp.value === 'mobile');
 
 // 上下兩個說明面板狀態
 const isTopInfoOpen = ref(false);
-const isBottomInfoOpen = ref(false);
+/** 手機版「購物權益與售後說明」點 info icon 開的 dialog。 */
+const isTopInfoDialogVisible = ref(false);
 
 const ordersStore = useOrdersStore();
 const ui = useUiStore();
@@ -115,22 +115,9 @@ const TIMELINE_STEPS: TimelineStep[] = [
 
 const orders = computed(() => ordersStore.orders);
 
-const filteredOrders = computed(() => {
+/** 套用日期區間 + 關鍵字後的訂單（不含 status tab 過濾）— 給 tab 數字 + filteredOrders 共用 */
+const dateKeywordFilteredOrders = computed(() => {
   let list = orders.value;
-  if (activeTab.value !== 'all') {
-    const timelineStep = TIMELINE_TABS[activeTab.value];
-    if (timelineStep) {
-      // timeline 階段 tab：任一包裹 currentStep 命中即列入
-      list = list.filter((o) =>
-        o.items.some((it) =>
-          it.packages.some((p) => p.currentStep === timelineStep),
-        ),
-      );
-    } else {
-      // OrderStatus tab：直接比 status
-      list = list.filter((o) => o.status === activeTab.value);
-    }
-  }
   const [from, to] = appliedDateRange.value;
   if (from || to) {
     const fromTs = from
@@ -162,6 +149,26 @@ const filteredOrders = computed(() => {
   }
   return list;
 });
+
+/** 給定 tab key，回傳對應訂單列表（不含 status tab 過濾）→ 該 tab 的訂單。 */
+const ordersForTab = (key: StatusTab) => {
+  const list = dateKeywordFilteredOrders.value;
+  if (key === 'all') return list;
+  const timelineStep = TIMELINE_TABS[key];
+  if (timelineStep) {
+    return list.filter((o) =>
+      o.items.some((it) =>
+        it.packages.some((p) => p.currentStep === timelineStep),
+      ),
+    );
+  }
+  return list.filter((o) => o.status === key);
+};
+
+const filteredOrders = computed(() => ordersForTab(activeTab.value));
+
+/** 各 tab 的訂單數量（受日期 + 關鍵字篩選影響，但不受 activeTab 影響）。 */
+const tabCount = (key: StatusTab) => ordersForTab(key).length;
 
 const stepStatus = (
   pkg: PackageInfo,
@@ -332,19 +339,51 @@ const handleCancelOrder = (order: OrderRecord): void => {
 // ── 訂單提問 drawer（右側抽出，內容為 AI 客服待開發提示） ──
 const isInquiryDrawerVisible = ref(false);
 /**
- * 手機版 Select 用：選到 'inquiry' 時要把 Select 視覺重置回原本選項。
+ * 手機版 Select 用：選到攔截型 tab（inquiry / payment）後要把 Select 視覺重置回原本選項。
  * PrimeVue Select 即使 :model-value 為單向綁定，內部仍可能 cache 顯示值；
  * bump 這個 key 強制 remount 才會重讀 model-value。
  */
 const inquirySelectKey = ref(0);
+
+// ── 訂購/付款資訊 dialog（對齊 Figma 6045-5536） ──
+const isPaymentInfoDialogVisible = ref(false);
+const paymentInfoTargetOrder = ref<OrderRecord | null>(null);
+
+// ── 物流配送進度 dialog（對齊 Figma 6045-2986） ──
+interface ShippingTrackingEvent {
+  status: string;
+  time: string;
+  carrier: string;
+  note: string;
+}
+const SHIPPING_TRACKING_EVENTS: ShippingTrackingEvent[] = [
+  { status: '貨件送達', time: '2026/02/10 08:00', carrier: '○○超商', note: '簽收' },
+  { status: '配送中', time: '2026/02/10 01:00', carrier: '新竹物流', note: '' },
+  { status: '轉運作業中', time: '2026/02/09 16:00', carrier: '高轉', note: '貨件到站' },
+  { status: '取件完成', time: '2026/02/09 13:00', carrier: '直營', note: '' },
+];
+const isShippingProgressDialogVisible = ref(false);
+const shippingProgressTargetPkg = ref<PackageInfo | null>(null);
+const handleOpenShippingProgress = (pkg: PackageInfo): void => {
+  shippingProgressTargetPkg.value = pkg;
+  isShippingProgressDialogVisible.value = true;
+};
+
 /**
  * 攔截 detail tab 切換：
  * - 'inquiry' → 不切換 tab，改開右側 drawer
+ * - 'payment' → 不切換 tab，改開訂購/付款資訊 dialog
  * - 其他 tab → 正常切換
  */
 const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
   if (key === 'inquiry') {
     isInquiryDrawerVisible.value = true;
+    inquirySelectKey.value++;
+    return;
+  }
+  if (key === 'payment') {
+    paymentInfoTargetOrder.value = order;
+    isPaymentInfoDialogVisible.value = true;
     inquirySelectKey.value++;
     return;
   }
@@ -354,8 +393,27 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
 
 <template>
   <div class="flex flex-col gap-4">
-    <!-- 上方：購物權益與售後說明（內容待提供） -->
+    <!-- 上方：購物權益與售後說明 -->
+    <!-- 手機版：單行標題 + info icon，點按開 Dialog 顯示完整內容 -->
+    <div
+      v-if="isMobile"
+      class="flex items-center justify-between gap-2 rounded-xl bg-white px-4 py-3 shadow-card"
+    >
+      <span class="text-sm font-semibold text-slate-700">
+        購物權益與售後說明
+        <span class="ml-1 text-xs font-normal text-red-500">（待提供）</span>
+      </span>
+      <button
+        class="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+        aria-label="顯示購物權益與售後說明"
+        @click="isTopInfoDialogVisible = true"
+      >
+        <i class="pi pi-info-circle" style="font-size: 18px" />
+      </button>
+    </div>
+    <!-- 桌機版：原本可收合 Panel -->
     <Panel
+      v-else
       toggleable
       :collapsed="!isTopInfoOpen"
       :pt="{
@@ -387,14 +445,65 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
         ※
         依「通訊交易解除權合理例外情事適用準則」，部分特殊商品不適用十天猶豫期之規定。
       </p>
-      <p>若無法線上操作，請您利用聯絡客服功能，將有專人盡速為您處理。</p>
+      <p class="mb-2">
+        ※ 食品因有保存期限問題，一經拆封食用後，將會影響退貨權限。
+      </p>
+      <p class="mb-2">
+        ※
+        商品請保持完整(含主商品、配件、贈品與原廠外箱)，若有缺件、毀損等個人因素，將保留接受退換貨與否之權力。
+      </p>
+      <p class="mb-2">※ 若商品已過猶豫期限，則無法線上申請銷退。</p>
+      <p class="mb-2">若無法線上操作，請您利用聯絡客服功能，將有專人盡速為您處理。</p>
+
+      <p class="mt-3 font-bold text-slate-700">相關事項說明：</p>
+      <p class="mb-2">
+        &lt; 配送服務 &gt;
+        除特殊商品外(如:材積過大等)須另行約定送貨時間外，其餘商品皆如網頁中所查詢的配送進度中顯示之日期進行配送。
+      </p>
+      <p class="mb-2">
+        &lt; 折價券 &gt;
+        折價券使用後，若取消訂單或辦理退貨時，折價券仍在有效期限內，將歸還至會員帳戶；若折價券已過期，則失效無法再次使用。
+      </p>
+      <p class="mb-2">
+        &lt; 退款方式 &gt;
+        付款方式為貨到付款、超商取貨付款、IBON付款及ATM付款之訂單，確認退貨後將款項以匯款方式退還訂購人。付款方式為信用卡者，確認退貨方式將款項退至原信用卡帳戶中。
+      </p>
+
+      <p class="mt-3 font-bold text-slate-700">關於發票開立與寄送：</p>
+      <p class="mb-2">
+        &lt; 個人發票 &gt;
+        本公司已全面採用電子發票，客戶購買商品並於付款完成、商品出貨後，將所開立的發票以
+        E-mail 方式通知客戶。
+      </p>
+      <p class="mb-2">
+        &lt; 法人發票 &gt;
+        訂購時選擇「公司用發票(線上列印)」者，您可於發票開立後點選訂單查詢頁面，可直接下載列印「電子發票證明聯」作為報帳使用。
+      </p>
+      <p class="mt-3 text-xs text-slate-400">
+        ※若有任何問題，歡迎您隨時利用網站
+        FAQ/連絡客服留下您要詢問的問題，將有專人為您服務。
+      </p>
     </Panel>
 
     <!-- 標題 -->
     <!-- 篩選卡：頁籤 + 日期/搜尋 + 結果摘要 -->
     <div class="shadow-card flex flex-col gap-4 rounded-xl bg-white p-4">
-      <!-- Tab list -->
-      <div class="-mx-4 -mt-4 border-b border-slate-200 px-4 pt-1">
+      <!-- Status filter：手機版用 pill button、桌機保留 tab 樣式；label 後面顯示符合查詢條件的訂單數量 -->
+      <div v-if="isMobile" class="-mx-4 -mt-4 px-4 pt-3 pb-2">
+        <div class="flex flex-wrap gap-2">
+          <Button
+            v-for="t in statusTabs"
+            :key="t.key"
+            :label="`${t.label} (${tabCount(t.key)})`"
+            size="small"
+            rounded
+            :outlined="activeTab !== t.key"
+            :severity="activeTab === t.key ? undefined : 'secondary'"
+            @click="activeTab = t.key"
+          />
+        </div>
+      </div>
+      <div v-else class="-mx-4 -mt-4 border-b border-slate-200 px-4 pt-1">
         <div class="flex scrollbar-none items-center gap-1 overflow-x-auto">
           <button
             v-for="t in statusTabs"
@@ -408,6 +517,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             @click="activeTab = t.key"
           >
             {{ t.label }}
+            <span class="ml-1 text-xs text-slate-400"
+              >({{ tabCount(t.key) }})</span
+            >
           </button>
         </div>
       </div>
@@ -661,7 +773,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                   :key="dt.key"
                   class="-mb-px border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors"
                   :style="
-                    order.detailTab === dt.key && dt.key !== 'inquiry'
+                    order.detailTab === dt.key &&
+                    dt.key !== 'inquiry' &&
+                    dt.key !== 'payment'
                       ? 'color: var(--primary); border-color: var(--primary)'
                       : 'color: #64748b; border-color: transparent'
                   "
@@ -817,6 +931,19 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                       }"
                     ></div>
                   </div>
+                  <!-- 進入配送階段才顯示「查看配送進度」連結 -->
+                  <a
+                    v-if="
+                      pkg.currentStep === 'shipped' ||
+                      pkg.currentStep === 'to_receive' ||
+                      pkg.currentStep === 'delivered' ||
+                      pkg.currentStep === 'completed'
+                    "
+                    class="mt-2 inline-block cursor-pointer text-xs hover:underline"
+                    style="color: #ef4444"
+                    @click="handleOpenShippingProgress(pkg)"
+                    >查看配送進度</a
+                  >
                 </div>
 
                 <!-- 非手機橫式（PrimeVue Timeline） -->
@@ -870,8 +997,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                               step.key === 'shipped' &&
                               step.status !== 'pending'
                             "
-                            class="text-xs hover:underline"
+                            class="cursor-pointer text-xs hover:underline"
                             style="color: #ef4444"
+                            @click="handleOpenShippingProgress(pkg)"
                             >(查看配送進度)</a
                           >
                         </p>
@@ -897,70 +1025,75 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </article>
     </div>
 
-    <!-- 下方：配送、退款與發票說明（內容待提供） -->
-    <Panel
-      toggleable
-      :collapsed="!isBottomInfoOpen"
-      :pt="{
-        header: {
-          style:
-            'background: #ffffff; border-radius: 8px 8px 0 0; padding: 8px 16px',
-        },
-        title: { style: 'font-size: 14px; font-weight: 600; color: #334155' },
-        content: {
-          style:
-            'padding: 14px 16px; font-size: 12.5px; line-height: 1.7; color: #475569',
-        },
-      }"
-      @update:collapsed="(v) => (isBottomInfoOpen = !v)"
-    >
-      <template #header>
-        <span class="text-sm font-semibold text-slate-700">
-          配送、退款與發票說明
-          <span class="ml-1 text-xs font-normal" style="color: #ef4444"
-            >（待提供）</span
-          >
-        </span>
-      </template>
-      <p class="mb-2">
-        ※ 食品因有保存期限問題，一經拆封食用後，將會影響退貨權限。
-      </p>
-      <p class="mb-2">
-        ※
-        商品請保持完整(含主商品、配件、贈品與原廠外箱)，若有缺件、毀損等個人因素，將保留接受退換貨與否之權力。
-      </p>
-      <p class="mb-2">※ 若商品已過猶豫期限，則無法線上申請銷退。</p>
-      <p class="mt-3 font-bold text-slate-700">相關事項說明：</p>
-      <p class="mb-2">
-        &lt; 配送服務 &gt;
-        除特殊商品外(如:材積過大等)須另行約定送貨時間外，其餘商品皆如網頁中所查詢的配送進度中顯示之日期進行配送。
-      </p>
-      <p class="mb-2">
-        &lt; 折價券 &gt;
-        折價券使用後，若取消訂單或辦理退貨時，折價券仍在有效期限內，將歸還至會員帳戶；若折價券已過期，則失效無法再次使用。
-      </p>
-      <p class="mb-2">
-        &lt; 退款方式 &gt;
-        付款方式為貨到付款、超商取貨付款、IBON付款及ATM付款之訂單，確認退貨後將款項以匯款方式退還訂購人。付款方式為信用卡者，確認退貨方式將款項退至原信用卡帳戶中。
-      </p>
-      <p class="mt-3 font-bold text-slate-700">關於發票開立與寄送：</p>
-      <p class="mb-2">
-        &lt; 個人發票 &gt;
-        本公司已全面採用電子發票，客戶購買商品並於付款完成、商品出貨後，將所開立的發票以
-        E-mail 方式通知客戶。
-      </p>
-      <p class="mb-2">
-        &lt; 法人發票 &gt;
-        訂購時選擇「公司用發票(線上列印)」者，您可於發票開立後點選訂單查詢頁面，可直接下載列印「電子發票證明聯」作為報帳使用。
-      </p>
-      <p class="mt-3 text-xs text-slate-400">
-        ※若有任何問題，歡迎您隨時利用網站
-        FAQ/連絡客服留下您要詢問的問題，將有專人為您服務。
-      </p>
-    </Panel>
-
     <!-- 更換配送地址 dialog -->
     <ChangeAddressDialog v-model:visible="isChangeAddressVisible" />
+
+    <!-- 購物權益與售後說明 dialog（手機版用） -->
+    <Dialog
+      v-model:visible="isTopInfoDialogVisible"
+      modal
+      :draggable="false"
+      header="購物權益與售後說明"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '480px' }"
+    >
+      <div class="flex flex-col gap-3 text-sm leading-relaxed text-slate-600">
+        <p>
+          產品均享有 10
+          天猶豫期之權益（注意！猶豫期非試用期），若回退產品非全新狀態且包裝完整，將影響您的權益及需負擔回復原狀責任。
+        </p>
+        <p>
+          ※
+          依「通訊交易解除權合理例外情事適用準則」，部分特殊商品不適用十天猶豫期之規定。
+        </p>
+        <p>※ 食品因有保存期限問題，一經拆封食用後，將會影響退貨權限。</p>
+        <p>
+          ※
+          商品請保持完整(含主商品、配件、贈品與原廠外箱)，若有缺件、毀損等個人因素，將保留接受退換貨與否之權力。
+        </p>
+        <p>※ 若商品已過猶豫期限，則無法線上申請銷退。</p>
+        <p>若無法線上操作，請您利用聯絡客服功能，將有專人盡速為您處理。</p>
+
+        <p class="mt-1 font-bold text-slate-700">相關事項說明：</p>
+        <p>
+          &lt; 配送服務 &gt;
+          除特殊商品外(如:材積過大等)須另行約定送貨時間外，其餘商品皆如網頁中所查詢的配送進度中顯示之日期進行配送。
+        </p>
+        <p>
+          &lt; 折價券 &gt;
+          折價券使用後，若取消訂單或辦理退貨時，折價券仍在有效期限內，將歸還至會員帳戶；若折價券已過期，則失效無法再次使用。
+        </p>
+        <p>
+          &lt; 退款方式 &gt;
+          付款方式為貨到付款、超商取貨付款、IBON付款及ATM付款之訂單，確認退貨後將款項以匯款方式退還訂購人。付款方式為信用卡者，確認退貨方式將款項退至原信用卡帳戶中。
+        </p>
+
+        <p class="mt-1 font-bold text-slate-700">關於發票開立與寄送：</p>
+        <p>
+          &lt; 個人發票 &gt;
+          本公司已全面採用電子發票，客戶購買商品並於付款完成、商品出貨後，將所開立的發票以
+          E-mail 方式通知客戶。
+        </p>
+        <p>
+          &lt; 法人發票 &gt;
+          訂購時選擇「公司用發票(線上列印)」者，您可於發票開立後點選訂單查詢頁面，可直接下載列印「電子發票證明聯」作為報帳使用。
+        </p>
+        <p class="text-xs text-slate-400">
+          ※若有任何問題，歡迎您隨時利用網站
+          FAQ/連絡客服留下您要詢問的問題，將有專人為您服務。
+        </p>
+      </div>
+      <template #footer>
+        <div class="flex w-full justify-end">
+          <Button
+            label="關閉"
+            severity="secondary"
+            outlined
+            @click="isTopInfoDialogVisible = false"
+          />
+        </div>
+      </template>
+    </Dialog>
 
     <!-- 退換貨申請 dialog（對齊 Figma 6045-3985） -->
     <Dialog
@@ -1033,6 +1166,112 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           @click="handleSubmitReturn"
         />
       </template>
+    </Dialog>
+
+    <!-- 訂購/付款資訊 dialog（對齊 Figma 6045-5536） -->
+    <Dialog
+      v-model:visible="isPaymentInfoDialogVisible"
+      modal
+      :draggable="false"
+      header="訂購/付款資訊"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '480px' }"
+    >
+      <div class="flex flex-col gap-4 text-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">收件人姓名</span>
+          <span class="text-slate-950">*曉*</span>
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">手機號碼</span>
+          <span class="text-slate-950">0912***789</span>
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">收件地址</span>
+          <span class="text-slate-950">高雄市三民區北平一街103號</span>
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">發票類型</span>
+          <span class="text-slate-950">
+            {{ paymentInfoTargetOrder?.invoice ?? '個人載具' }}
+          </span>
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">付款方式</span>
+          <span class="text-slate-950">
+            {{ paymentInfoTargetOrder?.payment ?? '線上刷卡' }}
+          </span>
+        </div>
+      </div>
+    </Dialog>
+
+    <!-- 物流配送進度 dialog（對齊 Figma 6045-2986） -->
+    <Dialog
+      v-model:visible="isShippingProgressDialogVisible"
+      modal
+      :draggable="false"
+      header="物流配送進度"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '720px' }"
+    >
+      <div class="flex flex-col gap-4">
+        <!-- 配送方式 / 出貨單號 -->
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="flex flex-col gap-1">
+            <span class="text-xs text-slate-500">配送方式</span>
+            <span class="text-slate-950">新竹物流</span>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-xs text-slate-500">出貨單號</span>
+            <span class="text-slate-950">{{
+              shippingProgressTargetPkg?.no ?? '—'
+            }}</span>
+          </div>
+        </div>
+
+        <!-- 物流追蹤表 -->
+        <div class="overflow-x-auto">
+          <table class="w-full table-auto text-sm">
+            <thead>
+              <tr class="border-b border-slate-200">
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 25%"
+                >
+                  狀態
+                </th>
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 28%"
+                >
+                  處理時間
+                </th>
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 22%"
+                >
+                  負責單位
+                </th>
+                <th class="px-3 py-2.5 text-left font-medium text-slate-700">
+                  備註
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(ev, idx) in SHIPPING_TRACKING_EVENTS"
+                :key="idx"
+                :class="idx % 2 === 1 ? 'bg-slate-50' : ''"
+              >
+                <td class="px-3 py-3 text-slate-950">{{ ev.status }}</td>
+                <td class="px-3 py-3 text-slate-700">{{ ev.time }}</td>
+                <td class="px-3 py-3 text-slate-700">{{ ev.carrier }}</td>
+                <td class="px-3 py-3 text-slate-700">{{ ev.note }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </Dialog>
 
     <!-- 訂單提問 drawer：從右側滑入，點遮罩關閉。

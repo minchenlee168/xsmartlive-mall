@@ -362,13 +362,14 @@ const handleGoProduct = (productId?: number) => {
           <div
             class="flex items-start gap-3 px-[var(--card-pad)] py-[var(--card-pad)] @7xl:gap-4"
           >
-            <Checkbox v-model="item.checked" binary class="mt-1 shrink-0" />
-
-            <!-- Image -->
-            <div
-              class="aspect-square w-16 shrink-0 overflow-hidden rounded @3xl:w-20 @7xl:w-[100px]"
-            >
-              <ProductImage :src="item.image" :alt="item.name" size="md" />
+            <!-- Checkbox + 圖片：用一個 items-center 子容器讓 checkbox 與圖片垂直置中對齊 -->
+            <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
+              <Checkbox v-model="item.checked" binary />
+              <div
+                class="aspect-square w-16 shrink-0 overflow-hidden rounded @3xl:w-20 @7xl:w-[100px]"
+              >
+                <ProductImage :src="item.image" :alt="item.name" size="md" />
+              </div>
             </div>
 
             <!-- Info -->
@@ -412,18 +413,18 @@ const handleGoProduct = (productId?: number) => {
               <div
                 class="mt-1 flex shrink-0 items-center justify-between @7xl:mt-0 @7xl:gap-8"
               >
-                <div class="flex flex-col items-start">
+                <div class="flex items-baseline gap-2">
+                  <span
+                    class="text-xl leading-none font-bold @7xl:text-2xl @7xl:font-medium"
+                    style="color: var(--primary)"
+                  >
+                    ${{ item.price.toLocaleString() }}
+                  </span>
                   <span
                     v-if="item.original"
                     class="text-sm text-slate-500 line-through"
                   >
                     ${{ item.original.toLocaleString() }}
-                  </span>
-                  <span
-                    class="text-base leading-none font-medium @7xl:text-2xl"
-                    style="color: var(--primary)"
-                  >
-                    ${{ item.price.toLocaleString() }}
                   </span>
                 </div>
                 <Button
