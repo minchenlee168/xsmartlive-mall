@@ -116,6 +116,16 @@
   min-height: 0;
 }
 
+/* PrimeVue Dialog / Drawer 右上角 X 關閉鍵：移除 focus 時的黑色 outline / 焦點環，
+   PrimeVue 預設聚焦會出現一圈黑線，不符合本專案視覺。 */
+.p-dialog-close-button:focus,
+.p-dialog-close-button:focus-visible,
+.p-drawer-close-button:focus,
+.p-drawer-close-button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* 視窗縮到手機寬時，所有 PrimeVue Dialog 對齊 viewport 寬（保留 PrimeVue 自身的置中 transform，
    只覆寫 max-width 讓寬的彈窗自動縮到 viewport - 32px，原本就比 viewport 窄的彈窗不受影響）。 */
 @media (max-width: 768px) {
