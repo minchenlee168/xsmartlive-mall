@@ -367,7 +367,7 @@ const handleBackToLogin = () => {
             </p>
           </div>
 
-          <!-- Phone + send code row -->
+          <!-- Phone row + 驗證碼輸入框（發送驗證碼按鈕放在驗證碼輸入框後方） -->
           <div class="flex w-full flex-col gap-3">
             <div class="flex items-end gap-2">
               <div class="flex w-[110px] shrink-0 flex-col gap-1.5">
@@ -394,24 +394,28 @@ const handleBackToLogin = () => {
                   />
                 </IconField>
               </div>
-              <Button
-                :disabled="!canSendVerifyCode"
-                :label="
-                  resendCountdown > 0 ? `${resendCountdown}s` : '發送驗證碼'
-                "
-                class="shrink-0 whitespace-nowrap"
-                @click="handleSendVerifyCode"
-              />
             </div>
 
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-slate-700">簡訊驗證碼</label>
-              <InputText
-                v-model="verifyCode"
-                :maxlength="SMS_CODE_LENGTH"
-                placeholder="請輸入六位數驗證碼"
-                class="w-full"
-              />
+              <label class="text-sm font-medium text-slate-700"
+                >簡訊驗證碼</label
+              >
+              <div class="flex items-stretch gap-2">
+                <InputText
+                  v-model="verifyCode"
+                  :maxlength="SMS_CODE_LENGTH"
+                  placeholder="請輸入六位數驗證碼"
+                  class="min-w-0 flex-1"
+                />
+                <Button
+                  :disabled="!canSendVerifyCode"
+                  :label="
+                    resendCountdown > 0 ? `${resendCountdown}s` : '發送驗證碼'
+                  "
+                  class="shrink-0 whitespace-nowrap"
+                  @click="handleSendVerifyCode"
+                />
+              </div>
             </div>
           </div>
 
