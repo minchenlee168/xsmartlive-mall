@@ -98,7 +98,7 @@ const handleAddToCart = () => {
   if (product.value.isPickBundle) {
     const need = totalPickCount.value;
     if (pickedTotal.value !== need) {
-      ui.toast(`請選擇 ${need} 件商品`);
+      ui.toast(`請選擇 ${need} 件商品`, 'warn');
       return;
     }
   }
@@ -156,11 +156,11 @@ const handleShareTo = (platform: SharePlatform) => {
       'noopener,width=600,height=500',
     );
   } else if (platform === 'instagram') {
-    ui.toast('Instagram 不支援網頁分享，請截圖分享');
+    ui.toast('Instagram 不支援網頁分享，請截圖分享', 'info');
   } else {
     navigator.clipboard?.writeText(url).then(
       () => ui.toast('已複製商品連結'),
-      () => ui.toast('複製失敗，請手動複製網址'),
+      () => ui.toast('複製失敗，請手動複製網址', 'error'),
     );
   }
 };

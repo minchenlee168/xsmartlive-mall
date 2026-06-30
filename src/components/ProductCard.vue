@@ -175,7 +175,7 @@ const handleConfirmBundleAdd = () => {
   if (!p) return;
   if (p.isPickBundle) {
     if (pickedTotal.value !== totalPickCount.value) {
-      ui.toast(`請選擇 ${totalPickCount.value} 件商品`);
+      ui.toast(`請選擇 ${totalPickCount.value} 件商品`, 'warn');
       return;
     }
     const picked = Object.entries(pickedQty.value)

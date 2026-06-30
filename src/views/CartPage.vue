@@ -285,7 +285,7 @@ const handleGoCheckout = () => {
     .flatMap((g) => g.items)
     .find((i) => i.checked && bundleNeedsAttention(i));
   if (incompleteBundle) {
-    ui.toast(`「${incompleteBundle.name}」尚未選擇規格或數量`);
+    ui.toast(`「${incompleteBundle.name}」尚未選擇規格或數量`, 'warn');
     return;
   }
   // 勾選的群組若包含不同配送方式 → 不能合併結帳，跳提示請拆單

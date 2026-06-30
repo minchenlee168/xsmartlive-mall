@@ -8,6 +8,7 @@ import {
   nextTick,
 } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
 import FloatingControls from './components/FloatingControls.vue';
 import AppFooter from './components/AppFooter.vue';
 import PageLoading from './components/PageLoading.vue';
@@ -17,6 +18,8 @@ import { useUiStore } from './pinia/ui';
 const viewportStore = useViewportStore();
 const ui = useUiStore();
 const route = useRoute();
+// 把 PrimeVue ToastService 注入 ui store，讓全域 ui.toast() 走 PrimeVue <Toast>
+ui.setToastService(useToast());
 const frameRef = ref<HTMLElement | null>(null);
 // 商城前台：所有頁面都允許 frame；入口頁外都顯示 FloatingControls
 const isFullscreen = computed(() => false);
@@ -127,29 +130,4 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
 
   <!-- PrimeVue 全域 Toast：靠上置中、一次只顯示一個（add 前會 removeAllGroups） -->
   <Toast position="top-center" />
-
-  <!-- Global toast -->
-  <Transition name="ui-toast">
-    <div
-      v-if="ui.toastVisible"
-      class="fixed top-6 left-1/2 z-[9999] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-[8px] bg-[#1e293b] px-4 py-2.5 text-sm text-white shadow-lg"
-    >
-      <i class="pi pi-info-circle" />
-      {{ ui.toastMessage }}
-    </div>
-  </Transition>
 </template>
-
-<style>
-.ui-toast-enter-active,
-.ui-toast-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-.ui-toast-enter-from,
-.ui-toast-leave-to {
-  opacity: 0;
-  transform: translate(-50%, -10px);
-}
-</style>

@@ -259,7 +259,108 @@ const genAccountId = (acc: SocialAccount) => {
     return '@wang_' + Math.random().toString(36).slice(2, 8);
   return String(Math.floor(1e14 + Math.random() * 9e14));
 };
+/**
+ * IG / FB 綁定流程引導 dialog：兩者都走「私訊輸入驗證碼」流程，
+ * 開啟引導 dialog 而不直接 toggle 綁定狀態。
+ */
+type SocialBindProvider = 'ig' | 'fb';
+const SOCIAL_BIND_CONFIG: Record<
+  SocialBindProvider,
+  { label: string; appName: string; dmUrl: string }
+> = {
+  ig: {
+    label: 'Instagram',
+    appName: 'Instagram App',
+    dmUrl: 'https://ig.me/m/funshow_168',
+  },
+  fb: {
+    label: 'Facebook',
+    appName: 'Facebook App',
+    dmUrl: 'https://m.me/sappletest',
+  },
+};
+const isSocialBindDialogVisible = ref(false);
+const socialBindProvider = ref<SocialBindProvider>('ig');
+const socialBindCode = ref('HMB4PP');
+const socialBindConfig = computed(
+  () => SOCIAL_BIND_CONFIG[socialBindProvider.value],
+);
+
+/** Google 帳號選擇器示意資料 */
+interface GoogleAccountChoice {
+  name: string;
+  email: string;
+  initial: string;
+  avatarColor: string;
+}
+const GOOGLE_ACCOUNT_CHOICES: GoogleAccountChoice[] = [
+  {
+    name: '王小明',
+    email: 'xiaoming.wang@gmail.com',
+    initial: 'W',
+    avatarColor: '#1a73e8',
+  },
+  {
+    name: 'Ming Wang',
+    email: 'mingwang168@gmail.com',
+    initial: 'M',
+    avatarColor: '#0f9d58',
+  },
+  {
+    name: '工作信箱',
+    email: 'wang.work@gmail.com',
+    initial: 'W',
+    avatarColor: '#ea4335',
+  },
+];
+const isGoogleBindDialogVisible = ref(false);
+
+/**
+ * LINE / TikTok 走「OAuth 跳轉授權」流程：跳示意 dialog，
+ * 使用者按「前往授權」後完成綁定。
+ */
+type OAuthBindProvider = 'line' | 'tiktok';
+const OAUTH_BIND_CONFIG: Record<
+  OAuthBindProvider,
+  { label: string; brandColor: string; description: string }
+> = {
+  line: {
+    label: 'LINE',
+    brandColor: '#06c755',
+    description:
+      '將跳轉至 LINE 授權頁面，授權後即可綁定您的 LINE 帳號至商城。',
+  },
+  tiktok: {
+    label: 'TikTok',
+    brandColor: '#000000',
+    description: '將跳轉至 TikTok 授權頁面，授權後即可綁定您的 TikTok 帳號。',
+  },
+};
+const isOAuthBindDialogVisible = ref(false);
+const oauthBindProvider = ref<OAuthBindProvider>('line');
+const oauthBindConfig = computed(
+  () => OAUTH_BIND_CONFIG[oauthBindProvider.value],
+);
+
 const handleToggleBind = (acc: SocialAccount) => {
+  if ((acc.icon === 'ig' || acc.icon === 'fb') && !acc.bound) {
+    socialBindProvider.value = acc.icon;
+    socialBindCode.value = Math.random()
+      .toString(36)
+      .slice(2, 8)
+      .toUpperCase();
+    isSocialBindDialogVisible.value = true;
+    return;
+  }
+  if (acc.icon === 'google' && !acc.bound) {
+    isGoogleBindDialogVisible.value = true;
+    return;
+  }
+  if ((acc.icon === 'line' || acc.icon === 'tiktok') && !acc.bound) {
+    oauthBindProvider.value = acc.icon;
+    isOAuthBindDialogVisible.value = true;
+    return;
+  }
   acc.bound = !acc.bound;
   if (acc.bound) {
     if (!acc.accountId) acc.accountId = genAccountId(acc);
@@ -267,6 +368,37 @@ const handleToggleBind = (acc: SocialAccount) => {
   } else {
     acc.accountId = '';
     ui.toast(`已解除綁定 ${acc.label}`);
+  }
+};
+
+const handlePickGoogleAccount = (choice: GoogleAccountChoice) => {
+  const google = socialAccounts.value.find((a) => a.icon === 'google');
+  if (google) {
+    google.bound = true;
+    google.accountId = choice.email;
+  }
+  isGoogleBindDialogVisible.value = false;
+  ui.toast(`已綁定 Google（${choice.email}）`);
+};
+
+const handleConfirmOAuthBind = () => {
+  const acc = socialAccounts.value.find(
+    (a) => a.icon === oauthBindProvider.value,
+  );
+  if (acc) {
+    acc.bound = true;
+    if (!acc.accountId) acc.accountId = genAccountId(acc);
+  }
+  isOAuthBindDialogVisible.value = false;
+  ui.toast(`已綁定 ${oauthBindConfig.value.label}`);
+};
+
+const handleCopySocialBindCode = async (): Promise<void> => {
+  try {
+    await navigator.clipboard.writeText(socialBindCode.value);
+    ui.toast('已複製驗證碼');
+  } catch {
+    ui.toast('複製失敗，請手動選取', 'error');
   }
 };
 
@@ -1652,6 +1784,216 @@ const handleSaveAddr = () => {
           label="刪除"
           severity="danger"
           @click="handleConfirmDeleteAddr"
+        />
+      </template>
+    </Dialog>
+
+    <!-- IG / FB 綁定引導 dialog -->
+    <Dialog
+      v-model:visible="isSocialBindDialogVisible"
+      modal
+      :draggable="false"
+      :header="`綁定 ${socialBindConfig.label}`"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '420px' }"
+    >
+      <ol class="flex flex-col gap-4 text-sm text-slate-700">
+        <!-- Step 1 -->
+        <li class="flex items-start gap-3">
+          <span
+            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+            style="background: var(--primary)"
+          >
+            1
+          </span>
+          <div class="flex-1">
+            <p class="font-medium text-slate-950">
+              請開啟 {{ socialBindConfig.appName }}
+            </p>
+          </div>
+        </li>
+
+        <!-- Step 2 -->
+        <li class="flex items-start gap-3">
+          <span
+            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+            style="background: var(--primary)"
+          >
+            2
+          </span>
+          <div class="flex-1">
+            <p class="font-medium text-slate-950">點此私訊我們：</p>
+            <a
+              :href="socialBindConfig.dmUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-1 block break-all underline hover:opacity-80"
+              style="color: var(--primary)"
+            >
+              {{ socialBindConfig.dmUrl }}
+            </a>
+          </div>
+        </li>
+
+        <!-- Step 3 -->
+        <li class="flex items-start gap-3">
+          <span
+            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+            style="background: var(--primary)"
+          >
+            3
+          </span>
+          <div class="flex-1">
+            <p class="font-medium text-slate-950">傳訊息並輸入驗證碼：</p>
+            <div
+              class="mt-1.5 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+            >
+              <code class="flex-1 font-mono text-base font-bold text-slate-950">
+                {{ socialBindCode }}
+              </code>
+              <Button
+                icon="pi pi-copy"
+                severity="secondary"
+                text
+                rounded
+                aria-label="複製驗證碼"
+                @click="handleCopySocialBindCode"
+              />
+            </div>
+          </div>
+        </li>
+      </ol>
+
+      <template #footer>
+        <Button
+          label="關閉"
+          severity="secondary"
+          outlined
+          @click="isSocialBindDialogVisible = false"
+        />
+      </template>
+    </Dialog>
+
+    <!-- Google 帳號選擇器 dialog -->
+    <Dialog
+      v-model:visible="isGoogleBindDialogVisible"
+      modal
+      :draggable="false"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '420px' }"
+    >
+      <template #header>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <img
+              :src="socialIconSrc('google')"
+              alt="Google"
+              class="h-5 w-5 object-contain"
+            />
+            <span class="text-sm text-slate-500">使用 Google 帳號登入</span>
+          </div>
+          <p class="text-lg font-medium text-slate-950">選擇帳戶</p>
+          <p class="text-xs text-slate-500">繼續以連結到「商城前台」</p>
+        </div>
+      </template>
+
+      <ul class="flex flex-col">
+        <li
+          v-for="choice in GOOGLE_ACCOUNT_CHOICES"
+          :key="choice.email"
+          class="-mx-2"
+        >
+          <button
+            class="flex w-full items-center gap-3 rounded-md px-2 py-3 text-left transition-colors hover:bg-slate-100"
+            @click="handlePickGoogleAccount(choice)"
+          >
+            <span
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
+              :style="{ background: choice.avatarColor }"
+            >
+              {{ choice.initial }}
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-medium text-slate-950">
+                {{ choice.name }}
+              </span>
+              <span class="block truncate text-xs text-slate-500">
+                {{ choice.email }}
+              </span>
+            </span>
+          </button>
+        </li>
+        <li class="-mx-2">
+          <button
+            class="flex w-full items-center gap-3 rounded-md px-2 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100"
+            @click="
+              ui.toast('已導向 Google 登入頁（示意）', 'info');
+              isGoogleBindDialogVisible = false;
+            "
+          >
+            <span
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+            >
+              <i class="pi pi-user-plus text-sm" />
+            </span>
+            使用其他帳戶
+          </button>
+        </li>
+      </ul>
+
+      <template #footer>
+        <Button
+          label="取消"
+          severity="secondary"
+          outlined
+          @click="isGoogleBindDialogVisible = false"
+        />
+      </template>
+    </Dialog>
+
+    <!-- LINE / TikTok OAuth 授權 dialog -->
+    <Dialog
+      v-model:visible="isOAuthBindDialogVisible"
+      modal
+      :draggable="false"
+      :header="`綁定 ${oauthBindConfig.label}`"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '380px' }"
+    >
+      <div class="flex flex-col items-center gap-4 py-2 text-center">
+        <span
+          class="flex h-16 w-16 items-center justify-center rounded-full"
+          :style="{ background: oauthBindConfig.brandColor + '15' }"
+        >
+          <img
+            :src="socialIconSrc(oauthBindProvider)"
+            :alt="oauthBindConfig.label"
+            class="h-9 w-9 object-contain"
+          />
+        </span>
+        <p class="text-sm leading-relaxed text-slate-700">
+          {{ oauthBindConfig.description }}
+        </p>
+        <div
+          class="flex w-full items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs text-slate-500"
+        >
+          <i class="pi pi-shield mt-0.5 shrink-0" />
+          <span
+            >我們不會取得您的密碼，僅取得綁定所需的基本資訊（暱稱、ID）。</span
+          >
+        </div>
+      </div>
+
+      <template #footer>
+        <Button
+          label="取消"
+          severity="secondary"
+          outlined
+          @click="isOAuthBindDialogVisible = false"
+        />
+        <Button
+          :label="`前往 ${oauthBindConfig.label} 授權`"
+          @click="handleConfirmOAuthBind"
         />
       </template>
     </Dialog>
