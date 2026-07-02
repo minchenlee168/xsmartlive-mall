@@ -16,6 +16,7 @@ const densities: { id: DensityMode; label: string; icon: string }[] = [
 ];
 
 const isOpen = ref(false);
+const isHidden = ref(false);
 
 /** vite.config 在 build/dev 啟動時注入 ISO 字串，轉成 YYYY/MM/DD HH:mm 顯示。 */
 const buildTimeDisplay = (() => {
@@ -26,7 +27,10 @@ const buildTimeDisplay = (() => {
 </script>
 
 <template>
-  <div class="fixed right-6 bottom-24 z-[9999] flex flex-col items-end gap-2">
+  <div
+    v-if="!isHidden"
+    class="fixed right-6 bottom-24 z-[9999] flex flex-col items-end gap-2"
+  >
     <!-- Panel -->
     <Transition
       enter-active-class="transition-all duration-200 ease-out"
@@ -172,19 +176,31 @@ const buildTimeDisplay = (() => {
     </Transition>
 
     <!-- FAB -->
-    <button
-      class="flex h-12 w-12 items-center justify-center rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:scale-110 active:scale-95"
-      style="background: var(--primary-bg)"
-      @click="isOpen = !isOpen"
-    >
-      <i
-        class="pi text-lg text-white"
-        :class="isOpen ? 'pi-times' : 'pi-palette'"
-        :style="{
-          transition: 'transform 0.2s',
-          transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-        }"
-      />
-    </button>
+    <div class="relative">
+      <button
+        class="flex h-12 w-12 items-center justify-center rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:scale-110 active:scale-95"
+        style="background: var(--primary-bg)"
+        @click="isOpen = !isOpen"
+      >
+        <i
+          class="pi text-lg text-white"
+          :class="isOpen ? 'pi-times' : 'pi-palette'"
+          :style="{
+            transition: 'transform 0.2s',
+            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+          }"
+        />
+      </button>
+      <!-- 暫時隱藏（重整後恢復） -->
+      <button
+        v-show="!isOpen"
+        class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow transition-colors hover:bg-slate-100 hover:text-slate-700"
+        aria-label="暫時隱藏（重整後恢復）"
+        title="暫時隱藏（重整後恢復）"
+        @click.stop="isHidden = true"
+      >
+        <i class="pi pi-times text-[10px]" />
+      </button>
+    </div>
   </div>
 </template>

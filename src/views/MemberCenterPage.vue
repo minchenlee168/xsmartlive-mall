@@ -732,6 +732,38 @@ const handleSaveAddr = () => {
         </div>
         <p class="text-base font-bold text-slate-950">{{ name }}</p>
         <p class="text-xs text-slate-500">{{ MEMBER_ID }}</p>
+        <div class="mt-1 flex flex-wrap items-center justify-center gap-2.5">
+          <button
+            v-for="acc in socialAccounts"
+            :key="acc.key"
+            class="group relative inline-flex shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+            :title="
+              acc.bound
+                ? `已綁定 ${acc.label}（點擊解除綁定）`
+                : `點擊綁定 ${acc.label}`
+            "
+            :aria-label="acc.bound ? `解除綁定 ${acc.label}` : `綁定 ${acc.label}`"
+            @click="handleToggleBind(acc)"
+          >
+            <img
+              :src="socialIconSrc(acc.icon)"
+              :alt="acc.label"
+              class="h-7 w-7 object-contain transition-opacity"
+              :class="acc.bound ? '' : 'opacity-40 grayscale'"
+            />
+            <span
+              class="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full text-white ring-2 ring-white"
+              :style="{
+                background: acc.bound ? 'var(--primary)' : '#94a3b8',
+              }"
+            >
+              <i
+                class="fa-solid text-[9px]"
+                :class="acc.bound ? 'fa-link' : 'fa-link-slash'"
+              />
+            </span>
+          </button>
+        </div>
 
         <!-- 紅利點數 / 優惠券一列：寬度縮到跟下方 card 的內容區同寬（兩側各扣 card-pad） -->
         <div
@@ -779,6 +811,40 @@ const handleSaveAddr = () => {
           <div class="min-w-0">
             <p class="text-lg font-bold text-slate-950">{{ name }}</p>
             <p class="text-xs text-slate-500">{{ MEMBER_ID }}</p>
+            <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
+              <button
+                v-for="acc in socialAccounts"
+                :key="acc.key"
+                class="group relative inline-flex shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+                :title="
+                  acc.bound
+                    ? `已綁定 ${acc.label}（點擊解除綁定）`
+                    : `點擊綁定 ${acc.label}`
+                "
+                :aria-label="
+                  acc.bound ? `解除綁定 ${acc.label}` : `綁定 ${acc.label}`
+                "
+                @click="handleToggleBind(acc)"
+              >
+                <img
+                  :src="socialIconSrc(acc.icon)"
+                  :alt="acc.label"
+                  class="h-7 w-7 object-contain transition-opacity"
+                  :class="acc.bound ? '' : 'opacity-40 grayscale'"
+                />
+                <span
+                  class="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full text-white ring-2 ring-white"
+                  :style="{
+                    background: acc.bound ? 'var(--primary)' : '#94a3b8',
+                  }"
+                >
+                  <i
+                    class="fa-solid text-[9px]"
+                    :class="acc.bound ? 'fa-link' : 'fa-link-slash'"
+                  />
+                </span>
+              </button>
+            </div>
             <Button
               label="編輯個人檔案"
               icon="pi pi-pencil"

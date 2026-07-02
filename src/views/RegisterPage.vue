@@ -139,12 +139,13 @@ const handleGoToShop = () => {
 
           <!-- 國碼 + 電話號碼 -->
           <div class="flex items-end gap-2">
-            <div class="flex w-[100px] shrink-0 flex-col gap-1.5">
+            <div class="flex w-[120px] shrink-0 flex-col gap-1.5">
               <label>國碼</label>
               <Select
                 v-model="countryCode"
                 :options="COUNTRY_CODES"
                 class="w-full"
+                :pt="{ overlay: { style: 'min-width: 140px' } }"
               />
             </div>
             <div class="flex min-w-0 flex-1 flex-col gap-1.5">
