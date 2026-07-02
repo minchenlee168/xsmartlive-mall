@@ -241,9 +241,9 @@ const socialAccounts = ref<SocialAccount[]>([
     key: 'ig',
     label: 'Instagram',
     icon: 'ig',
-    bound: false,
+    bound: true,
     idLabel: 'IG 帳號',
-    accountId: '',
+    accountId: '@wang_xm',
   },
   {
     key: 'tiktok',
@@ -327,8 +327,7 @@ const OAUTH_BIND_CONFIG: Record<
   line: {
     label: 'LINE',
     brandColor: '#06c755',
-    description:
-      '將跳轉至 LINE 授權頁面，授權後即可綁定您的 LINE 帳號至商城。',
+    description: '將跳轉至 LINE 授權頁面，授權後即可綁定您的 LINE 帳號至商城。',
   },
   tiktok: {
     label: 'TikTok',
@@ -345,10 +344,7 @@ const oauthBindConfig = computed(
 const handleToggleBind = (acc: SocialAccount) => {
   if ((acc.icon === 'ig' || acc.icon === 'fb') && !acc.bound) {
     socialBindProvider.value = acc.icon;
-    socialBindCode.value = Math.random()
-      .toString(36)
-      .slice(2, 8)
-      .toUpperCase();
+    socialBindCode.value = Math.random().toString(36).slice(2, 8).toUpperCase();
     isSocialBindDialogVisible.value = true;
     return;
   }
@@ -719,10 +715,10 @@ const handleSaveAddr = () => {
       class="border-b border-slate-200 bg-white"
       :class="activeNav === 'account' ? '' : 'hidden @4xl:block'"
     >
-      <!-- 手機版：上半身份（垂直置中：頭像 / 姓名 / 會員編號），下方紅利點數 vs 優惠券 左右一列 -->
+      <!-- 手機版：上半身份（頭像左、姓名/會員編號/綁定膠囊右），下方紅利點數 vs 優惠券 左右一列 -->
       <!-- padding 跟 main 用同一組 CSS var，紅利/優惠券列才能跟下方 card 外緣對齊 -->
       <div
-        class="flex flex-col items-center gap-2 @4xl:hidden"
+        class="flex flex-col items-center gap-3 @4xl:hidden"
         style="padding: var(--page-pad-y) var(--page-pad-x)"
       >
         <div
@@ -730,25 +726,31 @@ const handleSaveAddr = () => {
         >
           {{ auth.avatarLetter }}
         </div>
-        <p class="text-base font-bold text-slate-950">{{ name }}</p>
-        <p class="text-xs text-slate-500">{{ MEMBER_ID }}</p>
-        <div class="mt-1 flex flex-wrap items-center justify-center gap-2.5">
+        <div class="flex flex-col items-center gap-1">
+          <p class="text-base font-bold text-slate-950">{{ name }}</p>
+          <p class="text-xs text-slate-500">{{ MEMBER_ID }}</p>
+        </div>
+
+        <!-- 社群綁定 icon 列：單列 + 角落狀態徽章 -->
+        <div class="flex flex-wrap items-center justify-center gap-4">
           <button
             v-for="acc in socialAccounts"
             :key="acc.key"
-            class="group relative inline-flex shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+            class="relative inline-flex shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
             :title="
               acc.bound
-                ? `已綁定 ${acc.label}（點擊解除綁定）`
+                ? `已綁定 ${acc.label}（點擊解除）`
                 : `點擊綁定 ${acc.label}`
             "
-            :aria-label="acc.bound ? `解除綁定 ${acc.label}` : `綁定 ${acc.label}`"
+            :aria-label="
+              acc.bound ? `解除綁定 ${acc.label}` : `綁定 ${acc.label}`
+            "
             @click="handleToggleBind(acc)"
           >
             <img
               :src="socialIconSrc(acc.icon)"
               :alt="acc.label"
-              class="h-7 w-7 object-contain transition-opacity"
+              class="h-8 w-8 object-contain transition-opacity"
               :class="acc.bound ? '' : 'opacity-40 grayscale'"
             />
             <span
@@ -767,7 +769,7 @@ const handleSaveAddr = () => {
 
         <!-- 紅利點數 / 優惠券一列：寬度縮到跟下方 card 的內容區同寬（兩側各扣 card-pad） -->
         <div
-          class="mt-3 flex items-center justify-between border-t border-slate-200 pt-3"
+          class="mt-4 flex items-center justify-between border-t border-slate-200 pt-4"
           :style="{ width: 'calc(100% - 2 * var(--card-pad))' }"
         >
           <button
@@ -811,14 +813,14 @@ const handleSaveAddr = () => {
           <div class="min-w-0">
             <p class="text-lg font-bold text-slate-950">{{ name }}</p>
             <p class="text-xs text-slate-500">{{ MEMBER_ID }}</p>
-            <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
+            <div class="mt-2 flex flex-wrap items-center gap-4">
               <button
                 v-for="acc in socialAccounts"
                 :key="acc.key"
-                class="group relative inline-flex shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+                class="relative inline-flex shrink-0 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
                 :title="
                   acc.bound
-                    ? `已綁定 ${acc.label}（點擊解除綁定）`
+                    ? `已綁定 ${acc.label}（點擊解除）`
                     : `點擊綁定 ${acc.label}`
                 "
                 :aria-label="
@@ -829,7 +831,7 @@ const handleSaveAddr = () => {
                 <img
                   :src="socialIconSrc(acc.icon)"
                   :alt="acc.label"
-                  class="h-7 w-7 object-contain transition-opacity"
+                  class="h-8 w-8 object-contain transition-opacity"
                   :class="acc.bound ? '' : 'opacity-40 grayscale'"
                 />
                 <span
@@ -1434,8 +1436,8 @@ const handleSaveAddr = () => {
                 </div>
               </div>
               <Button
-                :label="acc.bound ? '已綁定' : '未綁定'"
-                :icon="acc.bound ? 'pi pi-link' : 'pi pi-times-circle'"
+                :label="acc.bound ? '已綁定' : '前往綁定'"
+                :icon="acc.bound ? 'fa-solid fa-link' : 'fa-solid fa-link-slash'"
                 :severity="acc.bound ? 'primary' : 'secondary'"
                 outlined
                 size="small"

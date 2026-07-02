@@ -92,6 +92,14 @@ const handleGoToLogin = () => {
     class="relative min-h-screen overflow-hidden"
     style="background: var(--surface-100)"
   >
+    <!-- 手機底圖：左側曲線 blob -->
+    <img
+      src="/auth-bg-mobile.png"
+      alt=""
+      aria-hidden="true"
+      class="pointer-events-none absolute top-0 right-0 h-full w-auto max-w-full select-none @3xl:hidden"
+    />
+
     <header
       class="relative z-10 border-b border-[var(--border-light)] bg-white"
     >

@@ -5,7 +5,7 @@ import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
 import { useCountdown } from '../composables/useCountdown';
 
-type Step = 'form' | 'success';
+type Step = 'form' | 'password' | 'success';
 
 const COUNTRY_CODES = ['+886', '+852', '+86'];
 const RESEND_COOLDOWN_SEC = 60;
@@ -37,21 +37,35 @@ const isPasswordInvalid = computed(
 const isPasswordMismatch = computed(
   () => !!confirm.value && password.value !== confirm.value,
 );
-const canSubmit = computed(
+const canProceedToPassword = computed(
   () =>
     !!name.value &&
     !!phone.value &&
     smsCode.value.length === SMS_CODE_LENGTH &&
+    isAgreed.value,
+);
+const canSubmit = computed(
+  () =>
     !!password.value &&
     !isPasswordInvalid.value &&
-    !isPasswordMismatch.value &&
-    isAgreed.value,
+    !!confirm.value &&
+    !isPasswordMismatch.value,
 );
 
 const handleSendSmsCode = () => {
   if (!canSendSms.value) return;
   startResendCountdown(RESEND_COOLDOWN_SEC);
   ui.toast('驗證碼已發送（示意）');
+};
+
+const handleNext = () => {
+  if (!canProceedToPassword.value) return;
+  step.value = 'password';
+  isSubmitted.value = false;
+};
+
+const handleBack = () => {
+  step.value = 'form';
 };
 
 const handleSubmit = () => {
@@ -72,6 +86,17 @@ const handleGoToShop = () => {
     class="relative min-h-screen overflow-hidden"
     style="background: var(--surface-100)"
   >
+    <!-- 手機底圖：左側曲線 blob -->
+    <img
+      src="/auth-bg-mobile.png"
+      alt=""
+      aria-hidden="true"
+      class="pointer-events-none absolute top-0 right-0 h-full w-auto max-w-full select-none @3xl:hidden"
+    />
+
+    <!-- Decorative background blob（平板/PC 才顯示，與登入頁一致） -->
+    <div class="login-bg hidden @3xl:block" aria-hidden="true"></div>
+
     <header
       class="relative z-10 border-b border-[var(--border-light)] bg-white"
     >
@@ -114,13 +139,20 @@ const handleGoToShop = () => {
         >
           註冊帳號
         </h2>
+        <h2
+          v-else-if="step === 'password'"
+          class="text-center text-3xl font-bold"
+          style="color: var(--surface-950)"
+        >
+          設定密碼
+        </h2>
 
         <!-- 父層統一 form 內 label 字級、顏色（PrimeVue 元件內部不受繼承） -->
         <form
           v-if="step === 'form'"
           class="flex flex-col gap-4 text-sm font-medium"
           style="color: var(--surface-700)"
-          @submit.prevent="handleSubmit"
+          @submit.prevent="handleNext"
         >
           <!-- 姓名 -->
           <div class="flex flex-col gap-1.5">
@@ -164,7 +196,7 @@ const handleGoToShop = () => {
             </div>
           </div>
 
-          <!-- 簡訊驗證碼 + 發送驗證碼 -->
+          <!-- 簡訊驗證碼 + 獲得驗證碼 -->
           <div class="flex flex-col gap-1.5">
             <label>簡訊驗證碼</label>
             <div class="flex gap-2">
@@ -176,48 +208,14 @@ const handleGoToShop = () => {
               />
               <Button
                 :label="
-                  resendCountdown > 0 ? `${resendCountdown}s` : '發送驗證碼'
+                  resendCountdown > 0 ? `${resendCountdown}s` : '獲得驗證碼'
                 "
                 :disabled="!canSendSms"
-                severity="secondary"
+                :severity="canSendSms ? 'primary' : 'secondary'"
                 class="!min-h-11 shrink-0 whitespace-nowrap"
                 @click="handleSendSmsCode"
               />
             </div>
-          </div>
-
-          <!-- 設定密碼 -->
-          <div class="flex flex-col gap-1.5">
-            <label>設定密碼</label>
-            <Password
-              v-model="password"
-              :feedback="false"
-              toggle-mask
-              :invalid="isPasswordInvalid"
-              placeholder="8-20位英數字組合，不可含特殊符號或 Emoji"
-              fluid
-              input-class="w-full"
-            />
-            <p v-if="isPasswordInvalid" class="text-xs text-red-500">
-              密碼需為 8-20 位英數字組合，不可包含特殊符號或 Emoji
-            </p>
-          </div>
-
-          <!-- 確認密碼 -->
-          <div class="flex flex-col gap-1.5">
-            <label>確認密碼</label>
-            <Password
-              v-model="confirm"
-              :feedback="false"
-              toggle-mask
-              :invalid="isPasswordMismatch"
-              placeholder="再次輸入設定密碼"
-              fluid
-              input-class="w-full"
-            />
-            <p v-if="isPasswordMismatch" class="text-xs text-red-500">
-              兩次輸入的密碼不一致
-            </p>
           </div>
 
           <!-- 同意條款 + 提醒 -->
@@ -253,11 +251,11 @@ const handleGoToShop = () => {
             </p>
           </div>
 
-          <!-- 完成註冊並登入 -->
+          <!-- 下一步 -->
           <Button
             type="submit"
-            :disabled="!canSubmit"
-            label="完成註冊並登入"
+            :disabled="!canProceedToPassword"
+            label="下一步"
             class="mt-1 !min-h-13 w-full"
           />
 
@@ -269,6 +267,66 @@ const handleGoToShop = () => {
               text
               class="!font-medium underline underline-offset-4"
               @click="router.push('/login')"
+            />
+          </div>
+        </form>
+
+        <!-- 第二步：設定密碼 -->
+        <form
+          v-else-if="step === 'password'"
+          class="flex flex-col gap-4 text-sm font-medium"
+          style="color: var(--surface-700)"
+          @submit.prevent="handleSubmit"
+        >
+          <!-- 設定密碼 -->
+          <div class="flex flex-col gap-1.5">
+            <label>設定密碼</label>
+            <Password
+              v-model="password"
+              :feedback="false"
+              toggle-mask
+              :invalid="isPasswordInvalid"
+              placeholder="8-20位英數字組合，不可含特殊符號或 Emoji"
+              fluid
+              input-class="w-full"
+            />
+            <p v-if="isPasswordInvalid" class="text-xs text-red-500">
+              密碼需為 8-20 位英數字組合，不可包含特殊符號或 Emoji
+            </p>
+          </div>
+
+          <!-- 確認密碼 -->
+          <div class="flex flex-col gap-1.5">
+            <label>確認密碼</label>
+            <Password
+              v-model="confirm"
+              :feedback="false"
+              toggle-mask
+              :invalid="isPasswordMismatch"
+              placeholder="再次輸入設定密碼"
+              fluid
+              input-class="w-full"
+            />
+            <p v-if="isPasswordMismatch" class="text-xs text-red-500">
+              兩次輸入的密碼不一致
+            </p>
+          </div>
+
+          <!-- 完成註冊並登入 -->
+          <div class="mt-1 flex gap-2">
+            <Button
+              type="button"
+              label="上一步"
+              severity="secondary"
+              outlined
+              class="!min-h-13 shrink-0"
+              @click="handleBack"
+            />
+            <Button
+              type="submit"
+              :disabled="!canSubmit"
+              label="完成註冊並登入"
+              class="!min-h-13 flex-1"
             />
           </div>
         </form>
@@ -293,3 +351,23 @@ const handleGoToShop = () => {
     </main>
   </div>
 </template>
+
+<style scoped>
+.login-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 30% 35%,
+      rgba(112, 8, 231, 0.55) 0%,
+      rgba(112, 8, 231, 0) 38%
+    ),
+    radial-gradient(
+      circle at 65% 70%,
+      rgba(96, 165, 250, 0.45) 0%,
+      rgba(96, 165, 250, 0) 40%
+    );
+  filter: blur(10px);
+}
+</style>

@@ -107,8 +107,16 @@ onBeforeUnmount(() => {
     class="relative min-h-screen overflow-hidden"
     style="background: var(--surface-100)"
   >
-    <!-- Decorative background blob -->
-    <div class="login-bg" aria-hidden="true"></div>
+    <!-- 手機底圖：左側曲線 blob -->
+    <img
+      src="/auth-bg-mobile.png"
+      alt=""
+      aria-hidden="true"
+      class="pointer-events-none absolute top-0 right-0 h-full w-auto max-w-full select-none @3xl:hidden"
+    />
+
+    <!-- Decorative background blob（平板/PC 才顯示） -->
+    <div class="login-bg hidden @3xl:block" aria-hidden="true"></div>
 
     <!-- Top bar -->
     <header
