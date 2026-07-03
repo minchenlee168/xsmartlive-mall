@@ -159,7 +159,12 @@ watch(
   },
 );
 /** 支援 `?sub=xxx` 直接跳到 account 下的 sub-tab（會員資料 / 更改綁定帳號 / 收件地址 / 更改密碼） */
-const VALID_ACCOUNT_SUBS = new Set(['profile', 'binding', 'address', 'password']);
+const VALID_ACCOUNT_SUBS = new Set([
+  'profile',
+  'binding',
+  'address',
+  'password',
+]);
 const readSubFromRoute = (): void => {
   const q = route.query.sub;
   if (typeof q === 'string' && VALID_ACCOUNT_SUBS.has(q)) {
@@ -1460,7 +1465,9 @@ const handleSaveAddr = () => {
               </div>
               <Button
                 :label="acc.bound ? '已綁定' : '前往綁定'"
-                :icon="acc.bound ? 'fa-solid fa-link' : 'fa-solid fa-link-slash'"
+                :icon="
+                  acc.bound ? 'fa-solid fa-link' : 'fa-solid fa-link-slash'
+                "
                 :severity="acc.bound ? 'primary' : 'secondary'"
                 outlined
                 size="small"

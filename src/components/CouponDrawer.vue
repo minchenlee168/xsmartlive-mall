@@ -92,7 +92,7 @@ const coupons: Coupon[] = [
             class="flex rounded-[10px] border border-slate-200"
           >
             <div
-              class="flex shrink-0 items-center justify-center rounded-l-[10px] bg-[#ede9fe]"
+              class="flex shrink-0 items-center justify-center rounded-l-[10px] bg-violet-100"
               :class="
                 isMobile
                   ? 'w-[76px] gap-1 px-2 py-3'

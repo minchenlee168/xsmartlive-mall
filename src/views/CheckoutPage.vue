@@ -783,7 +783,7 @@ const handlePlaceOrder = () => {
           <!-- PC：與運費折抵同一行；放在 col 1 並 justify-self-end 靠右。
                用 invisible @3xl:visible 確保手機也佔 grid cell（讓欄位對齊上方） -->
           <div
-            class="invisible flex items-center justify-self-end gap-1 text-sm @3xl:visible"
+            class="invisible flex items-center gap-1 justify-self-end text-sm @3xl:visible"
             style="color: var(--primary)"
           >
             <i class="pi pi-truck text-xs" />
@@ -804,7 +804,7 @@ const handlePlaceOrder = () => {
               已套用『{{ appliedCoupon.title }}』
             </div>
             <div
-              class="invisible flex items-center justify-self-end gap-1 text-sm @3xl:visible"
+              class="invisible flex items-center gap-1 justify-self-end text-sm @3xl:visible"
               style="color: var(--primary)"
             >
               <i class="pi pi-ticket text-xs" />
@@ -1486,12 +1486,12 @@ const handlePlaceOrder = () => {
   left: calc(var(--frame-left, 0px) + var(--frame-width, 100vw) / 2);
   bottom: var(--frame-bottom, 0px);
   transform: translateX(-50%);
-  width: var(--frame-width, 100vw);
+  /* PC 版限寬 720px 貼合內容，不再吃滿整個 frame 寬 */
+  width: min(720px, var(--frame-width, 100vw));
   max-width: 100vw;
   z-index: 110;
   background: white;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
+  border-radius: 16px 16px 0 0;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);

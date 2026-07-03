@@ -157,7 +157,9 @@ const handleBackToLogin = () => {
     <div v-if="step !== 'success'" class="login-bg" aria-hidden="true"></div>
 
     <!-- Top bar -->
-    <header class="relative z-10 border-b border-[var(--border-light)] bg-white">
+    <header
+      class="relative z-10 border-b border-[var(--border-light)] bg-white"
+    >
       <div
         class="mx-auto flex h-14 max-w-7xl items-center justify-between px-8 py-2"
       >
@@ -424,7 +426,9 @@ const handleBackToLogin = () => {
             class="flex w-full items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-700"
           >
             <i class="pi pi-info-circle mt-0.5 shrink-0" />
-            <span>驗證成功後，系統將自動連結您的帳號與手機，保障購物權益。</span>
+            <span
+              >驗證成功後，系統將自動連結您的帳號與手機，保障購物權益。</span
+            >
           </div>
 
           <Button

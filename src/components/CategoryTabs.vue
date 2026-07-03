@@ -104,7 +104,11 @@ watch(isMobile, () => {
 
 <template>
   <!-- tabs bar：sticky 在 frame 頂端，捲動內容時保持可見。Aurora 走全站 shell，不顯示。 -->
-  <div v-if="!isAurora" class="sticky top-0 z-40 w-full" style="background: var(--tabs-bg)">
+  <div
+    v-if="!isAurora"
+    class="sticky top-0 z-40 w-full"
+    style="background: var(--tabs-bg)"
+  >
     <div class="mx-auto max-w-7xl">
       <div class="flex items-center">
         <!-- main category tabs -->

@@ -158,7 +158,7 @@ const handlePickKeyword = (kw: string) => {
 <template>
   <header
     v-if="!isAurora"
-    class="sticky top-0 z-50 border-b border-[#e5e5e5] bg-white @4xl:h-[89px]"
+    class="sticky top-0 z-50 border-b border-slate-200 bg-white @4xl:h-[89px]"
   >
     <div
       class="mx-auto max-w-7xl px-4 py-3 @4xl:flex @4xl:h-full @4xl:flex-col @4xl:justify-center @4xl:py-[4px]"
@@ -272,7 +272,9 @@ const handlePickKeyword = (kw: string) => {
                       : 'text-slate-700'
                   "
                   :style="
-                    l.code === prefs.language.code ? 'color: var(--primary)' : ''
+                    l.code === prefs.language.code
+                      ? 'color: var(--primary)'
+                      : ''
                   "
                   @click="handlePickLanguage(l)"
                 >

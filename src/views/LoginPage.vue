@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
+import { useThemeStore } from '../pinia/theme';
 
 declare global {
   interface Window {
@@ -24,6 +25,16 @@ const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
 const ui = useUiStore();
+const themeStore = useThemeStore();
+const BASE_URL = import.meta.env.BASE_URL;
+
+const isAuroraTheme = computed(() => themeStore.current.id === 'aurora');
+/** Aurora 外觀用不同底圖（珊瑚 → 蒂芬妮綠曲線）；用 BASE_URL 才能對到 Vite 的 base '/xsmartlive-mall/' */
+const authBgSrc = computed(() =>
+  isAuroraTheme.value
+    ? `${import.meta.env.BASE_URL}auth-bg-aurora.png`
+    : `${import.meta.env.BASE_URL}auth-bg-mobile.png`,
+);
 
 const countryCode = ref('+886');
 const phone = ref('');
@@ -107,16 +118,20 @@ onBeforeUnmount(() => {
     class="relative min-h-screen overflow-hidden"
     style="background: var(--surface-100)"
   >
-    <!-- 手機底圖：左側曲線 blob -->
+    <!-- 手機底圖（Aurora / 其他外觀各自的曲線 blob） -->
     <img
-      src="/auth-bg-mobile.png"
+      :src="authBgSrc"
       alt=""
       aria-hidden="true"
       class="pointer-events-none absolute top-0 right-0 h-full w-auto max-w-full select-none @3xl:hidden"
     />
 
-    <!-- Decorative background blob（平板/PC 才顯示） -->
-    <div class="login-bg hidden @3xl:block" aria-hidden="true"></div>
+    <!-- PC 徑向漸層 blob：Aurora 用珊瑚色調、其他外觀用原本紫藍 -->
+    <div
+      class="hidden @3xl:block"
+      :class="isAuroraTheme ? 'login-bg-aurora' : 'login-bg'"
+      aria-hidden="true"
+    ></div>
 
     <!-- Top bar -->
     <header
@@ -166,7 +181,7 @@ onBeforeUnmount(() => {
             歡迎光臨！<br />直播好康等你來逛
           </h1>
           <img
-            src="/login-illustration.png"
+            :src="`${BASE_URL}login-illustration.svg`"
             alt="直播購物插圖"
             class="pointer-events-none hidden h-auto max-w-full select-none @3xl:block @3xl:w-[200px] @4xl:w-[476px]"
             draggable="false"
@@ -366,6 +381,24 @@ onBeforeUnmount(() => {
       circle at 65% 70%,
       rgba(96, 165, 250, 0.45) 0%,
       rgba(96, 165, 250, 0) 40%
+    );
+  filter: blur(10px);
+}
+/* Aurora PC 版：珊瑚 → 蒂芬妮綠 徑向漸層，鋪滿背景不切邊 */
+.login-bg-aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 30% 35%,
+      rgba(224, 120, 86, 0.5) 0%,
+      rgba(224, 120, 86, 0) 40%
+    ),
+    radial-gradient(
+      circle at 70% 65%,
+      rgba(108, 212, 208, 0.45) 0%,
+      rgba(108, 212, 208, 0) 42%
     );
   filter: blur(10px);
 }

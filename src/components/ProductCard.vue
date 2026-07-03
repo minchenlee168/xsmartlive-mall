@@ -374,9 +374,7 @@ const handleConfirmBundleAdd = () => {
     <div class="flex flex-col gap-4">
       <!-- 商品圖 + 名稱 -->
       <div class="flex gap-3">
-        <div
-          class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100"
-        >
+        <div class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
           <ProductImage :src="image" :alt="name" size="sm" />
         </div>
         <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -474,9 +472,7 @@ const handleConfirmBundleAdd = () => {
     <div @click.stop class="flex flex-col gap-4">
       <!-- 商品圖 + 名稱 + 主數量 -->
       <div class="flex gap-3">
-        <div
-          class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100"
-        >
+        <div class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
           <ProductImage :src="image" :alt="name" size="sm" />
         </div>
         <div class="flex min-w-0 flex-1 flex-col gap-1">

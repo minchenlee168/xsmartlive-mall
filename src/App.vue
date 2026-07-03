@@ -21,16 +21,23 @@ const viewportStore = useViewportStore();
 const ui = useUiStore();
 const themeStore = useThemeStore();
 const route = useRoute();
+
+// 入口頁與 auth 頁；不顯示 Footer、不套 Aurora shell
+const AUTH_PATHS = ['/login', '/register', '/forgot', '/social-signup'];
+
 const isAurora = computed(() => themeStore.current.id === 'aurora');
+/** Aurora 但走到 auth 路徑時不套 Shell，讓頁面像其他外觀一樣全寬 */
+const useAuroraShell = computed(
+  () => isAurora.value && !AUTH_PATHS.includes(route.path),
+);
 const appearanceId = computed(() => themeStore.current.id);
+
 // 把 PrimeVue ToastService 注入 ui store，讓全域 ui.toast() 走 PrimeVue <Toast>
 ui.setToastService(useToast());
 const frameRef = ref<HTMLElement | null>(null);
 // 商城前台：所有頁面都允許 frame；入口頁外都顯示 FloatingControls
 const isFullscreen = computed(() => false);
 const showControls = computed(() => route.path !== '/');
-// Footer 只在主商城頁出現；auth / 入口頁不顯示，避免破壞自訂全頁版型。
-const AUTH_PATHS = ['/login', '/register', '/forgot', '/social-signup'];
 const showFooter = computed(
   () => route.path !== '/' && !AUTH_PATHS.includes(route.path),
 );
@@ -112,7 +119,7 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
     <!-- device label -->
     <div v-if="isConstrained" class="mb-2 text-center">
       <span
-        class="rounded-full bg-white/80 px-3 py-1 text-xs text-[#64748b] shadow-sm"
+        class="rounded-full bg-white/80 px-3 py-1 text-xs text-slate-500 shadow-sm"
       >
         <i
           :class="`pi pi-${viewportStore.current.id === 'mobile' ? 'mobile' : 'tablet'} mr-1`"
@@ -128,7 +135,7 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
       class="@container"
       :class="`appearance-${appearanceId}`"
     >
-      <template v-if="isAurora">
+      <template v-if="useAuroraShell">
         <AuroraShell>
           <RouterView />
         </AuroraShell>
@@ -150,10 +157,21 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
 </template>
 
 <style scoped>
+/* ═════════════ Aurora（極光珊瑚）全站樣式 ═════════════ */
+/* AuroraShell 已提供 bottom nav，會員中心自己的手機底部 4-tab bar（z-30）隱藏，避免雙 bar 重疊 */
+.appearance-aurora :deep(.sticky.bottom-0.z-30) {
+  display: none !important;
+}
+
 /* ═════════════ Midnight（深夜藍）全站樣式 ═════════════ */
 /* 整頁深底 + 亮字 */
 .appearance-midnight {
-  background: linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  background: linear-gradient(
+    160deg,
+    #0f172a 0%,
+    #1e293b 50%,
+    #0f172a 100%
+  ) !important;
   color: #f1f5f9;
 }
 .appearance-midnight :deep(h2),
@@ -243,7 +261,10 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
   border-color: #3b82f6 !important;
   color: #fff !important;
 }
-.appearance-midnight :deep([style*='var(--tabs-bg)']) button > span.absolute.bottom-0 {
+.appearance-midnight
+  :deep([style*='var(--tabs-bg)'])
+  button
+  > span.absolute.bottom-0 {
   display: none !important;
 }
 .appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full {
@@ -251,15 +272,24 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
   border-bottom-color: rgba(148, 163, 184, 0.15) !important;
   box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.6) !important;
 }
-.appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full .p-button {
+.appearance-midnight
+  :deep([style*='var(--tabs-bg)'])
+  > div.absolute.top-full
+  .p-button {
   background: transparent !important;
   border-color: rgba(148, 163, 184, 0.3) !important;
   color: #e0e7ff !important;
 }
-.appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full .p-button:hover {
+.appearance-midnight
+  :deep([style*='var(--tabs-bg)'])
+  > div.absolute.top-full
+  .p-button:hover {
   background: rgba(59, 130, 246, 0.2) !important;
 }
-.appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full .p-button:not(.p-button-outlined) {
+.appearance-midnight
+  :deep([style*='var(--tabs-bg)'])
+  > div.absolute.top-full
+  .p-button:not(.p-button-outlined) {
   background: #3b82f6 !important;
   border-color: #3b82f6 !important;
   color: #fff !important;
@@ -283,13 +313,15 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
   background: transparent !important;
   border-color: rgba(148, 163, 184, 0.2) !important;
 }
-.appearance-midnight :deep(.rounded-lg.border.border-slate-200.bg-white .bg-gray-100) {
+.appearance-midnight
+  :deep(.rounded-lg.border.border-slate-200.bg-white .bg-gray-100) {
   background: rgba(30, 41, 59, 0.5) !important;
 }
 .appearance-midnight :deep(.h-px.flex-1.bg-slate-200) {
   background: rgba(148, 163, 184, 0.2) !important;
 }
-.appearance-midnight :deep(.rounded-lg.border.border-slate-200.bg-white .text-slate-700) {
+.appearance-midnight
+  :deep(.rounded-lg.border.border-slate-200.bg-white .text-slate-700) {
   color: #f1f5f9 !important;
 }
 .appearance-midnight :deep(span.text-xl.font-bold.text-slate-700) {
@@ -370,5 +402,11 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
 .appearance-midnight :deep(.p-button.p-button-text.p-button-secondary),
 .appearance-midnight :deep(.p-button.p-button-text.p-button-secondary:hover) {
   color: #e0e7ff !important;
+}
+
+/* ── 金額 / 主色文字：深藍在深底看不清，改螢光藍 ── */
+.appearance-midnight :deep([style*='color: var(--primary)']) {
+  color: #22d3ee !important;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.3);
 }
 </style>

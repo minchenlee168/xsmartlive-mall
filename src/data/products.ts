@@ -185,7 +185,7 @@ export const products: Product[] = [
           'https://images.unsplash.com/photo-1517242810446-cc8951b2be40?w=400&fit=crop',
         spec: '粉色',
         specOptions: ['粉色', '藍色', '黃色'],
-        maxQty: 10,
+        maxQty: 1,
       },
       {
         id: 202,
@@ -194,7 +194,7 @@ export const products: Product[] = [
           'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
         spec: '黃-F',
         specOptions: ['黃-F', '藍-F'],
-        maxQty: 10,
+        maxQty: 1,
       },
       {
         id: 203,
@@ -203,7 +203,7 @@ export const products: Product[] = [
           'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
         spec: '白',
         specOptions: ['白', '黃', '粉'],
-        maxQty: 10,
+        maxQty: 2,
       },
       {
         id: 204,

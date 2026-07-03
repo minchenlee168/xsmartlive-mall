@@ -18,7 +18,12 @@ interface AddOnProduct {
   price: number;
   original?: number;
   image: string;
+  /** 預設規格（沒有 sizes 時使用） */
   spec?: string;
+  /** 可選規格清單；有值 → 顯示規格 Select */
+  sizes?: string[];
+  /** 規格 label（顏色 / 尺寸 / 口味 等），預設「規格」 */
+  specLabel?: string;
 }
 
 // 加價購：商城分類頁沒有、僅在購物車推薦的加價商品
@@ -30,6 +35,8 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 150,
     image:
       'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
+    sizes: ['粉色', '藍色', '黃色'],
+    specLabel: '顏色',
   },
   {
     id: 9002,
@@ -46,6 +53,8 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 200,
     image:
       'https://images.unsplash.com/photo-1517242810446-cc8951b2be40?w=400&fit=crop',
+    sizes: ['S', 'M', 'L'],
+    specLabel: '尺寸',
   },
   {
     id: 9004,
@@ -62,6 +71,8 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 180,
     image:
       'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=400&fit=crop',
+    sizes: ['蘋果口味', '香蕉口味', '南瓜口味'],
+    specLabel: '口味',
   },
   {
     id: 9006,
@@ -70,58 +81,8 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 480,
     image:
       'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&fit=crop',
-  },
-];
-
-// 直播回放加購區：使用者看過往場次回放時可補加購的商品（區隔於即時直播加購）
-const REPLAY_ADD_ON_PRODUCTS: AddOnProduct[] = [
-  {
-    id: 9101,
-    name: '寶寶有機棉襪 3 雙組',
-    price: 79,
-    original: 150,
-    image:
-      'https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&fit=crop',
-  },
-  {
-    id: 9102,
-    name: '幼兒矽膠學習餐具組',
-    price: 199,
-    original: 320,
-    image:
-      'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?w=400&fit=crop',
-  },
-  {
-    id: 9103,
-    name: '嬰兒抗 UV 遮陽帽',
-    price: 159,
-    original: 280,
-    image:
-      'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
-  },
-  {
-    id: 9104,
-    name: '寶寶印花圍兜口水巾',
-    price: 69,
-    original: 120,
-    image:
-      'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=400&fit=crop',
-  },
-  {
-    id: 9105,
-    name: '寶寶柔嫩沐浴乳 300ml',
-    price: 169,
-    original: 250,
-    image:
-      'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&fit=crop',
-  },
-  {
-    id: 9106,
-    name: '嬰兒益生菌粉 30 包',
-    price: 459,
-    original: 680,
-    image:
-      'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&fit=crop',
+    sizes: ['珍珠白', '玫瑰粉', '午夜藍'],
+    specLabel: '顏色',
   },
 ];
 
@@ -275,7 +236,24 @@ const setSubQty = (sub: CartBundleItem, value: number) => {
   sub.qty = value;
 };
 
-const handleAddAddOn = (p: AddOnProduct) => {
+// 加價購：點按「加入購物車」跳 Dialog 選規格 + 數量；成功後記錄摘要顯示在卡片
+const addOnDialog = ref<AddOnProduct | null>(null);
+const addOnDialogSpec = ref<string>('');
+const addOnDialogQty = ref<number>(1);
+/** 已加入的加價購摘要（productId → { spec, qty }），顯示在卡片價格下方 */
+const addedAddOnRecord = ref<Record<number, { spec: string; qty: number }>>({});
+
+const handleOpenAddOnDialog = (p: AddOnProduct): void => {
+  addOnDialog.value = p;
+  const prev = addedAddOnRecord.value[p.id];
+  addOnDialogSpec.value = prev?.spec ?? p.sizes?.[0] ?? p.spec ?? '預設';
+  addOnDialogQty.value = prev?.qty ?? 1;
+};
+const handleConfirmAddOnDialog = (): void => {
+  const p = addOnDialog.value;
+  if (!p) return;
+  const spec = addOnDialogSpec.value || p.spec || '預設';
+  const qty = Math.max(1, addOnDialogQty.value);
   cart.addItem(
     {
       id: p.id,
@@ -284,10 +262,12 @@ const handleAddAddOn = (p: AddOnProduct) => {
       original: p.original,
       image: p.image,
     },
-    p.spec ?? '預設',
-    1,
+    spec,
+    qty,
   );
-  ui.toast(`已加入「${p.name}」`);
+  addedAddOnRecord.value[p.id] = { spec, qty };
+  addOnDialog.value = null;
+  ui.toast(`已加入「${p.name}」× ${qty}`);
 };
 
 const handleGoCheckout = () => {
@@ -520,9 +500,11 @@ const handleGoProduct = (productId?: number) => {
               </div>
 
               <!-- Sub-items grid：一律兩欄 -->
+              <!-- 部分限購（任選組合）：一行一件；固定組合：兩欄 -->
               <div
                 v-if="item.bundleExpanded"
-                class="grid grid-cols-2 gap-3"
+                class="grid gap-3"
+                :class="isPickBundleItem(item) ? 'grid-cols-1' : 'grid-cols-2'"
               >
                 <div
                   v-for="(sub, si) in item.bundleItems"
@@ -573,17 +555,20 @@ const handleGoProduct = (productId?: number) => {
                     >
                       <span>規格</span><span>{{ sub.spec }}</span>
                     </div>
-                    <!-- 任選組合：可調整子品數量；固定組合：純顯示數量 -->
+                    <!-- 任選組合：可調整子品數量（+/- stepper）；固定組合：純顯示數量 -->
                     <div
                       v-if="isPickBundleItem(item)"
                       class="flex items-center gap-2 text-sm text-slate-700"
                     >
                       <span class="shrink-0">數量</span>
-                      <Select
+                      <InputNumber
                         :model-value="sub.qty"
-                        :options="subQtyOptionsFor(item, sub)"
-                        fluid
-                        class="min-w-0 flex-1"
+                        :min="0"
+                        show-buttons
+                        button-layout="horizontal"
+                        increment-button-icon="pi pi-plus"
+                        decrement-button-icon="pi pi-minus"
+                        class="qty-stepper min-w-0 flex-1"
                         @update:model-value="(v) => setSubQty(sub, v)"
                       />
                     </div>
@@ -654,66 +639,22 @@ const handleGoProduct = (productId?: number) => {
               >
                 ${{ p.price }}
               </span>
-              <Button
-                label="加入購物車"
-                icon="pi pi-plus"
-                size="small"
-                class="mt-auto whitespace-nowrap"
-                @click="handleAddAddOn(p)"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Livebuy 直播回放加購區 -->
-      <section class="shadow-card rounded-xl bg-white">
-        <div
-          class="flex items-center border-b-2 px-4 py-2"
-          style="
-            background: color-mix(in srgb, var(--primary) 8%, transparent);
-            border-color: var(--primary);
-            border-radius: 12px 12px 0 0;
-          "
-        >
-          <span class="text-lg font-semibold text-slate-700"
-            >Livebuy 直播回放加購區</span
-          >
-        </div>
-
-        <!-- 直播回放加購卡片 -->
-        <div
-          class="grid gap-2 p-[var(--card-pad)]"
-          style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr))"
-        >
-          <div
-            v-for="p in REPLAY_ADD_ON_PRODUCTS"
-            :key="p.id"
-            class="flex flex-col gap-[7px] rounded-lg p-2"
-          >
-            <div
-              class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
-            >
-              <ProductImage :src="p.image" :alt="p.name" size="md" />
-            </div>
-            <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
+              <!-- 已加入摘要：只有已加入才顯示 -->
               <p
-                class="line-clamp-2 min-h-9 overflow-hidden text-sm leading-snug text-slate-950 @7xl:min-h-11 @7xl:text-base"
+                v-if="addedAddOnRecord[p.id]"
+                class="text-xs text-slate-600"
               >
-                {{ p.name }}
+                已加入：{{ addedAddOnRecord[p.id].spec }} ×
+                {{ addedAddOnRecord[p.id].qty }}
               </p>
-              <span
-                class="text-base font-bold @7xl:text-lg"
-                style="color: var(--primary)"
-              >
-                ${{ p.price }}
-              </span>
               <Button
-                label="加入購物車"
-                icon="pi pi-plus"
+                :label="addedAddOnRecord[p.id] ? '修改內容' : '加入購物車'"
+                :icon="addedAddOnRecord[p.id] ? 'pi pi-pencil' : 'pi pi-plus'"
                 size="small"
+                :severity="addedAddOnRecord[p.id] ? 'secondary' : undefined"
+                :outlined="!!addedAddOnRecord[p.id]"
                 class="mt-auto whitespace-nowrap"
-                @click="handleAddAddOn(p)"
+                @click="handleOpenAddOnDialog(p)"
               />
             </div>
           </div>
@@ -749,8 +690,10 @@ const handleGoProduct = (productId?: number) => {
 
         <!-- 已選 · 總計 + checkout -->
         <div class="flex min-w-0 items-center gap-3 @7xl:gap-8">
-          <div class="flex min-w-0 flex-col items-end gap-0.5 @3xl:flex-row @3xl:items-baseline @3xl:gap-3">
-            <span class="text-xs text-slate-600 whitespace-nowrap @3xl:text-sm">
+          <div
+            class="flex min-w-0 flex-col items-end gap-0.5 @3xl:flex-row @3xl:items-baseline @3xl:gap-3"
+          >
+            <span class="text-xs whitespace-nowrap text-slate-600 @3xl:text-sm">
               已選 {{ checkedCount }} 件 · 總計
             </span>
             <span
@@ -809,6 +752,82 @@ const handleGoProduct = (productId?: number) => {
       </template>
     </Dialog>
 
+    <!-- 加價購：選規格 + 數量 Dialog -->
+    <Dialog
+      :visible="!!addOnDialog"
+      modal
+      :draggable="false"
+      dismissable-mask
+      header="加入購物車"
+      :style="{ width: '400px' }"
+      :breakpoints="{ '768px': '92vw' }"
+      @update:visible="(v) => !v && (addOnDialog = null)"
+    >
+      <div v-if="addOnDialog" class="flex flex-col gap-4">
+        <!-- 商品資訊 -->
+        <div class="flex gap-3">
+          <div
+            class="aspect-square w-20 shrink-0 overflow-hidden rounded-lg bg-slate-200"
+          >
+            <ProductImage
+              :src="addOnDialog.image"
+              :alt="addOnDialog.name"
+              size="sm"
+            />
+          </div>
+          <div class="flex min-w-0 flex-1 flex-col gap-1">
+            <p class="line-clamp-2 text-base font-semibold text-slate-950">
+              {{ addOnDialog.name }}
+            </p>
+            <span
+              class="text-lg font-bold"
+              style="color: var(--primary)"
+            >
+              ${{ addOnDialog.price }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 規格：有 sizes 才顯示，label 依商品指定（顏色 / 尺寸 / 口味...） -->
+        <div v-if="addOnDialog.sizes?.length" class="flex flex-col gap-1.5">
+          <label class="text-sm font-medium text-slate-700">
+            {{ addOnDialog.specLabel ?? '規格' }}
+          </label>
+          <Select
+            v-model="addOnDialogSpec"
+            :options="addOnDialog.sizes"
+            class="w-full"
+          />
+        </div>
+
+        <!-- 數量 -->
+        <div class="flex items-center gap-3">
+          <label class="w-14 shrink-0 text-sm font-medium text-slate-700"
+            >數量</label
+          >
+          <InputNumber
+            v-model="addOnDialogQty"
+            :min="1"
+            :max="10"
+            show-buttons
+            button-layout="horizontal"
+            increment-button-icon="pi pi-plus"
+            decrement-button-icon="pi pi-minus"
+            class="qty-stepper"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="取消"
+          severity="secondary"
+          outlined
+          @click="addOnDialog = null"
+        />
+        <Button label="確認加入" @click="handleConfirmAddOnDialog" />
+      </template>
+    </Dialog>
+
     <!-- 圖片放大預覽 -->
     <Dialog
       v-model:visible="isImagePreviewOpen"
@@ -818,7 +837,9 @@ const handleGoProduct = (productId?: number) => {
       :show-header="false"
       :style="{ width: 'min(90vw, 640px)' }"
       :pt="{
-        content: { style: 'padding: 0; background: transparent; box-shadow: none' },
+        content: {
+          style: 'padding: 0; background: transparent; box-shadow: none',
+        },
       }"
     >
       <div class="relative flex items-center justify-center">

@@ -8,6 +8,13 @@
   font-family: 'Noto Sans TC', sans-serif;
 }
 
+/* 讓 body 也吃當前主題的 page-bg，PC 版 Aurora shell (max-w-7xl) 兩側才不會空白 */
+html,
+body {
+  background: var(--page-bg);
+  min-height: 100vh;
+}
+
 :root {
   /* 主色（純色）：用於文字、border、icon、spinner。品牌色 #7008e7 */
   --primary: #7008e7;

@@ -38,12 +38,7 @@ const ui = useUiStore();
  * - 出貨中、待收貨：兩個 tab 都顯示「任一包裹 currentStep === 'shipped'」的訂單（賣家 / 買家觀點）
  * - 已送達：任一包裹 currentStep === 'delivered'
  */
-type StatusTab =
-  | 'all'
-  | OrderStatus
-  | 'shipped'
-  | 'to_receive'
-  | 'delivered';
+type StatusTab = 'all' | OrderStatus | 'shipped' | 'to_receive' | 'delivered';
 const statusTabs: Array<{ key: StatusTab; label: string }> = [
   { key: 'all', label: '所有訂單' },
   { key: 'unpaid', label: '待付款' },
@@ -414,9 +409,19 @@ interface ShippingTrackingEvent {
   note: string;
 }
 const SHIPPING_TRACKING_EVENTS: ShippingTrackingEvent[] = [
-  { status: '貨件送達', time: '2026/02/10 08:00', carrier: '○○超商', note: '簽收' },
+  {
+    status: '貨件送達',
+    time: '2026/02/10 08:00',
+    carrier: '○○超商',
+    note: '簽收',
+  },
   { status: '配送中', time: '2026/02/10 01:00', carrier: '新竹物流', note: '' },
-  { status: '轉運作業中', time: '2026/02/09 16:00', carrier: '高轉', note: '貨件到站' },
+  {
+    status: '轉運作業中',
+    time: '2026/02/09 16:00',
+    carrier: '高轉',
+    note: '貨件到站',
+  },
   { status: '取件完成', time: '2026/02/09 13:00', carrier: '直營', note: '' },
 ];
 const isShippingProgressDialogVisible = ref(false);
@@ -454,7 +459,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
     <!-- 手機版：單行標題 + info icon，點按開 Dialog 顯示完整內容 -->
     <div
       v-if="isMobile"
-      class="flex items-center justify-between gap-2 rounded-xl bg-white px-4 py-3 shadow-card"
+      class="shadow-card flex items-center justify-between gap-2 rounded-xl bg-white px-4 py-3"
     >
       <span class="text-sm font-semibold text-slate-700">
         購物權益與售後說明
@@ -510,7 +515,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
         商品請保持完整(含主商品、配件、贈品與原廠外箱)，若有缺件、毀損等個人因素，將保留接受退換貨與否之權力。
       </p>
       <p class="mb-2">※ 若商品已過猶豫期限，則無法線上申請銷退。</p>
-      <p class="mb-2">若無法線上操作，請您利用聯絡客服功能，將有專人盡速為您處理。</p>
+      <p class="mb-2">
+        若無法線上操作，請您利用聯絡客服功能，將有專人盡速為您處理。
+      </p>
 
       <p class="mt-3 font-bold text-slate-700">相關事項說明：</p>
       <p class="mb-2">
@@ -877,13 +884,11 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
 
           <div
             v-for="(item, ii) in order.items"
-            v-show="
-              !(order.detailTab === 'return' && returnReasonText(order))
-            "
+            v-show="!(order.detailTab === 'return' && returnReasonText(order))"
             :key="ii"
             class="px-4 py-4"
             :class="
-              ii !== order.items.length - 1 ? 'border-b border-[#f1f5f9]' : ''
+              ii !== order.items.length - 1 ? 'border-b border-slate-100' : ''
             "
           >
             <!-- 商品 row -->
@@ -936,7 +941,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <div class="mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5 text-sm text-slate-700">
                     <i class="pi pi-box" style="font-size: 14px"></i>
-                    <span v-if="pkg.currentStep !== 'unpaid'" class="font-medium"
+                    <span
+                      v-if="pkg.currentStep !== 'unpaid'"
+                      class="font-medium"
                       >包裹編號：{{ pkg.no }}</span
                     >
                     <span v-else class="text-slate-500">尚未配箱</span>
@@ -1293,7 +1300,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <div class="flex items-center gap-2.5">
             <i class="pi pi-phone shrink-0" style="color: var(--primary)" />
             <span class="text-slate-700">客服電話：</span>
-            <a href="tel:0800000000" class="font-medium hover:underline"
+            <a
+              href="tel:0800000000"
+              class="font-medium hover:underline"
               style="color: var(--primary)"
               >0800-000-000</a
             >

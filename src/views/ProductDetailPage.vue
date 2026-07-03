@@ -62,8 +62,10 @@ const thumbCount = computed(() => {
 const isCouponDrawerVisible = ref(false);
 const isLoginPromptOpen = ref(false);
 
-/** 單一選項的上限：直接取 maxQty（即該規格庫存），不再依購買組數放大。 */
-const optMaxQty = (opt: { maxQty?: number }): number => opt.maxQty ?? 10;
+/** 單一選項的上限：opt.maxQty × 購買組數（qty）。
+ *  例：限購 1 個、主商品買 1 → 限購 1；買 2 → 限購 2；買 3 → 限購 3。 */
+const optMaxQty = (opt: { maxQty?: number }): number =>
+  (opt.maxQty ?? 10) * qty.value;
 
 /**
  * 此選項可選的數量清單：0 ~ 單一選項上限。
@@ -77,9 +79,20 @@ const qtyOptionsFor = (opt: { id: number; maxQty?: number }): number[] => {
 
 /** 是否超過總挑選數 → 用於警示 + 阻擋送出 */
 const isPickOver = computed(
-  () =>
-    product.value.isPickBundle && pickedTotal.value > totalPickCount.value,
+  () => product.value.isPickBundle && pickedTotal.value > totalPickCount.value,
 );
+/** 是否有任一選項超過該項限購 → 也走同一條紅色警示 */
+const overLimitOpt = computed(() => {
+  if (!product.value.isPickBundle) return null;
+  return (
+    product.value.pickOptions?.find((opt) => {
+      const cur = pickedQty.value[opt.id] ?? 0;
+      return cur > optMaxQty(opt);
+    }) ?? null
+  );
+});
+/** 任一限購超額或總數超過 */
+const hasPickWarning = computed(() => isPickOver.value || !!overLimitOpt.value);
 
 const setPickQty = (opt: { id: number; spec: string }, picked: number) => {
   pickedQty.value = { ...pickedQty.value, [opt.id]: picked };
@@ -103,6 +116,18 @@ const handleGoLogin = () => {
 
 const handleAddToCart = () => {
   if (product.value.isPickBundle) {
+    // 檢查是否有單一選項超過該項限購 maxQty
+    const overOpt = product.value.pickOptions?.find((opt) => {
+      const cur = pickedQty.value[opt.id] ?? 0;
+      return cur > optMaxQty(opt);
+    });
+    if (overOpt) {
+      ui.toast(
+        `「${overOpt.name}」限購 ${optMaxQty(overOpt)} 個，請調整數量`,
+        'warn',
+      );
+      return;
+    }
     const need = totalPickCount.value;
     if (pickedTotal.value > need) {
       ui.toast(
@@ -473,20 +498,25 @@ const handleNextThumb = () => {
                 </span>
                 <span
                   class="text-sm font-medium"
-                  :class="isPickOver ? 'text-red-500' : ''"
-                  :style="isPickOver ? '' : 'color: var(--primary)'"
+                  :class="hasPickWarning ? 'text-red-500' : ''"
+                  :style="hasPickWarning ? '' : 'color: var(--primary)'"
                 >
                   已選 {{ pickedTotal }} / {{ totalPickCount }}
                 </span>
               </div>
-              <!-- 超過提示：請客人自行調整（不自動幫忙帶 0） -->
+              <!-- 超過提示：總數超過 或 任一限購超額 -->
               <div
-                v-if="isPickOver"
+                v-if="hasPickWarning"
                 class="-mt-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
               >
                 <i class="pi pi-exclamation-triangle mt-0.5 shrink-0" />
-                <span>
-                  已超過 {{ totalPickCount }} 件（目前 {{ pickedTotal }} 件），請減少商品數量後再加入購物車。
+                <span v-if="overLimitOpt">
+                  「{{ overLimitOpt.name }}」限購
+                  {{ optMaxQty(overLimitOpt) }} 個，請調整數量。
+                </span>
+                <span v-else>
+                  已超過 {{ totalPickCount }} 件（目前
+                  {{ pickedTotal }} 件），請減少商品數量後再加入購物車。
                 </span>
               </div>
 
@@ -508,22 +538,11 @@ const handleNextThumb = () => {
                   </div>
 
                   <div class="flex flex-col gap-1.5">
-                    <div class="flex flex-col gap-0.5">
-                      <p
-                        class="line-clamp-2 h-10 overflow-hidden text-sm leading-snug text-slate-950 @7xl:h-[44px] @7xl:text-base"
-                      >
-                        {{ opt.name }}
-                      </p>
-                      <p
-                        v-if="
-                          opt.maxQty != null &&
-                          opt.maxQty < (product.pickCount ?? 0)
-                        "
-                        class="text-xs font-medium text-red-500"
-                      >
-                        限購 {{ optMaxQty(opt) }} 個
-                      </p>
-                    </div>
+                    <p
+                      class="line-clamp-2 h-10 overflow-hidden text-sm leading-snug text-slate-950 @7xl:h-[44px] @7xl:text-base"
+                    >
+                      {{ opt.name }}
+                    </p>
                     <div class="flex flex-col gap-2 text-sm text-slate-700">
                       <div
                         v-if="opt.specOptions?.length"
@@ -540,11 +559,15 @@ const handleNextThumb = () => {
                       </div>
                       <div class="flex items-center gap-2">
                         <span class="shrink-0 text-slate-500">數量</span>
-                        <Select
+                        <!-- 不設 max：允許使用者自由加減；送出時再檢查是否超過總挑選數 -->
+                        <InputNumber
                           :model-value="pickedQty[opt.id] ?? 0"
-                          :options="qtyOptionsFor(opt)"
-                          fluid
-                          class="min-w-0 flex-1"
+                          :min="0"
+                          show-buttons
+                          button-layout="horizontal"
+                          increment-button-icon="pi pi-plus"
+                          decrement-button-icon="pi pi-minus"
+                          class="qty-stepper min-w-0 flex-1"
                           @update:model-value="(v) => setPickQty(opt, v)"
                         />
                       </div>
@@ -584,7 +607,11 @@ const handleNextThumb = () => {
                   <div
                     class="aspect-square w-full overflow-hidden rounded-lg bg-slate-200"
                   >
-                    <ProductImage :src="item.image" :alt="item.name" size="md" />
+                    <ProductImage
+                      :src="item.image"
+                      :alt="item.name"
+                      size="md"
+                    />
                   </div>
                   <div class="flex flex-col gap-1.5">
                     <p

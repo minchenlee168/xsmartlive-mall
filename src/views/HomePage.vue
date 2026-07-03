@@ -68,7 +68,9 @@ const handleNavToTheme = (query?: string) => {
               >
                 <i class="pi pi-play-circle text-xs" />
               </span>
-              <h2 class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]">
+              <h2
+                class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]"
+              >
                 秋冬童裝主題館
               </h2>
             </button>
@@ -96,7 +98,9 @@ const handleNavToTheme = (query?: string) => {
               >
                 <i class="pi pi-sparkles text-xs" />
               </span>
-              <h2 class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]">
+              <h2
+                class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]"
+              >
                 秋冬童裝主題館
               </h2>
             </button>
@@ -124,7 +128,9 @@ const handleNavToTheme = (query?: string) => {
               >
                 <i class="pi pi-bolt text-xs" />
               </span>
-              <h2 class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]">
+              <h2
+                class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]"
+              >
                 限時搶購
               </h2>
             </button>
@@ -152,7 +158,9 @@ const handleNavToTheme = (query?: string) => {
               >
                 <i class="pi pi-star-fill text-xs" />
               </span>
-              <h2 class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]">
+              <h2
+                class="text-lg font-black text-slate-800 group-hover:text-[color:var(--primary)]"
+              >
                 今日精選
               </h2>
             </button>
@@ -177,16 +185,27 @@ const handleNavToTheme = (query?: string) => {
     >
       <div class="flex flex-col gap-6">
         <!-- 精練 Hero：橫向雙欄 -->
-        <section class="grid grid-cols-1 gap-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-6 @4xl:grid-cols-[1.2fr_1fr]">
+        <section
+          class="grid grid-cols-1 gap-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-6 @4xl:grid-cols-[1.2fr_1fr]"
+        >
           <div class="flex flex-col justify-center gap-3">
-            <p class="text-[10px] tracking-[0.3em] text-slate-400 uppercase">Midnight Edition</p>
+            <p class="text-[10px] tracking-[0.3em] text-slate-400 uppercase">
+              Midnight Edition
+            </p>
             <h1 class="text-2xl leading-tight font-bold @3xl:text-4xl">
               深夜好眠<br />精選好物
             </h1>
-            <p class="text-sm text-slate-400">極致精練的購物體驗，只挑最耐看的。</p>
+            <p class="text-sm text-slate-400">
+              極致精練的購物體驗，只挑最耐看的。
+            </p>
             <div class="mt-2 flex gap-2">
               <Button label="立即選購" @click="handleNavToTheme()" />
-              <Button label="全部主題" severity="secondary" outlined @click="handleNavToTheme()" />
+              <Button
+                label="全部主題"
+                severity="secondary"
+                outlined
+                @click="handleNavToTheme()"
+              />
             </div>
           </div>
           <BannerCarousel />
@@ -197,8 +216,12 @@ const handleNavToTheme = (query?: string) => {
 
         <!-- 精練 grid：無多餘裝飾 -->
         <section class="flex flex-col gap-3">
-          <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-            <h2 class="text-sm font-medium tracking-wide">秋冬童裝主題館 / Fall Collection</h2>
+          <div
+            class="flex items-center justify-between border-b border-slate-700 pb-2"
+          >
+            <h2 class="text-sm font-medium tracking-wide">
+              秋冬童裝主題館 / Fall Collection
+            </h2>
             <button
               class="text-xs text-slate-400 transition-colors hover:text-white"
               @click="handleNavToTheme()"
@@ -210,8 +233,12 @@ const handleNavToTheme = (query?: string) => {
         </section>
 
         <section class="flex flex-col gap-3">
-          <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-            <h2 class="text-sm font-medium tracking-wide">限時精選 / Flash Deals</h2>
+          <div
+            class="flex items-center justify-between border-b border-slate-700 pb-2"
+          >
+            <h2 class="text-sm font-medium tracking-wide">
+              限時精選 / Flash Deals
+            </h2>
             <button
               class="text-xs text-slate-400 transition-colors hover:text-white"
               @click="handleNavToTheme('flash')"
@@ -263,11 +290,20 @@ const handleNavToTheme = (query?: string) => {
         <!-- 可愛 section 標題（花瓣分隔） -->
         <section class="flex flex-col gap-4">
           <div class="flex items-center justify-center gap-3 text-center">
-            <span class="h-px flex-1 max-w-[80px]" style="background: var(--primary-200)" />
-            <h2 class="flex items-center gap-2 text-xl font-black" style="color: var(--primary)">
+            <span
+              class="h-px max-w-[80px] flex-1"
+              style="background: var(--primary-200)"
+            />
+            <h2
+              class="flex items-center gap-2 text-xl font-black"
+              style="color: var(--primary)"
+            >
               🌷 秋冬童裝主題館 🌷
             </h2>
-            <span class="h-px flex-1 max-w-[80px]" style="background: var(--primary-200)" />
+            <span
+              class="h-px max-w-[80px] flex-1"
+              style="background: var(--primary-200)"
+            />
           </div>
           <ThemeBanner name="秋冬童裝主題館" :image="BANNER_IMG" />
           <ThemeHallProducts />
@@ -285,11 +321,20 @@ const handleNavToTheme = (query?: string) => {
 
         <section class="flex flex-col gap-4">
           <div class="flex items-center justify-center gap-3 text-center">
-            <span class="h-px flex-1 max-w-[80px]" style="background: var(--primary-200)" />
-            <h2 class="flex items-center gap-2 text-xl font-black" style="color: var(--primary)">
+            <span
+              class="h-px max-w-[80px] flex-1"
+              style="background: var(--primary-200)"
+            />
+            <h2
+              class="flex items-center gap-2 text-xl font-black"
+              style="color: var(--primary)"
+            >
               💗 限時心動 💗
             </h2>
-            <span class="h-px flex-1 max-w-[80px]" style="background: var(--primary-200)" />
+            <span
+              class="h-px max-w-[80px] flex-1"
+              style="background: var(--primary-200)"
+            />
           </div>
           <FlashSaleBar />
           <ThemeHallProducts simple autoplay />
@@ -305,10 +350,15 @@ const handleNavToTheme = (query?: string) => {
     >
       <div class="flex flex-col gap-6">
         <!-- 雜誌感 Hero：雙欄（公告 + 輪播） -->
-        <section class="border-t-4 border-b-2 border-double" style="border-color: var(--primary)">
+        <section
+          class="border-t-4 border-b-2 border-double"
+          style="border-color: var(--primary)"
+        >
           <div class="grid grid-cols-1 gap-4 py-6 @4xl:grid-cols-[1.4fr_1fr]">
             <!-- 公告取代原本雜誌感文字 -->
-            <div class="flex flex-col justify-center border-r-0 pr-0 @4xl:border-r @4xl:border-slate-300 @4xl:pr-6">
+            <div
+              class="flex flex-col justify-center border-r-0 pr-0 @4xl:border-r @4xl:border-slate-300 @4xl:pr-6"
+            >
               <AnnouncementSection />
             </div>
             <div>
@@ -320,9 +370,15 @@ const handleNavToTheme = (query?: string) => {
         <!-- 雜誌感章節 -->
         <section class="flex flex-col gap-4">
           <div class="flex items-baseline gap-4">
-            <span class="font-serif text-4xl font-black italic" style="color: var(--primary)">01</span>
+            <span
+              class="font-serif text-4xl font-black italic"
+              style="color: var(--primary)"
+              >01</span
+            >
             <div class="flex flex-1 flex-col">
-              <h2 class="font-serif text-xl font-bold text-slate-800 italic @3xl:text-2xl">
+              <h2
+                class="font-serif text-xl font-bold text-slate-800 italic @3xl:text-2xl"
+              >
                 秋冬童裝主題館
               </h2>
               <span class="text-xs tracking-widest text-slate-500 uppercase">
@@ -344,9 +400,15 @@ const handleNavToTheme = (query?: string) => {
 
         <section class="flex flex-col gap-4 border-t border-slate-300 pt-6">
           <div class="flex items-baseline gap-4">
-            <span class="font-serif text-4xl font-black italic" style="color: var(--primary)">02</span>
+            <span
+              class="font-serif text-4xl font-black italic"
+              style="color: var(--primary)"
+              >02</span
+            >
             <div class="flex flex-1 flex-col">
-              <h2 class="font-serif text-xl font-bold text-slate-800 italic @3xl:text-2xl">
+              <h2
+                class="font-serif text-xl font-bold text-slate-800 italic @3xl:text-2xl"
+              >
                 限時特賣專輯
               </h2>
               <span class="text-xs tracking-widest text-slate-500 uppercase">
@@ -527,7 +589,12 @@ const handleNavToTheme = (query?: string) => {
 
 /* Bloom：外層加更多柔和 padding */
 .home-layout-bloom {
-  background: linear-gradient(160deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%) !important;
+  background: linear-gradient(
+    160deg,
+    #fdf2f8 0%,
+    #fce7f3 50%,
+    #fbcfe8 100%
+  ) !important;
 }
 
 /* Aurora：珊瑚白卡風格 */
@@ -541,7 +608,8 @@ const handleNavToTheme = (query?: string) => {
   display: none !important;
 }
 /* AnnouncementSection 內部原本的 rounded-lg 卡拿掉外框，直接融入外層 section 卡 */
-.aurora-announcement :deep(.overflow-hidden.rounded-lg.border.border-slate-200.bg-white) {
+.aurora-announcement
+  :deep(.overflow-hidden.rounded-lg.border.border-slate-200.bg-white) {
   border: none !important;
   box-shadow: none !important;
   border-radius: 12px !important;
@@ -563,6 +631,11 @@ const handleNavToTheme = (query?: string) => {
 
 /* Retro：整體米黃紙感 */
 .home-layout-retro {
-  background: linear-gradient(160deg, #fef7ec 0%, #fdead0 50%, #fbd6a0 100%) !important;
+  background: linear-gradient(
+    160deg,
+    #fef7ec 0%,
+    #fdead0 50%,
+    #fbd6a0 100%
+  ) !important;
 }
 </style>

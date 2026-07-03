@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
+import { useThemeStore } from '../pinia/theme';
 import { useCountdown } from '../composables/useCountdown';
 
 type Step = 'form' | 'password' | 'success';
@@ -16,6 +17,15 @@ const PASSWORD_RULE = /^[A-Za-z0-9]{8,20}$/;
 const router = useRouter();
 const auth = useAuthStore();
 const ui = useUiStore();
+const themeStore = useThemeStore();
+
+const isAuroraTheme = computed(() => themeStore.current.id === 'aurora');
+/** Aurora 外觀用不同底圖；用 BASE_URL 才能對到 Vite base */
+const authBgSrc = computed(() =>
+  isAuroraTheme.value
+    ? `${import.meta.env.BASE_URL}auth-bg-aurora.png`
+    : `${import.meta.env.BASE_URL}auth-bg-mobile.png`,
+);
 
 const step = ref<Step>('form');
 const countryCode = ref('+886');
@@ -86,16 +96,20 @@ const handleGoToShop = () => {
     class="relative min-h-screen overflow-hidden"
     style="background: var(--surface-100)"
   >
-    <!-- 手機底圖：左側曲線 blob -->
+    <!-- 手機底圖：Aurora / 其他外觀各自的曲線 blob -->
     <img
-      src="/auth-bg-mobile.png"
+      :src="authBgSrc"
       alt=""
       aria-hidden="true"
       class="pointer-events-none absolute top-0 right-0 h-full w-auto max-w-full select-none @3xl:hidden"
     />
 
-    <!-- Decorative background blob（平板/PC 才顯示，與登入頁一致） -->
-    <div class="login-bg hidden @3xl:block" aria-hidden="true"></div>
+    <!-- PC 徑向漸層 blob：Aurora 珊瑚色調、其他紫藍 -->
+    <div
+      class="hidden @3xl:block"
+      :class="isAuroraTheme ? 'login-bg-aurora' : 'login-bg'"
+      aria-hidden="true"
+    ></div>
 
     <header
       class="relative z-10 border-b border-[var(--border-light)] bg-white"
@@ -367,6 +381,23 @@ const handleGoToShop = () => {
       circle at 65% 70%,
       rgba(96, 165, 250, 0.45) 0%,
       rgba(96, 165, 250, 0) 40%
+    );
+  filter: blur(10px);
+}
+.login-bg-aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 30% 35%,
+      rgba(224, 120, 86, 0.5) 0%,
+      rgba(224, 120, 86, 0) 40%
+    ),
+    radial-gradient(
+      circle at 70% 65%,
+      rgba(108, 212, 208, 0.45) 0%,
+      rgba(108, 212, 208, 0) 42%
     );
   filter: blur(10px);
 }
