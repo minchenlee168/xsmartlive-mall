@@ -134,6 +134,86 @@ export const themes: Theme[] = [
     },
   },
   {
+    id: 'aurora',
+    label: '極光珊瑚 Aurora',
+    swatch: '#e07856',
+    swatchGradient: 'linear-gradient(135deg, #ef9a7a, #e07856, #6cd4d0)',
+    vars: {
+      '--primary': '#e07856',
+      '--primary-200': '#f5c9b8',
+      '--primary-bg':
+        'linear-gradient(135deg, #ef9a7a 0%, #e07856 55%, #6cd4d0 100%)',
+      '--primary-hover-bg': 'linear-gradient(135deg, #e07856 0%, #b95a3d 100%)',
+      '--accent': '#6cd4d0',
+      '--accent-200': '#c6ecea',
+      '--accent-hover': '#4bb8b3',
+      '--tabs-bg':
+        'linear-gradient(135deg, #ef9a7a 0%, #e07856 55%, #6cd4d0 100%)',
+      '--page-bg':
+        'linear-gradient(160deg, #fdf3ee 0%, #f9e2d7 50%, #d9f2f0 100%)',
+    },
+  },
+  {
+    id: 'midnight',
+    label: '深夜藍 Midnight',
+    swatch: '#1e40af',
+    swatchGradient: 'linear-gradient(135deg, #3b82f6, #1e40af, #0f172a)',
+    vars: {
+      '--primary': '#1e40af',
+      '--primary-200': '#c7d2fe',
+      '--primary-bg':
+        'linear-gradient(135deg, #3b82f6 0%, #1e40af 55%, #0f172a 100%)',
+      '--primary-hover-bg': 'linear-gradient(135deg, #1e40af 0%, #0f172a 100%)',
+      '--accent': '#94a3b8',
+      '--accent-200': '#e2e8f0',
+      '--accent-hover': '#64748b',
+      '--tabs-bg':
+        'linear-gradient(135deg, #3b82f6 0%, #1e40af 55%, #0f172a 100%)',
+      '--page-bg':
+        'linear-gradient(160deg, #eef2ff 0%, #e0e7ff 50%, #c7d2fe 100%)',
+    },
+  },
+  {
+    id: 'bloom',
+    label: '櫻花粉 Bloom',
+    swatch: '#f472b6',
+    swatchGradient: 'linear-gradient(135deg, #fbcfe8, #f472b6, #db2777)',
+    vars: {
+      '--primary': '#f472b6',
+      '--primary-200': '#fbcfe8',
+      '--primary-bg':
+        'linear-gradient(135deg, #fbcfe8 0%, #f472b6 55%, #db2777 100%)',
+      '--primary-hover-bg': 'linear-gradient(135deg, #f472b6 0%, #db2777 100%)',
+      '--accent': '#a78bfa',
+      '--accent-200': '#ddd6fe',
+      '--accent-hover': '#7c3aed',
+      '--tabs-bg':
+        'linear-gradient(135deg, #fbcfe8 0%, #f472b6 55%, #db2777 100%)',
+      '--page-bg':
+        'linear-gradient(160deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%)',
+    },
+  },
+  {
+    id: 'retro',
+    label: '復古橘 Retro',
+    swatch: '#d97706',
+    swatchGradient: 'linear-gradient(135deg, #f59e0b, #d97706, #92400e)',
+    vars: {
+      '--primary': '#d97706',
+      '--primary-200': '#fde4b7',
+      '--primary-bg':
+        'linear-gradient(135deg, #f59e0b 0%, #d97706 55%, #92400e 100%)',
+      '--primary-hover-bg': 'linear-gradient(135deg, #d97706 0%, #92400e 100%)',
+      '--accent': '#78350f',
+      '--accent-200': '#e0c9a6',
+      '--accent-hover': '#5b2a08',
+      '--tabs-bg':
+        'linear-gradient(135deg, #f59e0b 0%, #d97706 55%, #92400e 100%)',
+      '--page-bg':
+        'linear-gradient(160deg, #fef7ec 0%, #fdead0 50%, #fbd6a0 100%)',
+    },
+  },
+  {
     id: 'techblue',
     label: '科技藍',
     swatch: '#0891b2',

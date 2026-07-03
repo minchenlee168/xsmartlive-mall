@@ -32,7 +32,7 @@ export const useOrdersStore = defineStore('orders', () => {
   const orders = ref<OrderRecord[]>([
     {
       id: '1',
-      date: '2026/02/05 11:24',
+      date: '2026/02/03 11:24',
       orderNo: '1000000020',
       qty: 3,
       total: 600,
@@ -319,6 +319,70 @@ export const useOrdersStore = defineStore('orders', () => {
           packages: [
             {
               no: 'F2026011501',
+              qty: 1,
+              currentStep: 'delivered',
+              stepTimes: SAMPLE_TIMES,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: '9',
+      date: '2026/01/12 15:30',
+      orderNo: '1000000009',
+      qty: 1,
+      total: 520,
+      payment: '線上刷卡',
+      delivery: '宅配',
+      invoice: '線上列印',
+      status: 'completed',
+      detailTab: 'return',
+      expanded: true,
+      items: [
+        {
+          image: IMG_PJ,
+          name: '寶寶純棉短袖套裝',
+          spec: '粉，70cm',
+          price: 520,
+          qty: 1,
+          returnStatus: 'approved',
+          packages: [
+            {
+              no: 'F2026011201',
+              qty: 1,
+              currentStep: 'delivered',
+              stepTimes: SAMPLE_TIMES,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: '10',
+      date: '2026/01/10 09:45',
+      orderNo: '1000000010',
+      qty: 1,
+      total: 380,
+      payment: '線上刷卡',
+      delivery: '宅配',
+      invoice: '線上列印',
+      status: 'completed',
+      detailTab: 'return',
+      expanded: true,
+      items: [
+        {
+          image: IMG_HAT,
+          name: '嬰兒抗 UV 遮陽帽',
+          spec: '藍，F',
+          price: 380,
+          qty: 1,
+          returnStatus: 'rejected',
+          returnRejectReason:
+            '商品已超過 7 天鑑賞期，依據退換貨政策無法受理。若對此結果有疑問，請透過訂單提問聯絡客服。',
+          packages: [
+            {
+              no: 'F2026011001',
               qty: 1,
               currentStep: 'delivered',
               stepTimes: SAMPLE_TIMES,

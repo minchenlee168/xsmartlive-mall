@@ -62,17 +62,24 @@ const thumbCount = computed(() => {
 const isCouponDrawerVisible = ref(false);
 const isLoginPromptOpen = ref(false);
 
-/** 單一選項的上限：單組 maxQty × 購買組數（qty）。預設 maxQty=1。 */
-const optMaxQty = (opt: { maxQty?: number }): number =>
-  (opt.maxQty ?? 1) * qty.value;
+/** 單一選項的上限：直接取 maxQty（即該規格庫存），不再依購買組數放大。 */
+const optMaxQty = (opt: { maxQty?: number }): number => opt.maxQty ?? 10;
 
-/** 此選項可選的數量清單：0 ~ min(maxQty, 目前已選 + 剩餘額度)。 */
+/**
+ * 此選項可選的數量清單：0 ~ 單一選項上限。
+ * 不再依「剩餘總額度」限縮，避免自動幫忙帶 0；
+ * 若使用者超過總挑選數，在送出時另行提示或阻擋。
+ */
 const qtyOptionsFor = (opt: { id: number; maxQty?: number }): number[] => {
-  const remaining = totalPickCount.value - pickedTotal.value;
-  const cur = pickedQty.value[opt.id] ?? 0;
-  const max = Math.min(optMaxQty(opt), cur + Math.max(remaining, 0));
+  const max = optMaxQty(opt);
   return Array.from({ length: max + 1 }, (_, i) => i);
 };
+
+/** 是否超過總挑選數 → 用於警示 + 阻擋送出 */
+const isPickOver = computed(
+  () =>
+    product.value.isPickBundle && pickedTotal.value > totalPickCount.value,
+);
 
 const setPickQty = (opt: { id: number; spec: string }, picked: number) => {
   pickedQty.value = { ...pickedQty.value, [opt.id]: picked };
@@ -97,7 +104,14 @@ const handleGoLogin = () => {
 const handleAddToCart = () => {
   if (product.value.isPickBundle) {
     const need = totalPickCount.value;
-    if (pickedTotal.value !== need) {
+    if (pickedTotal.value > need) {
+      ui.toast(
+        `已超過 ${need} 件（目前 ${pickedTotal.value} 件），請調整數量後再送出`,
+        'warn',
+      );
+      return;
+    }
+    if (pickedTotal.value < need) {
       ui.toast(`請選擇 ${need} 件商品`, 'warn');
       return;
     }
@@ -359,6 +373,7 @@ const handleNextThumb = () => {
                     <InputNumber
                       v-model="qty"
                       :min="1"
+                      :max="product.stock ?? 10"
                       show-buttons
                       button-layout="horizontal"
                       increment-button-icon="pi pi-plus"
@@ -456,8 +471,22 @@ const handleNextThumb = () => {
                 <span class="text-lg font-semibold text-slate-700">
                   商品組合（請選擇 {{ totalPickCount }} 件商品）
                 </span>
-                <span class="text-sm font-medium" style="color: var(--primary)">
+                <span
+                  class="text-sm font-medium"
+                  :class="isPickOver ? 'text-red-500' : ''"
+                  :style="isPickOver ? '' : 'color: var(--primary)'"
+                >
                   已選 {{ pickedTotal }} / {{ totalPickCount }}
+                </span>
+              </div>
+              <!-- 超過提示：請客人自行調整（不自動幫忙帶 0） -->
+              <div
+                v-if="isPickOver"
+                class="-mt-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
+              >
+                <i class="pi pi-exclamation-triangle mt-0.5 shrink-0" />
+                <span>
+                  已超過 {{ totalPickCount }} 件（目前 {{ pickedTotal }} 件），請減少商品數量後再加入購物車。
                 </span>
               </div>
 
@@ -504,7 +533,6 @@ const handleNextThumb = () => {
                         <Select
                           :model-value="pickedSpecs[opt.id] ?? opt.spec"
                           :options="opt.specOptions"
-                          size="small"
                           fluid
                           class="min-w-0 flex-1"
                           @update:model-value="(v) => (pickedSpecs[opt.id] = v)"
@@ -515,7 +543,6 @@ const handleNextThumb = () => {
                         <Select
                           :model-value="pickedQty[opt.id] ?? 0"
                           :options="qtyOptionsFor(opt)"
-                          size="small"
                           fluid
                           class="min-w-0 flex-1"
                           @update:model-value="(v) => setPickQty(opt, v)"
@@ -572,7 +599,6 @@ const handleNextThumb = () => {
                           v-if="item.specOptions?.length"
                           v-model="bundleSelections[idx]"
                           :options="item.specOptions"
-                          size="small"
                           fluid
                           class="min-w-0 flex-1"
                         />

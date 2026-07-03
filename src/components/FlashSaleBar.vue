@@ -23,10 +23,20 @@ onUnmounted(() => clearInterval(timer));
 const pad = (n: number) => String(n).padStart(2, '0');
 </script>
 
+<style scoped>
+/* 預設紅色系；外層可透過 --flash-bar-bg / --flash-bar-chip-bg 覆蓋成主題色 */
+.flash-sale-bar {
+  background: var(--flash-bar-bg, #fca5a5);
+}
+.flash-sale-chip {
+  background: var(--flash-bar-chip-bg, #f87171);
+}
+</style>
+
 <template>
-  <!-- 紅色 header bar：比照 Figma（1280:53），限時搶購靠左、倒數靠右；內部用 cqh 等比例縮放 -->
+  <!-- 紅色 header bar：限時搶購靠左、倒數靠右；內部用 cqh 等比例縮放 -->
   <div
-    class="flex w-full items-center justify-between rounded-[0.5rem] bg-red-300"
+    class="flash-sale-bar flex w-full items-center justify-between rounded-[0.5rem]"
     style="
       aspect-ratio: 1280 / 53;
       min-height: 40px;
@@ -52,7 +62,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
       >
       <div class="flex items-center" style="gap: 7cqh">
         <span
-          class="flex items-center justify-center bg-red-400 font-bold text-white tabular-nums"
+          class="flash-sale-chip flex items-center justify-center font-bold text-white tabular-nums"
           style="
             font-size: 45cqh;
             padding: 7cqh;
@@ -63,7 +73,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
         >
         <span class="font-bold text-slate-700" style="font-size: 45cqh">:</span>
         <span
-          class="flex items-center justify-center bg-red-400 font-bold text-white tabular-nums"
+          class="flash-sale-chip flex items-center justify-center font-bold text-white tabular-nums"
           style="
             font-size: 45cqh;
             padding: 7cqh;
@@ -74,7 +84,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
         >
         <span class="font-bold text-slate-700" style="font-size: 45cqh">:</span>
         <span
-          class="flex items-center justify-center bg-red-400 font-bold text-white tabular-nums"
+          class="flash-sale-chip flex items-center justify-center font-bold text-white tabular-nums"
           style="
             font-size: 45cqh;
             padding: 7cqh;

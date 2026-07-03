@@ -8,6 +8,7 @@ const banners = [
 
 <template>
   <Carousel
+    class="banner-carousel"
     :value="banners"
     :num-visible="1"
     :num-scroll="1"
@@ -38,3 +39,13 @@ const banners = [
     </template>
   </Carousel>
 </template>
+
+<style scoped>
+/* 關掉 PrimeVue Carousel 所有內建過場（transform / opacity / animation），秒切 */
+.banner-carousel :deep(*),
+.banner-carousel :deep(*::before),
+.banner-carousel :deep(*::after) {
+  transition: none !important;
+  animation: none !important;
+}
+</style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useViewportStore } from '../pinia/viewport';
 import { useCartStore } from '../pinia/cart';
@@ -80,6 +80,21 @@ const handleGoDetail = () => {
   });
 };
 
+/** 「加入購物車」視覺回饋：按鈕暫時變綠色 + ✓，1.5 秒後恢復 */
+const isJustAdded = ref(false);
+let addedTimer: ReturnType<typeof setTimeout> | null = null;
+const flashAddedFeedback = () => {
+  isJustAdded.value = true;
+  if (addedTimer) clearTimeout(addedTimer);
+  addedTimer = setTimeout(() => {
+    isJustAdded.value = false;
+    addedTimer = null;
+  }, 1500);
+};
+onUnmounted(() => {
+  if (addedTimer) clearTimeout(addedTimer);
+});
+
 const addToCart = (spec: string, n: number) => {
   cart.addItem(
     {
@@ -92,7 +107,7 @@ const addToCart = (spec: string, n: number) => {
     spec,
     n,
   );
-  ui.toast('已加入購物車');
+  flashAddedFeedback();
 };
 
 const handlePrimaryAction = (e: MouseEvent) => {
@@ -166,7 +181,7 @@ const handlePendingBundleAdd = () => {
       placeholderItems,
     );
   }
-  ui.toast('已加入購物車，記得至購物車補選規格');
+  flashAddedFeedback();
   isBundleDialogVisible.value = false;
 };
 
@@ -221,14 +236,14 @@ const handleConfirmBundleAdd = () => {
       qty.value,
     );
   }
-  ui.toast('已加入購物車');
+  flashAddedFeedback();
   isBundleDialogVisible.value = false;
 };
 </script>
 
 <template>
   <div
-    class="flex h-full w-full cursor-pointer flex-col gap-2 rounded-xl bg-white p-2 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.06)] transition-shadow hover:shadow-md"
+    class="product-card flex h-full w-full cursor-pointer flex-col gap-2 rounded-xl bg-white p-2 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.06)] transition-shadow hover:shadow-md"
     @click="handleGoDetail"
   >
     <!-- Product image -->
@@ -294,35 +309,54 @@ const handleConfirmBundleAdd = () => {
           >
         </div>
 
-        <!-- CTA Button — 一律「加入購物車」；有規格者點擊跳彈窗選規格 -->
+        <!-- CTA Button — 一律「加入購物車」；成功後暫時變成綠色✓ -->
         <button
-          class="flex w-full items-center justify-center font-medium transition-colors"
-          :class="
+          class="add-cart-btn flex w-full items-center justify-center font-medium transition-all duration-200"
+          :class="[
             isPC
               ? 'gap-2 rounded-lg px-4 py-3 text-base'
-              : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm'
+              : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
+            isJustAdded ? 'added-pop' : '',
+          ]"
+          :style="
+            isJustAdded
+              ? {
+                  background: '#10b981',
+                  border: '1px solid #059669',
+                  color: '#fff',
+                }
+              : {
+                  background: 'var(--primary-bg)',
+                  border: '1px solid var(--primary)',
+                  color: '#fff',
+                }
           "
-          style="
-            background: var(--primary-bg);
-            border: 1px solid var(--primary);
-            color: #fff;
-          "
+          :disabled="isJustAdded"
           @mouseover="
             (e) => {
+              if (isJustAdded) return;
               (e.currentTarget as HTMLElement).style.background =
                 'var(--primary-hover-bg)';
             }
           "
           @mouseleave="
             (e) => {
+              if (isJustAdded) return;
               (e.currentTarget as HTMLElement).style.background =
                 'var(--primary-bg)';
             }
           "
-          @click="handlePrimaryAction"
+          @click.stop="handlePrimaryAction"
         >
-          <i class="pi pi-cart-plus" :class="isPC ? 'text-sm' : 'text-xl'" />
-          <span v-if="isPC">加入購物車</span>
+          <i
+            :class="[
+              isJustAdded ? 'pi pi-check-circle' : 'pi pi-cart-plus',
+              isPC ? 'text-sm' : 'text-xl',
+            ]"
+          />
+          <span v-if="isPC">{{
+            isJustAdded ? '已加入購物車' : '加入購物車'
+          }}</span>
         </button>
       </div>
     </div>
@@ -383,6 +417,26 @@ const handleConfirmBundleAdd = () => {
             {{ s }}
           </button>
         </div>
+      </div>
+
+      <!-- 數量 -->
+      <div class="flex items-center gap-3">
+        <span class="w-[60px] shrink-0 text-sm font-medium text-slate-700">
+          數量
+        </span>
+        <InputNumber
+          v-model="qty"
+          :min="1"
+          :max="stock ?? 10"
+          show-buttons
+          button-layout="horizontal"
+          increment-button-icon="pi pi-plus"
+          decrement-button-icon="pi pi-minus"
+          class="qty-stepper"
+        />
+        <span v-if="stock != null" class="text-sm text-slate-500">
+          庫存 {{ stock }} 件
+        </span>
       </div>
     </div>
 
@@ -570,3 +624,27 @@ const handleConfirmBundleAdd = () => {
     </template>
   </Dialog>
 </template>
+
+<style scoped>
+/* 加入購物車成功時的 pop 動畫 */
+.add-cart-btn.added-pop {
+  animation: cart-added-pop 0.5s ease;
+}
+@keyframes cart-added-pop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  40% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+.add-cart-btn:disabled {
+  cursor: default;
+}
+</style>

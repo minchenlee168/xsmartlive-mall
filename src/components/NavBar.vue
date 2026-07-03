@@ -5,6 +5,10 @@ import { useAuthStore } from '../pinia/auth';
 import { useCartStore } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { usePrefsStore, type Currency, type Language } from '../pinia/prefs';
+import { useThemeStore } from '../pinia/theme';
+
+const themeStore = useThemeStore();
+const isAurora = computed(() => themeStore.current.id === 'aurora');
 import walletIcon from '../assets/wallet.svg';
 import couponIcon from '../assets/coupon.svg';
 
@@ -153,6 +157,7 @@ const handlePickKeyword = (kw: string) => {
 
 <template>
   <header
+    v-if="!isAurora"
     class="sticky top-0 z-50 border-b border-[#e5e5e5] bg-white @4xl:h-[89px]"
   >
     <div
@@ -181,7 +186,7 @@ const handlePickKeyword = (kw: string) => {
         <div
           class="relative hidden max-w-[512px] flex-1 flex-col gap-1 @4xl:flex"
         >
-          <div class="flex h-[42px]">
+          <div class="flex items-stretch">
             <IconField class="flex-1">
               <InputIcon class="pi pi-search" />
               <InputText
@@ -193,7 +198,7 @@ const handlePickKeyword = (kw: string) => {
             </IconField>
             <Button
               label="搜尋"
-              class="rounded-l-none"
+              class="!min-h-11 rounded-l-none"
               @click="handleRunSearch(keyword)"
             />
           </div>
@@ -594,7 +599,7 @@ const handlePickKeyword = (kw: string) => {
           class="relative mt-2 @4xl:hidden"
           data-msearch
         >
-          <div class="flex h-[38px]">
+          <div class="flex items-stretch">
             <IconField class="flex-1">
               <InputIcon class="pi pi-search" />
               <InputText
@@ -607,7 +612,7 @@ const handlePickKeyword = (kw: string) => {
             </IconField>
             <Button
               label="搜尋"
-              class="rounded-l-none"
+              class="!min-h-11 rounded-l-none"
               @click="handleRunSearch(keyword)"
             />
           </div>

@@ -134,6 +134,17 @@ const isEmpty = computed(() => groups.value.every((g) => g.items.length === 0));
 
 // 不同配送方式 → 阻擋共同結帳並彈窗請使用者拆單
 const isMixedShippingDialogVisible = ref(false);
+
+// 圖片放大預覽
+const isImagePreviewOpen = ref(false);
+const previewImageSrc = ref<string | undefined>();
+const previewImageAlt = ref<string>('');
+const handleOpenImagePreview = (src: string | undefined, alt: string): void => {
+  if (!src) return;
+  previewImageSrc.value = src;
+  previewImageAlt.value = alt;
+  isImagePreviewOpen.value = true;
+};
 const mixedShippingMethods = ref<string[]>([]);
 
 /** 找到該購物車對應的配送方式 tag（label 含「配送」字樣的那個）。 */
@@ -366,41 +377,30 @@ const handleGoProduct = (productId?: number) => {
         :key="group.id"
         class="rounded-xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)]"
       >
-        <!-- Group header -->
+        <!-- Group header：全選 checkbox（取代圓點）+ 店家名稱 + tag -->
         <div
-          class="cart-divider flex items-center gap-4 px-[var(--card-pad)] py-[var(--card-pad)]"
+          class="cart-divider flex flex-wrap items-center gap-2 px-[var(--card-pad)] py-[var(--card-pad)] @3xl:gap-3"
         >
-          <div class="flex shrink-0 items-center gap-2">
-            <Checkbox
-              :model-value="isGroupAllChecked(group)"
-              binary
-              :input-id="'grp-' + group.id"
-              @update:model-value="toggleGroupAll(group)"
-            />
-            <label
-              :for="'grp-' + group.id"
-              class="cursor-pointer text-sm text-slate-700"
-            >
-              全選
-            </label>
-          </div>
-          <!-- 名稱 + tag：手機版直式（避免名稱過長與 tag 一起折行），@3xl 以上橫式 -->
-          <div
-            class="flex min-w-0 flex-1 flex-col items-start gap-1 @3xl:flex-row @3xl:items-center @3xl:gap-2"
+          <Checkbox
+            :model-value="isGroupAllChecked(group)"
+            binary
+            :input-id="'grp-' + group.id"
+            aria-label="全選此店家所有商品"
+            @update:model-value="toggleGroupAll(group)"
+          />
+          <label
+            :for="'grp-' + group.id"
+            class="max-w-full cursor-pointer truncate text-base font-bold text-slate-950 @3xl:text-[17.5px]"
           >
-            <span
-              class="max-w-full truncate text-[17.5px] font-medium text-slate-700"
-            >
-              {{ group.sellerName }}
-            </span>
-            <div class="flex flex-wrap items-center gap-2">
-              <Tag
-                v-for="tag in group.tags"
-                :key="tag.label"
-                :value="tag.label"
-                :severity="tag.type"
-              />
-            </div>
+            {{ group.sellerName }}
+          </label>
+          <div class="flex flex-wrap items-center gap-2">
+            <Tag
+              v-for="tag in group.tags"
+              :key="tag.label"
+              :value="tag.label"
+              :severity="tag.type"
+            />
           </div>
         </div>
 
@@ -414,23 +414,24 @@ const handleGoProduct = (productId?: number) => {
           <div
             class="flex items-start gap-3 px-[var(--card-pad)] py-[var(--card-pad)] @7xl:gap-4"
           >
-            <!-- Checkbox + 圖片：用一個 items-center 子容器讓 checkbox 與圖片垂直置中對齊 -->
+            <!-- Checkbox + 圖片：勾選在圖片前面（同一列） -->
             <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
               <Checkbox v-model="item.checked" binary />
-              <div
-                class="aspect-square w-16 shrink-0 overflow-hidden rounded @3xl:w-20 @7xl:w-[100px]"
+              <button
+                type="button"
+                class="aspect-square w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-lg @3xl:w-20 @7xl:w-[100px]"
+                :aria-label="`放大圖片：${item.name}`"
+                @click="handleOpenImagePreview(item.image, item.name)"
               >
                 <ProductImage :src="item.image" :alt="item.name" size="md" />
-              </div>
+              </button>
             </div>
 
-            <!-- Info -->
-            <div
-              class="flex min-w-0 flex-1 flex-col gap-1 @7xl:flex-row @7xl:items-start @7xl:gap-4"
-            >
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
+            <!-- Info：左側商品資訊 + 右側價格/刪除 -->
+            <div class="flex min-w-0 flex-1 items-start gap-3 @7xl:gap-4">
+              <div class="flex min-w-0 flex-1 flex-col gap-1.5">
                 <p
-                  class="truncate text-base font-semibold text-slate-700"
+                  class="line-clamp-2 text-base font-bold text-slate-950"
                   :class="
                     item.productId != null
                       ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
@@ -442,13 +443,12 @@ const handleGoProduct = (productId?: number) => {
                 </p>
                 <div
                   v-if="item.spec && item.spec !== '預設'"
-                  class="flex gap-4 text-base text-slate-700 @7xl:text-sm"
+                  class="text-sm text-slate-600"
                 >
-                  <span>規格</span>
-                  <span>{{ item.spec }}</span>
+                  規格 {{ item.spec }}
                 </div>
-                <div class="flex items-center gap-4 text-base @7xl:text-sm">
-                  <span class="text-slate-700">數量</span>
+                <div class="flex items-center gap-3 text-sm">
+                  <span class="text-slate-600">數量</span>
                   <InputNumber
                     v-model="item.qty"
                     :min="1"
@@ -461,20 +461,18 @@ const handleGoProduct = (productId?: number) => {
                 </div>
               </div>
 
-              <!-- Price + Delete -->
-              <div
-                class="mt-1 flex shrink-0 items-center justify-between @7xl:mt-0 @7xl:gap-8"
-              >
-                <div class="flex items-baseline gap-2">
+              <!-- Right column：NTD 價格（上）+ 刪除（下） -->
+              <div class="flex shrink-0 flex-col items-end gap-2">
+                <div class="flex flex-col items-end gap-0.5">
                   <span
-                    class="text-xl leading-none font-bold @7xl:text-2xl @7xl:font-medium"
+                    class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
                     style="color: var(--primary)"
                   >
-                    ${{ item.price.toLocaleString() }}
+                    NTD ${{ item.price.toLocaleString() }}
                   </span>
                   <span
                     v-if="item.original"
-                    class="text-sm text-slate-500 line-through"
+                    class="text-xs whitespace-nowrap text-slate-500 line-through"
                   >
                     ${{ item.original.toLocaleString() }}
                   </span>
@@ -483,31 +481,31 @@ const handleGoProduct = (productId?: number) => {
                   v-if="!isGroupLocked(group)"
                   label="刪除"
                   icon="pi pi-trash"
-                  severity="danger"
-                  text
-                  class="!min-h-11 !px-3"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  class="!min-h-8 !px-2 !py-1"
                   @click="removeItem(group, item.id)"
                 />
               </div>
             </div>
           </div>
 
-          <!-- Bundle fieldset -->
-          <div v-if="item.isBundle" class="px-[var(--card-pad)] pt-4 pb-4 pl-9">
+          <!-- Bundle 組合商品 -->
+          <div v-if="item.isBundle" class="px-[var(--card-pad)] pt-2 pb-4 pl-9">
             <div
-              class="relative rounded-md border border-slate-200 bg-white p-4"
+              class="relative rounded-lg border border-slate-200 bg-slate-50 p-4"
             >
-              <!-- Legend button -->
+              <!-- 標題：靠左 -->
               <button
-                class="absolute flex items-center gap-2 rounded-md border-0 bg-transparent px-3 py-2 text-sm font-black text-slate-700 transition-colors hover:text-[var(--primary)]"
-                style="top: -18px; left: 16px"
+                class="absolute top-0 left-3 flex -translate-y-1/2 items-center gap-1.5 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 transition-colors hover:text-[var(--primary)]"
                 @click="item.bundleExpanded = !item.bundleExpanded"
               >
                 <i
-                  class="pi text-xs"
+                  class="pi text-[10px]"
                   :class="item.bundleExpanded ? 'pi-minus' : 'pi-plus'"
                 />
-                組合商品內容
+                <span>組合商品</span>
               </button>
 
               <!-- 未選規格 / 數量提示 banner -->
@@ -521,26 +519,29 @@ const handleGoProduct = (productId?: number) => {
                 >
               </div>
 
-              <!-- Sub-items grid -->
+              <!-- Sub-items grid：一律兩欄 -->
               <div
                 v-if="item.bundleExpanded"
-                class="grid grid-cols-1 gap-4 @7xl:grid-cols-2"
+                class="grid grid-cols-2 gap-3"
               >
                 <div
                   v-for="(sub, si) in item.bundleItems"
                   :key="si"
-                  class="flex items-center gap-4 rounded-xl bg-slate-100 p-[var(--card-pad)] shadow-[0_1px_2px_rgba(0,0,0,0.1)]"
+                  class="flex items-center gap-3"
                   :style="
                     subNeedsAttention(sub, item)
-                      ? 'outline: 1px solid #ef4444'
+                      ? 'outline: 1px solid #ef4444; border-radius: 8px; padding: 4px'
                       : ''
                   "
                 >
-                  <div
-                    class="h-20 w-20 shrink-0 overflow-hidden rounded bg-slate-200"
+                  <button
+                    type="button"
+                    class="aspect-square w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-lg bg-slate-200 @3xl:w-20 @7xl:w-[100px]"
+                    :aria-label="`放大圖片：${sub.name}`"
+                    @click="handleOpenImagePreview(sub.image, sub.name)"
                   >
                     <ProductImage :src="sub.image" :alt="sub.name" size="md" />
-                  </div>
+                  </button>
                   <div class="flex min-w-0 flex-1 flex-col gap-1">
                     <p class="truncate text-base font-semibold text-slate-700">
                       {{ sub.name }}
@@ -561,7 +562,6 @@ const handleGoProduct = (productId?: number) => {
                           :model-value="sub.spec || null"
                           :options="subSpecOptionsFor(item, sub, si) ?? []"
                           placeholder="請選擇規格"
-                          size="small"
                           class="min-w-0 flex-1"
                           @update:model-value="(v) => setSubSpec(sub, v)"
                         />
@@ -582,7 +582,6 @@ const handleGoProduct = (productId?: number) => {
                       <Select
                         :model-value="sub.qty"
                         :options="subQtyOptionsFor(item, sub)"
-                        size="small"
                         fluid
                         class="min-w-0 flex-1"
                         @update:model-value="(v) => setSubQty(sub, v)"
@@ -748,21 +747,21 @@ const handleGoProduct = (productId?: number) => {
           </label>
         </div>
 
-        <!-- Total + checkout -->
+        <!-- 已選 · 總計 + checkout -->
         <div class="flex min-w-0 items-center gap-3 @7xl:gap-8">
-          <div class="flex min-w-0 items-baseline gap-2">
-            <span class="hidden text-lg text-slate-700 @3xl:inline"
-              >訂單總金額</span
-            >
+          <div class="flex min-w-0 flex-col items-end gap-0.5 @3xl:flex-row @3xl:items-baseline @3xl:gap-3">
+            <span class="text-xs text-slate-600 whitespace-nowrap @3xl:text-sm">
+              已選 {{ checkedCount }} 件 · 總計
+            </span>
             <span
-              class="truncate text-2xl font-bold @7xl:text-3xl"
+              class="truncate text-xl font-bold @7xl:text-2xl"
               style="color: var(--primary)"
             >
               ${{ globalTotal.toLocaleString() }}
             </span>
           </div>
           <Button
-            :label="checkedCount > 0 ? `去結帳 (${checkedCount})` : '去結帳'"
+            :label="`去結帳 (${checkedCount})`"
             class="!min-h-12 shrink-0 !px-5 @7xl:!px-16"
             :disabled="checkedCount === 0"
             @click="handleGoCheckout"
@@ -808,6 +807,36 @@ const handleGoProduct = (productId?: number) => {
           />
         </div>
       </template>
+    </Dialog>
+
+    <!-- 圖片放大預覽 -->
+    <Dialog
+      v-model:visible="isImagePreviewOpen"
+      modal
+      :draggable="false"
+      :dismissable-mask="true"
+      :show-header="false"
+      :style="{ width: 'min(90vw, 640px)' }"
+      :pt="{
+        content: { style: 'padding: 0; background: transparent; box-shadow: none' },
+      }"
+    >
+      <div class="relative flex items-center justify-center">
+        <img
+          v-if="previewImageSrc"
+          :src="previewImageSrc"
+          :alt="previewImageAlt"
+          class="max-h-[80vh] w-auto rounded-lg object-contain"
+        />
+        <button
+          type="button"
+          class="absolute top-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+          aria-label="關閉"
+          @click="isImagePreviewOpen = false"
+        >
+          <i class="pi pi-times" />
+        </button>
+      </div>
     </Dialog>
   </div>
 </template>

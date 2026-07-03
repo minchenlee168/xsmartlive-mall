@@ -1,19 +1,56 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useThemeStore } from '../pinia/theme';
-import { useViewportStore, viewports } from '../pinia/viewport';
+import { useThemeStore, themes as allThemes } from '../pinia/theme';
 import { useDensityStore, type DensityMode } from '../pinia/density';
 
 declare const __BUILD_TIME__: string;
 
 const themeStore = useThemeStore();
-const viewportStore = useViewportStore();
 const densityStore = useDensityStore();
 
 const densities: { id: DensityMode; label: string; icon: string }[] = [
   { id: 'wide', label: '寬', icon: 'pi-arrows-h' },
   { id: 'compact', label: '窄', icon: 'pi-arrow-right-arrow-left' },
 ];
+
+// 外觀選項：預設(紫) + 4 個具名 preset；主題色只調整「預設」外觀的主色。
+const APPEARANCE_IDS = ['aurora', 'midnight', 'bloom', 'retro'] as const;
+const APPEARANCE_ID_SET = new Set<string>(APPEARANCE_IDS);
+const appearanceThemes = APPEARANCE_IDS.map((id) =>
+  allThemes.find((t) => t.id === id),
+).filter((t): t is NonNullable<typeof t> => !!t);
+
+/** 「預設」外觀在浮動控制列的顯示用資料（沒有實體 theme.id，代表「非外觀類的主題色」）。 */
+const defaultAppearance = {
+  id: 'default' as const,
+  label: '預設',
+  swatch: '#7008e7',
+  swatchGradient: undefined as string | undefined,
+};
+const appearanceOptions = [defaultAppearance, ...appearanceThemes];
+
+/** 主題色 palette：只顯示可作為「預設」主色的顏色（排除外觀主題和作為 default 的紫色）。 */
+const paletteThemes = allThemes.filter(
+  (t) => t.id !== 'purple' && !APPEARANCE_ID_SET.has(t.id),
+);
+
+const isAppearanceActive = (id: string): boolean => {
+  if (id === 'default') return !APPEARANCE_ID_SET.has(themeStore.current.id);
+  return themeStore.current.id === id;
+};
+
+/** 點按外觀：預設 → 若目前在外觀主題就跳回紫，否則保留現有主題色。 */
+const handlePickAppearance = (opt: (typeof appearanceOptions)[number]) => {
+  if (opt.id === 'default') {
+    if (APPEARANCE_ID_SET.has(themeStore.current.id)) {
+      const purple = allThemes.find((t) => t.id === 'purple');
+      if (purple) themeStore.set(purple);
+    }
+    return;
+  }
+  const theme = allThemes.find((t) => t.id === opt.id);
+  if (theme) themeStore.set(theme);
+};
 
 const isOpen = ref(false);
 const isHidden = ref(false);
@@ -44,20 +81,20 @@ const buildTimeDisplay = (() => {
         v-if="isOpen"
         class="flex w-60 flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_32px_rgba(0,0,0,0.15)]"
       >
-        <!-- Viewport -->
+        <!-- 外觀 -->
         <div>
           <p
             class="mb-2 text-xs font-bold tracking-wide text-slate-500 uppercase"
           >
-            裝置
+            外觀
           </p>
-          <div class="flex gap-1.5">
+          <div class="grid grid-cols-2 gap-1.5">
             <button
-              v-for="vp in viewports"
-              :key="vp.id"
-              class="flex min-h-12 flex-1 flex-col items-center justify-center gap-1 rounded-xl border py-2 text-xs font-medium transition-all"
+              v-for="opt in appearanceOptions"
+              :key="opt.id"
+              class="flex min-h-12 items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs font-medium transition-all"
               :style="
-                viewportStore.userSelection.id === vp.id
+                isAppearanceActive(opt.id)
                   ? {
                       background: 'var(--primary-bg)',
                       borderColor: 'var(--primary)',
@@ -66,27 +103,24 @@ const buildTimeDisplay = (() => {
                   : {}
               "
               :class="
-                viewportStore.userSelection.id !== vp.id
+                !isAppearanceActive(opt.id)
                   ? 'border-slate-200 text-slate-700 hover:border-[var(--primary)] hover:text-[var(--primary)]'
                   : ''
               "
-              @click="viewportStore.set(vp)"
+              @click="handlePickAppearance(opt)"
             >
-              <i :class="`pi ${vp.icon} text-base`" />
-              {{ vp.label }}
               <span
-                v-if="vp.id !== 'pc'"
-                class="text-[9px] leading-none text-red-500"
-                >開發中</span
-              >
+                class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2"
+                :style="{
+                  background: opt.swatchGradient ?? opt.swatch,
+                  borderColor: isAppearanceActive(opt.id)
+                    ? '#fff'
+                    : 'transparent',
+                }"
+              />
+              <span class="leading-tight">{{ opt.label }}</span>
             </button>
           </div>
-          <p
-            v-if="viewportStore.userSelection.width"
-            class="mt-1.5 text-center text-xs text-slate-500"
-          >
-            {{ viewportStore.userSelection.width }}px
-          </p>
         </div>
 
         <div class="h-px bg-slate-200" />
@@ -136,7 +170,7 @@ const buildTimeDisplay = (() => {
           </p>
           <div class="grid grid-cols-4 gap-x-2 gap-y-3">
             <button
-              v-for="theme in themeStore.themes"
+              v-for="theme in paletteThemes"
               :key="theme.id"
               class="group flex flex-col items-center gap-1"
               @click="themeStore.set(theme)"

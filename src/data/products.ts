@@ -46,7 +46,7 @@ export const products: Product[] = [
     name: '新春海陸雙享套組',
     price: 1280,
     original: 1580,
-    stock: 12,
+    stock: 10,
     category: '生鮮',
     image:
       'https://images.unsplash.com/photo-1485921325833-c519f76c4927?w=600&fit=crop',
@@ -74,7 +74,7 @@ export const products: Product[] = [
     name: '新手主廚三件組（固定組合）',
     price: 899,
     original: 1290,
-    stock: 6,
+    stock: 10,
     category: '生鮮',
     image:
       'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&fit=crop',
@@ -109,7 +109,7 @@ export const products: Product[] = [
     name: '挪威生鮮鮭魚切片 厚切真空包裝',
     price: 380,
     original: 480,
-    stock: 30,
+    stock: 10,
     category: '生鮮',
     image:
       'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600&fit=crop',
@@ -121,7 +121,7 @@ export const products: Product[] = [
     name: '古早味手工冷凍水餃 高麗菜豬肉口味',
     price: 199,
     original: 250,
-    stock: 50,
+    stock: 10,
     category: '生鮮',
     image:
       'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=600&fit=crop',
@@ -134,7 +134,7 @@ export const products: Product[] = [
     name: '新生兒入門必備三件組（固定組合）',
     price: 599,
     original: 890,
-    stock: 8,
+    stock: 10,
     category: '大童童裝',
     image:
       'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=600&fit=crop',
@@ -169,7 +169,7 @@ export const products: Product[] = [
     name: '任選 4 件 寶寶配件超值組合（部分限購）',
     price: 599,
     original: 980,
-    stock: 6,
+    stock: 10,
     category: '大童童裝',
     image:
       'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600&fit=crop',
@@ -185,7 +185,7 @@ export const products: Product[] = [
           'https://images.unsplash.com/photo-1517242810446-cc8951b2be40?w=400&fit=crop',
         spec: '粉色',
         specOptions: ['粉色', '藍色', '黃色'],
-        maxQty: 1,
+        maxQty: 10,
       },
       {
         id: 202,
@@ -194,7 +194,7 @@ export const products: Product[] = [
           'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
         spec: '黃-F',
         specOptions: ['黃-F', '藍-F'],
-        maxQty: 1,
+        maxQty: 10,
       },
       {
         id: 203,
@@ -203,7 +203,7 @@ export const products: Product[] = [
           'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
         spec: '白',
         specOptions: ['白', '黃', '粉'],
-        maxQty: 2,
+        maxQty: 10,
       },
       {
         id: 204,
@@ -228,7 +228,7 @@ export const products: Product[] = [
     price: 350,
     original: 500,
     hasVariant: false,
-    stock: 11,
+    stock: 10,
     sizes: ['90cm', '100cm', '110cm', '120cm'],
     category: '寶寶包屁',
   },
@@ -238,7 +238,7 @@ export const products: Product[] = [
     price: 280,
     original: 420,
     hasVariant: true,
-    stock: 8,
+    stock: 10,
     sizes: ['S', 'M', 'L', 'XL'],
     category: '大童童裝',
   },
@@ -248,7 +248,7 @@ export const products: Product[] = [
     price: 199,
     original: 320,
     hasVariant: true,
-    stock: 15,
+    stock: 10,
     sizes: ['66cm', '73cm', '80cm', '90cm'],
     category: '寶寶包屁',
     image:
@@ -260,7 +260,7 @@ export const products: Product[] = [
     price: 890,
     original: 1200,
     hasVariant: false,
-    stock: 5,
+    stock: 10,
     sizes: ['S', 'M', 'L'],
     category: '親子裝',
     image:
@@ -273,7 +273,7 @@ export const products: Product[] = [
     price: 450,
     original: 680,
     hasVariant: false,
-    stock: 8,
+    stock: 10,
     sizes: ['100cm', '110cm', '120cm', '130cm'],
     category: '小童童裝',
     image:
@@ -285,7 +285,7 @@ export const products: Product[] = [
     price: 620,
     original: 980,
     hasVariant: false,
-    stock: 3,
+    stock: 10,
     sizes: ['110cm', '120cm', '130cm', '140cm'],
     category: '大童童裝',
     image:
@@ -298,7 +298,7 @@ export const products: Product[] = [
     price: 169,
     original: 250,
     hasVariant: false,
-    stock: 20,
+    stock: 10,
     sizes: ['59cm', '66cm', '73cm', '80cm'],
     category: '寶寶包屁',
     image:
@@ -310,7 +310,7 @@ export const products: Product[] = [
     price: 220,
     original: 360,
     hasVariant: true,
-    stock: 12,
+    stock: 10,
     sizes: ['100cm', '110cm', '120cm'],
     category: '小童童裝',
     image:
@@ -322,7 +322,7 @@ export const products: Product[] = [
     price: 399,
     original: 560,
     hasVariant: false,
-    stock: 14,
+    stock: 10,
     sizes: ['110cm', '120cm', '130cm', '140cm'],
     category: '大童童裝',
     image:
@@ -334,7 +334,7 @@ export const products: Product[] = [
     price: 580,
     original: 800,
     hasVariant: false,
-    stock: 7,
+    stock: 10,
     sizes: ['S', 'M', 'L', 'XL'],
     category: '親子裝',
     image:
@@ -346,7 +346,7 @@ export const products: Product[] = [
     price: 320,
     original: 480,
     hasVariant: false,
-    stock: 9,
+    stock: 10,
     sizes: ['100cm', '110cm', '120cm', '130cm'],
     category: '小童童裝',
     image:
@@ -358,7 +358,7 @@ export const products: Product[] = [
     price: 460,
     original: 650,
     hasVariant: false,
-    stock: 6,
+    stock: 10,
     sizes: ['110cm', '120cm', '130cm'],
     category: '大童童裝',
     image:
@@ -369,7 +369,7 @@ export const products: Product[] = [
     name: '新款組合 包屁衣韓版小洋裝雙件組',
     price: 290,
     original: 350,
-    stock: 1,
+    stock: 10,
     category: '寶寶包屁',
     image:
       'https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=600&fit=crop',
@@ -399,7 +399,7 @@ export const products: Product[] = [
     name: '任選 3 件 寶寶超值組合包',
     price: 499,
     original: 870,
-    stock: 5,
+    stock: 10,
     category: '寶寶包屁',
     image:
       'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600&fit=crop',
@@ -465,7 +465,7 @@ export const products: Product[] = [
     name: '【出清】童裝鋪棉外套 不挑款福袋',
     price: 299,
     original: 990,
-    stock: 12,
+    stock: 10,
     category: '廠商出清',
     image:
       'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=600&fit=crop',
@@ -477,7 +477,7 @@ export const products: Product[] = [
     name: '【出清】經典素色棉T 三件組（固定組合）',
     price: 399,
     original: 870,
-    stock: 8,
+    stock: 10,
     category: '廠商出清',
     image:
       'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=600&fit=crop',
@@ -512,7 +512,7 @@ export const products: Product[] = [
     name: '【出清】男女童冬季毛帽 限量花色',
     price: 99,
     original: 280,
-    stock: 24,
+    stock: 10,
     category: '廠商出清',
     image:
       'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=600&fit=crop',
@@ -524,7 +524,7 @@ export const products: Product[] = [
     name: '【出清】童襪 12 雙超值組 隨機混色',
     price: 199,
     original: 480,
-    stock: 30,
+    stock: 10,
     category: '廠商出清',
     image:
       'https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=600&fit=crop',
@@ -534,7 +534,7 @@ export const products: Product[] = [
     name: '【出清】兒童透明雨衣 最後 6 件',
     price: 149,
     original: 350,
-    stock: 6,
+    stock: 10,
     category: '廠商出清',
     image:
       'https://images.unsplash.com/photo-1519074069390-98277fc02a5d?w=600&fit=crop',
@@ -546,7 +546,7 @@ export const products: Product[] = [
     name: '【出清】寶寶配件福袋 任選 3 件',
     price: 199,
     original: 690,
-    stock: 4,
+    stock: 10,
     category: '廠商出清',
     image:
       'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=600&fit=crop',

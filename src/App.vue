@@ -12,12 +12,17 @@ import { useToast } from 'primevue/usetoast';
 import FloatingControls from './components/FloatingControls.vue';
 import AppFooter from './components/AppFooter.vue';
 import PageLoading from './components/PageLoading.vue';
+import AuroraShell from './components/AuroraShell.vue';
 import { useViewportStore } from './pinia/viewport';
 import { useUiStore } from './pinia/ui';
+import { useThemeStore } from './pinia/theme';
 
 const viewportStore = useViewportStore();
 const ui = useUiStore();
+const themeStore = useThemeStore();
 const route = useRoute();
+const isAurora = computed(() => themeStore.current.id === 'aurora');
+const appearanceId = computed(() => themeStore.current.id);
 // 把 PrimeVue ToastService 注入 ui store，讓全域 ui.toast() 走 PrimeVue <Toast>
 ui.setToastService(useToast());
 const frameRef = ref<HTMLElement | null>(null);
@@ -117,9 +122,21 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
     </div>
 
     <!-- viewport frame -->
-    <div ref="frameRef" :style="frameStyle" class="@container">
-      <RouterView />
-      <AppFooter v-if="showFooter" />
+    <div
+      ref="frameRef"
+      :style="frameStyle"
+      class="@container"
+      :class="`appearance-${appearanceId}`"
+    >
+      <template v-if="isAurora">
+        <AuroraShell>
+          <RouterView />
+        </AuroraShell>
+      </template>
+      <template v-else>
+        <RouterView />
+        <AppFooter v-if="showFooter" />
+      </template>
     </div>
   </div>
 
@@ -131,3 +148,227 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
   <!-- PrimeVue 全域 Toast：靠上置中、一次只顯示一個（add 前會 removeAllGroups） -->
   <Toast position="top-center" />
 </template>
+
+<style scoped>
+/* ═════════════ Midnight（深夜藍）全站樣式 ═════════════ */
+/* 整頁深底 + 亮字 */
+.appearance-midnight {
+  background: linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  color: #f1f5f9;
+}
+.appearance-midnight :deep(h2),
+.appearance-midnight :deep(p) {
+  color: inherit;
+}
+/* 頁面 wrapper 若有 var(--page-bg) 背景蓋掉，維持深底 */
+.appearance-midnight :deep(.min-h-screen) {
+  background: transparent !important;
+}
+
+/* NavBar：深色底 + 亮字 */
+.appearance-midnight :deep(header.sticky) {
+  background: #0f172a !important;
+  border-bottom-color: rgba(148, 163, 184, 0.15) !important;
+}
+.appearance-midnight :deep(header.sticky button:hover) {
+  background-color: transparent !important;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.5) !important;
+  border-radius: 8px !important;
+}
+.appearance-midnight :deep(header .text-slate-700),
+.appearance-midnight :deep(header .text-slate-950) {
+  color: #e0e7ff !important;
+}
+.appearance-midnight :deep(header .text-slate-400),
+.appearance-midnight :deep(header .text-slate-500),
+.appearance-midnight :deep(header .text-slate-600) {
+  color: #94a3b8 !important;
+}
+.appearance-midnight :deep(header .p-inputtext) {
+  background: #1e293b !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  color: #e0e7ff !important;
+}
+
+/* Header 展開的下拉選單（用戶選單 / 貨幣 / 購物車…）：實心深底 + 強陰影，避免透過看到後方內容 */
+.appearance-midnight :deep(header .absolute.top-full),
+.appearance-midnight :deep(header div.absolute.top-full.bg-white) {
+  background-color: #0f172a !important;
+  background-image: none !important;
+  border: 1px solid rgba(148, 163, 184, 0.35) !important;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+.appearance-midnight :deep(header .absolute.top-full .border-b),
+.appearance-midnight :deep(header .absolute.top-full .border-t) {
+  border-color: rgba(148, 163, 184, 0.15) !important;
+}
+.appearance-midnight :deep(header .absolute.top-full button:hover),
+.appearance-midnight :deep(header .absolute.top-full a:hover) {
+  background: rgba(59, 130, 246, 0.15) !important;
+  box-shadow: none !important;
+}
+/* 選單內的文字：亮色 */
+.appearance-midnight :deep(header .absolute.top-full .text-slate-700),
+.appearance-midnight :deep(header .absolute.top-full .text-slate-950) {
+  color: #e0e7ff !important;
+}
+.appearance-midnight :deep(header .absolute.top-full .text-slate-400),
+.appearance-midnight :deep(header .absolute.top-full .text-slate-500),
+.appearance-midnight :deep(header .absolute.top-full .text-slate-600) {
+  color: #94a3b8 !important;
+}
+
+/* CategoryTabs：改膠囊式 */
+.appearance-midnight :deep(.sticky[style*='--tabs-bg']),
+.appearance-midnight :deep([style*='var(--tabs-bg)']) {
+  background: transparent !important;
+  padding: 8px 0;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) button {
+  margin: 0 4px;
+  border-radius: 9999px !important;
+  padding: 6px 16px !important;
+  border: 1px solid rgba(148, 163, 184, 0.4) !important;
+  background: #1e293b !important;
+  color: #e0e7ff !important;
+  min-height: 36px !important;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) button:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) button.bg-white\/15 {
+  background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+  color: #fff !important;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) button > span.absolute.bottom-0 {
+  display: none !important;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full {
+  background: #0f172a !important;
+  border-bottom-color: rgba(148, 163, 184, 0.15) !important;
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.6) !important;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full .p-button {
+  background: transparent !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  color: #e0e7ff !important;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full .p-button:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+}
+.appearance-midnight :deep([style*='var(--tabs-bg)']) > div.absolute.top-full .p-button:not(.p-button-outlined) {
+  background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+  color: #fff !important;
+}
+
+/* Footer 深色 */
+.appearance-midnight :deep(footer) {
+  background: #0f172a !important;
+  border-top-color: rgba(148, 163, 184, 0.15) !important;
+}
+.appearance-midnight :deep(footer .text-slate-500),
+.appearance-midnight :deep(footer .text-slate-400) {
+  color: #94a3b8 !important;
+}
+.appearance-midnight :deep(footer .text-slate-300) {
+  color: rgba(148, 163, 184, 0.4) !important;
+}
+
+/* AnnouncementSection：拿掉內部白底卡 */
+.appearance-midnight :deep(.rounded-lg.border.border-slate-200.bg-white) {
+  background: transparent !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+.appearance-midnight :deep(.rounded-lg.border.border-slate-200.bg-white .bg-gray-100) {
+  background: rgba(30, 41, 59, 0.5) !important;
+}
+.appearance-midnight :deep(.h-px.flex-1.bg-slate-200) {
+  background: rgba(148, 163, 184, 0.2) !important;
+}
+.appearance-midnight :deep(.rounded-lg.border.border-slate-200.bg-white .text-slate-700) {
+  color: #f1f5f9 !important;
+}
+.appearance-midnight :deep(span.text-xl.font-bold.text-slate-700) {
+  color: #22d3ee !important;
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+}
+
+/* 商品卡：透明底 + 淺藍框 + 螢光藍價格 */
+.appearance-midnight :deep(.product-card) {
+  background: transparent !important;
+  border: 1px solid #93c5fd !important;
+  box-shadow: none !important;
+  color: #e0e7ff;
+}
+.appearance-midnight :deep(.product-card .text-rose-500) {
+  color: #22d3ee !important;
+}
+.appearance-midnight :deep(.product-card .text-slate-700),
+.appearance-midnight :deep(.product-card .text-slate-950) {
+  color: #e0e7ff !important;
+}
+.appearance-midnight :deep(.product-card .text-slate-500),
+.appearance-midnight :deep(.product-card .text-slate-400) {
+  color: #94a3b8 !important;
+}
+
+/* 限時搶購：霓虹風（無底色、無邊線） */
+.appearance-midnight :deep(.flash-sale-bar) {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: #f1f5f9;
+}
+.appearance-midnight :deep(.flash-sale-bar .text-slate-700) {
+  color: #f1f5f9 !important;
+}
+.appearance-midnight :deep(.flash-sale-bar .pi-stopwatch) {
+  color: #22d3ee !important;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+}
+.appearance-midnight :deep(.flash-sale-chip) {
+  background: transparent !important;
+  border: 1px solid rgba(56, 189, 248, 0.7) !important;
+  color: #22d3ee !important;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+  box-shadow:
+    0 0 12px rgba(34, 211, 238, 0.25),
+    inset 0 0 8px rgba(34, 211, 238, 0.1) !important;
+}
+.appearance-midnight :deep(.flash-sale-bar .text-slate-700):is(span) {
+  color: #22d3ee !important;
+}
+
+/* ── 全站白底卡片改深底（購物車 / 會員 / 商品詳情…） ── */
+.appearance-midnight :deep(.bg-white),
+.appearance-midnight :deep(.bg-slate-50),
+.appearance-midnight :deep(.bg-slate-100) {
+  background: #1e293b !important;
+}
+/* 商品圖片預設灰底 → 略深板岩，避免亮灰在深底突出 */
+.appearance-midnight :deep(.bg-slate-200) {
+  background: #334155 !important;
+}
+.appearance-midnight :deep([class*='border-slate-200']) {
+  border-color: rgba(148, 163, 184, 0.15) !important;
+}
+/* ── 一般 slate 文字色 → 亮色（specific overrides 會優先） ── */
+.appearance-midnight :deep(.text-slate-950),
+.appearance-midnight :deep(.text-slate-700) {
+  color: #e0e7ff !important;
+}
+.appearance-midnight :deep(.text-slate-600),
+.appearance-midnight :deep(.text-slate-500),
+.appearance-midnight :deep(.text-slate-400) {
+  color: #94a3b8 !important;
+}
+/* ── PrimeVue secondary text Button（返回箭頭等）→ 亮色 icon ── */
+.appearance-midnight :deep(.p-button.p-button-text.p-button-secondary),
+.appearance-midnight :deep(.p-button.p-button-text.p-button-secondary:hover) {
+  color: #e0e7ff !important;
+}
+</style>

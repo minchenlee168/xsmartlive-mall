@@ -16,7 +16,6 @@ import ChangeAddressDialog from './ChangeAddressDialog.vue';
 
 /**
  * 我的訂單 section（會員中心右側內容）。
- * 對齊 Figma 8845:44643：
  * - 上方「購物權益與售後說明」 — 桌機可收合 Panel、手機是單行 + info icon → Dialog
  * - 標題 + 多 tab + 日期區間 + 搜尋 + 查詢結果摘要
  * - 訂單卡（header table + 子 tab + 商品列 + timeline）
@@ -49,8 +48,8 @@ const statusTabs: Array<{ key: StatusTab; label: string }> = [
   { key: 'all', label: '所有訂單' },
   { key: 'unpaid', label: '待付款' },
   { key: 'to_ship', label: '待出貨' },
-  { key: 'shipped', label: '出貨中' },
-  { key: 'to_receive', label: '待收貨' },
+  { key: 'to_receive', label: '備貨中' },
+  { key: 'shipped', label: '已出貨' },
   { key: 'delivered', label: '已送達' },
   { key: 'completed', label: '已完成' },
   { key: 'cancelled', label: '取消' },
@@ -107,11 +106,13 @@ interface TimelineStep {
 const TIMELINE_STEPS: TimelineStep[] = [
   { key: 'unpaid', label: '待付款', icon: 'pi-credit-card' },
   { key: 'to_ship', label: '待出貨', icon: 'pi-box' },
-  { key: 'shipped', label: '出貨中', icon: 'pi-truck' },
-  { key: 'to_receive', label: '待收貨', icon: 'pi-inbox' },
+  { key: 'to_receive', label: '備貨中', icon: 'pi-box' },
+  { key: 'shipped', label: '已出貨', icon: 'pi-truck' },
   { key: 'delivered', label: '已送達', icon: 'pi-check-circle' },
   { key: 'completed', label: '已完成', icon: 'pi-verified' },
 ];
+/** 進度條專用：待付款不算配送進度，從待出貨開始計 */
+const PROGRESS_STEPS = TIMELINE_STEPS.filter((s) => s.key !== 'unpaid');
 
 const orders = computed(() => ordersStore.orders);
 
@@ -156,10 +157,14 @@ const ordersForTab = (key: StatusTab) => {
   if (key === 'all') return list;
   const timelineStep = TIMELINE_TABS[key];
   if (timelineStep) {
-    return list.filter((o) =>
-      o.items.some((it) =>
-        it.packages.some((p) => p.currentStep === timelineStep),
-      ),
+    // 已取消 / 已退貨屬訂單層級狀態，只出現在自己的 tab，不進 timeline 進度 tab
+    return list.filter(
+      (o) =>
+        o.status !== 'cancelled' &&
+        o.status !== 'returned' &&
+        o.items.some((it) =>
+          it.packages.some((p) => p.currentStep === timelineStep),
+        ),
     );
   }
   return list.filter((o) => o.status === key);
@@ -253,14 +258,14 @@ const stepIcon = (key: TimelineStep['key']): string => {
   return TIMELINE_STEPS.find((s) => s.key === key)?.icon ?? 'pi-circle';
 };
 
-/** 進度條百分比：currentStep 在 timeline 的位置 / (總數 - 1)。 */
+/** 進度條百分比：currentStep 在 PROGRESS_STEPS 的位置 / (總數 - 1)。 */
 const stepProgressPct = (key: TimelineStep['key']): number => {
-  const idx = TIMELINE_STEPS.findIndex((s) => s.key === key);
+  const idx = PROGRESS_STEPS.findIndex((s) => s.key === key);
   if (idx === -1) return 0;
-  return Math.round((idx / (TIMELINE_STEPS.length - 1)) * 100);
+  return Math.round((idx / (PROGRESS_STEPS.length - 1)) * 100);
 };
 const stepIndex = (key: TimelineStep['key']): number => {
-  return TIMELINE_STEPS.findIndex((s) => s.key === key) + 1;
+  return PROGRESS_STEPS.findIndex((s) => s.key === key) + 1;
 };
 
 /** 取得第一個包裹的當前狀態（給手機版緊湊卡顯示用） */
@@ -277,7 +282,7 @@ interface TimelineRow {
   status: 'done' | 'current' | 'pending';
 }
 const timelineFor = (pkg: PackageInfo): TimelineRow[] => {
-  return TIMELINE_STEPS.map((s) => ({
+  return PROGRESS_STEPS.map((s) => ({
     key: s.key,
     label: s.label,
     icon: s.icon,
@@ -292,7 +297,7 @@ const handleOpenChangeAddress = (): void => {
   isChangeAddressVisible.value = true;
 };
 
-// ── 退換貨申請 dialog（對齊 Figma 6045-3985）──
+// ── 退換貨申請 dialog ──
 const RETURN_REASONS = [
   '商品瑕疵 / 破損',
   '尺寸不合 / 規格錯誤',
@@ -309,10 +314,24 @@ const returnTargetItem = ref<OrderItem | null>(null);
 const returnType = ref<ReturnType>('return');
 const returnReason = ref<string | null>(null);
 const returnNote = ref('');
-/** 已送出退換貨申請的商品集合；用 reactive Set 追蹤，避免改動 OrderItem 型別。 */
-const returnAppliedItems = ref(new Set<OrderItem>());
-const isReturnApplied = (item: OrderItem) =>
-  returnAppliedItems.value.has(item);
+const isReturnApplied = (item: OrderItem): boolean => !!item.returnStatus;
+
+/** 退換貨狀態 → 按鈕文字（未申請時為空，由 v-if 決定顯示原始「退換貨」） */
+const returnStatusLabel = (item: OrderItem): string => {
+  if (item.returnStatus === 'pending') return '退換貨申請中';
+  if (item.returnStatus === 'approved') return '申請通過';
+  if (item.returnStatus === 'rejected') return '退換貨申請駁回';
+  return '退換貨';
+};
+/** 退換貨狀態 → PrimeVue Button severity */
+const returnStatusSeverity = (
+  item: OrderItem,
+): 'success' | 'danger' | 'secondary' => {
+  if (item.returnStatus === 'approved') return 'success';
+  if (item.returnStatus === 'rejected') return 'danger';
+  if (item.returnStatus === 'pending') return 'secondary';
+  return 'danger';
+};
 
 /** 商品是否可退換貨：任一包裹的 currentStep 落在可退/換貨階段（shipped / delivered） */
 const itemCanReturnOrExchange = (item: OrderItem): boolean =>
@@ -328,10 +347,39 @@ const handleOpenReturnDialog = (item: OrderItem): void => {
   isReturnDialogVisible.value = true;
 };
 
+// ── 退換貨駁回原因 dialog ──
+const isRejectReasonDialogVisible = ref(false);
+const rejectReasonTargetItem = ref<OrderItem | null>(null);
+const handleOpenRejectReasonDialog = (item: OrderItem): void => {
+  rejectReasonTargetItem.value = item;
+  isRejectReasonDialogVisible.value = true;
+};
+
+// ── 退換貨通過後聯絡賣家 dialog ──
+const isApprovedContactDialogVisible = ref(false);
+const approvedContactTargetItem = ref<OrderItem | null>(null);
+const handleOpenApprovedContactDialog = (item: OrderItem): void => {
+  approvedContactTargetItem.value = item;
+  isApprovedContactDialogVisible.value = true;
+};
+
+/** 統一的退換貨按鈕點擊入口：駁回 → 顯示原因；通過 → 聯絡賣家；其他 → 走原本申請 dialog */
+const handleReturnButtonClick = (item: OrderItem): void => {
+  if (item.returnStatus === 'rejected') {
+    handleOpenRejectReasonDialog(item);
+    return;
+  }
+  if (item.returnStatus === 'approved') {
+    handleOpenApprovedContactDialog(item);
+    return;
+  }
+  handleOpenReturnDialog(item);
+};
+
 const handleSubmitReturn = (): void => {
   if (!returnReason.value) return;
   if (returnTargetItem.value) {
-    returnAppliedItems.value.add(returnTargetItem.value);
+    returnTargetItem.value.returnStatus = 'pending';
   }
   ui.toast(
     `${returnType.value === 'return' ? '退貨' : '換貨'}申請已送出（示意）`,
@@ -354,11 +402,11 @@ const isInquiryDrawerVisible = ref(false);
  */
 const inquirySelectKey = ref(0);
 
-// ── 訂購/付款資訊 dialog（對齊 Figma 6045-5536） ──
+// ── 訂購/付款資訊 dialog ──
 const isPaymentInfoDialogVisible = ref(false);
 const paymentInfoTargetOrder = ref<OrderRecord | null>(null);
 
-// ── 物流配送進度 dialog（對齊 Figma 6045-2986） ──
+// ── 物流配送進度 dialog ──
 interface ShippingTrackingEvent {
   status: string;
   time: string;
@@ -817,7 +865,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
         </div>
 
-        <!-- 商品列 + 多包裹 timeline（對齊 Figma 9645-29876）；收合時整段隱藏 -->
+        <!-- 商品列 + 多包裹 timeline；收合時整段隱藏 -->
         <div v-if="order.expanded" class="flex flex-col">
           <!-- 退換貨 tab：不可退/換貨時顯示原因 -->
           <div
@@ -855,19 +903,20 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <p class="text-sm font-bold text-slate-950">
                   ${{ item.price.toLocaleString() }} / {{ item.qty }}件
                 </p>
-                <!-- 退換貨 tab + 商品可退換貨 → 顯示按鈕；送出申請後變「退換貨申請中」並 disabled -->
+                <!-- 退換貨 tab + 商品可退換貨 → 顯示按鈕；申請後依 returnStatus 顯示 申請中 / 通過 / 駁回 -->
+                <!-- 駁回可再點按查看原因；申請中 / 通過為 disabled 唯讀 -->
                 <Button
                   v-if="
                     order.detailTab === 'return' &&
                     itemCanReturnOrExchange(item) &&
                     !returnReasonText(order)
                   "
-                  :label="isReturnApplied(item) ? '退換貨申請中' : '退換貨'"
-                  :severity="isReturnApplied(item) ? 'secondary' : 'danger'"
-                  :disabled="isReturnApplied(item)"
+                  :label="returnStatusLabel(item)"
+                  :severity="returnStatusSeverity(item)"
+                  :disabled="item.returnStatus === 'pending'"
                   outlined
                   size="small"
-                  @click="handleOpenReturnDialog(item)"
+                  @click="handleReturnButtonClick(item)"
                 />
               </div>
             </div>
@@ -925,14 +974,18 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                       </div>
                     </div>
                     <span
+                      v-if="pkg.currentStep !== 'unpaid'"
                       class="shrink-0 text-xs font-bold"
                       style="color: var(--primary)"
                     >
                       {{ stepIndex(pkg.currentStep) }} /
-                      {{ TIMELINE_STEPS.length }}
+                      {{ PROGRESS_STEPS.length }}
                     </span>
                   </div>
-                  <div class="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    v-if="pkg.currentStep !== 'unpaid'"
+                    class="h-1.5 overflow-hidden rounded-full bg-slate-200"
+                  >
                     <div
                       class="h-full rounded-full transition-all"
                       :style="{
@@ -1105,7 +1158,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </template>
     </Dialog>
 
-    <!-- 退換貨申請 dialog（對齊 Figma 6045-3985） -->
+    <!-- 退換貨申請 dialog -->
     <Dialog
       v-model:visible="isReturnDialogVisible"
       modal
@@ -1178,7 +1231,111 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </template>
     </Dialog>
 
-    <!-- 訂購/付款資訊 dialog（對齊 Figma 6045-5536） -->
+    <!-- 退換貨申請駁回原因 dialog -->
+    <Dialog
+      v-model:visible="isRejectReasonDialogVisible"
+      modal
+      :draggable="false"
+      header="退換貨申請駁回"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '480px' }"
+    >
+      <div class="flex flex-col gap-4 text-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">商品名稱</span>
+          <span class="text-slate-950">
+            {{ rejectReasonTargetItem?.name }}
+          </span>
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">駁回原因</span>
+          <p class="leading-relaxed text-slate-950">
+            {{ rejectReasonTargetItem?.returnRejectReason ?? '—' }}
+          </p>
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="關閉"
+          severity="secondary"
+          outlined
+          @click="isRejectReasonDialogVisible = false"
+        />
+      </template>
+    </Dialog>
+
+    <!-- 退換貨申請通過：聯絡賣家 dialog -->
+    <Dialog
+      v-model:visible="isApprovedContactDialogVisible"
+      modal
+      :draggable="false"
+      header="退換貨申請通過"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '480px' }"
+    >
+      <div class="flex flex-col gap-4 text-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs text-slate-500">商品名稱</span>
+          <span class="text-slate-950">
+            {{ approvedContactTargetItem?.name }}
+          </span>
+        </div>
+        <div
+          class="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-emerald-700"
+        >
+          <i class="pi pi-check-circle mt-0.5 shrink-0" />
+          <p class="leading-relaxed">
+            您的退換貨申請已通過，請聯絡賣家安排寄回 / 換貨物流事宜。
+          </p>
+        </div>
+        <div class="flex flex-col gap-3">
+          <span class="text-xs font-medium text-slate-500">賣家聯絡資訊</span>
+          <div class="flex items-center gap-2.5">
+            <i class="pi pi-phone shrink-0" style="color: var(--primary)" />
+            <span class="text-slate-700">客服電話：</span>
+            <a href="tel:0800000000" class="font-medium hover:underline"
+              style="color: var(--primary)"
+              >0800-000-000</a
+            >
+          </div>
+          <div class="flex items-center gap-2.5">
+            <i class="pi pi-envelope shrink-0" style="color: var(--primary)" />
+            <span class="text-slate-700">客服信箱：</span>
+            <a
+              href="mailto:service@xsmartlive.com"
+              class="font-medium hover:underline"
+              style="color: var(--primary)"
+              >service@xsmartlive.com</a
+            >
+          </div>
+          <div class="flex items-center gap-2.5">
+            <i class="pi pi-comments shrink-0" style="color: var(--primary)" />
+            <span class="text-slate-700">官方 LINE：</span>
+            <span class="font-medium" style="color: var(--primary)"
+              >@xsmartlive</span
+            >
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i
+              class="pi pi-clock mt-0.5 shrink-0"
+              style="color: var(--primary)"
+            />
+            <span class="text-slate-700">服務時間：</span>
+            <span class="text-slate-700">週一至週五 09:00 – 18:00</span>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="關閉"
+          severity="secondary"
+          outlined
+          @click="isApprovedContactDialogVisible = false"
+        />
+      </template>
+    </Dialog>
+
+    <!-- 訂購/付款資訊 dialog -->
     <Dialog
       v-model:visible="isPaymentInfoDialogVisible"
       modal
@@ -1215,7 +1372,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </div>
     </Dialog>
 
-    <!-- 物流配送進度 dialog（對齊 Figma 6045-2986） -->
+    <!-- 物流配送進度 dialog -->
     <Dialog
       v-model:visible="isShippingProgressDialogVisible"
       modal

@@ -6,7 +6,7 @@ import { useUiStore } from '../pinia/ui';
 import { useCountdown } from '../composables/useCountdown';
 
 /**
- * 社群帳號首次登入流程（對應 Figma 7663-56079 / 7668-56511 / 7668-57069 / 9038-11167）：
+ * 社群帳號首次登入流程：
  * - step = 'review'  → 顯示由 provider 帶來的 email / phone，同意條款後進入綁定步驟
  * - step = 'verify'  → 安全驗證：填手機 + 簡訊驗證碼，綁定到帳號
  * - step = 'success' → 綁定成功提示，按鈕進入商城

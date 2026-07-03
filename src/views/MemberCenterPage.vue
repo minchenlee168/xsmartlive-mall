@@ -158,6 +158,16 @@ watch(
     activeNav.value = readTabFromRoute();
   },
 );
+/** 支援 `?sub=xxx` 直接跳到 account 下的 sub-tab（會員資料 / 更改綁定帳號 / 收件地址 / 更改密碼） */
+const VALID_ACCOUNT_SUBS = new Set(['profile', 'binding', 'address', 'password']);
+const readSubFromRoute = (): void => {
+  const q = route.query.sub;
+  if (typeof q === 'string' && VALID_ACCOUNT_SUBS.has(q)) {
+    activeSub.value = q;
+  }
+};
+readSubFromRoute();
+watch(() => route.query.sub, readSubFromRoute);
 
 // Saved baseline — updated only after a successful save
 const snapshot = reactive({
@@ -727,7 +737,18 @@ const handleSaveAddr = () => {
           {{ auth.avatarLetter }}
         </div>
         <div class="flex flex-col items-center gap-1">
-          <p class="text-base font-bold text-slate-950">{{ name }}</p>
+          <div class="flex items-center gap-2">
+            <p class="text-base font-bold text-slate-950">{{ name }}</p>
+            <Button
+              icon="pi pi-pen-to-square"
+              link
+              size="small"
+              class="!p-0"
+              aria-label="編輯個人檔案"
+              title="編輯個人檔案"
+              @click="handleEditProfile"
+            />
+          </div>
           <p class="text-xs text-slate-500">{{ MEMBER_ID }}</p>
         </div>
 
@@ -811,9 +832,20 @@ const handleSaveAddr = () => {
             {{ auth.avatarLetter }}
           </div>
           <div class="min-w-0">
-            <p class="text-lg font-bold text-slate-950">{{ name }}</p>
+            <div class="flex items-center gap-2">
+              <p class="text-lg font-bold text-slate-950">{{ name }}</p>
+              <Button
+                icon="pi pi-pen-to-square"
+                link
+                size="small"
+                class="!p-0"
+                aria-label="編輯個人檔案"
+                title="編輯個人檔案"
+                @click="handleEditProfile"
+              />
+            </div>
             <p class="text-xs text-slate-500">{{ MEMBER_ID }}</p>
-            <div class="mt-2 flex flex-wrap items-center gap-4">
+            <div class="mt-2 flex flex-wrap items-center gap-3">
               <button
                 v-for="acc in socialAccounts"
                 :key="acc.key"
@@ -831,31 +863,22 @@ const handleSaveAddr = () => {
                 <img
                   :src="socialIconSrc(acc.icon)"
                   :alt="acc.label"
-                  class="h-8 w-8 object-contain transition-opacity"
+                  class="h-6 w-6 object-contain transition-opacity"
                   :class="acc.bound ? '' : 'opacity-40 grayscale'"
                 />
                 <span
-                  class="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full text-white ring-2 ring-white"
+                  class="absolute -right-1 -bottom-1 flex h-3.5 w-3.5 items-center justify-center rounded-full text-white ring-2 ring-white"
                   :style="{
                     background: acc.bound ? 'var(--primary)' : '#94a3b8',
                   }"
                 >
                   <i
-                    class="fa-solid text-[9px]"
+                    class="fa-solid text-[8px]"
                     :class="acc.bound ? 'fa-link' : 'fa-link-slash'"
                   />
                 </span>
               </button>
             </div>
-            <Button
-              label="編輯個人檔案"
-              icon="pi pi-pencil"
-              icon-pos="right"
-              link
-              size="small"
-              class="mt-1 !p-0"
-              @click="handleEditProfile"
-            />
           </div>
         </div>
 
@@ -985,7 +1008,7 @@ const handleSaveAddr = () => {
 
       <!-- Right column -->
       <div class="flex min-w-0 flex-1 flex-col gap-4">
-        <!-- 我的訂單（對齊 Figma 設計） -->
+        <!-- 我的訂單 -->
         <MyOrdersSection v-if="activeNav === 'orders'" />
 
         <!-- 紅利點數 -->

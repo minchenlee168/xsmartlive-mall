@@ -112,6 +112,25 @@
 .p-select {
   min-height: 44px;
 }
+/* Select 被撐到 44px 時，內部 label 與 chevron 需明確垂直置中，
+   否則 label 會落在 padding 頂端、chevron 在中間，造成兩者不對齊 */
+.p-select {
+  display: inline-flex;
+  align-items: center;
+}
+.p-select-label {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1;
+}
+.p-select-dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .qty-stepper .p-inputnumber-input {
   min-height: 0;
 }

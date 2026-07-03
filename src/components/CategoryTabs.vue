@@ -9,8 +9,12 @@ import {
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useViewportStore } from '../pinia/viewport';
+import { useThemeStore } from '../pinia/theme';
 
 const tabs = ['大童童裝', '小童童裝', '寶寶包屁', '親子裝', '生鮮', '廠商出清'];
+
+const themeStoreCT = useThemeStore();
+const isAurora = computed(() => themeStoreCT.current.id === 'aurora');
 
 const route = useRoute();
 const router = useRouter();
@@ -99,8 +103,8 @@ watch(isMobile, () => {
 </script>
 
 <template>
-  <!-- tabs bar：sticky 在 frame 頂端，捲動內容時保持可見 -->
-  <div class="sticky top-0 z-40 w-full" style="background: var(--tabs-bg)">
+  <!-- tabs bar：sticky 在 frame 頂端，捲動內容時保持可見。Aurora 走全站 shell，不顯示。 -->
+  <div v-if="!isAurora" class="sticky top-0 z-40 w-full" style="background: var(--tabs-bg)">
     <div class="mx-auto max-w-7xl">
       <div class="flex items-center">
         <!-- main category tabs -->
