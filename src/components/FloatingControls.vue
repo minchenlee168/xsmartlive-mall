@@ -11,6 +11,7 @@ import {
   type CheckoutMode,
   type BulkDiscountRule,
 } from '../pinia/cart';
+import { useAppModeStore } from '../pinia/appMode';
 import { products } from '../data/products';
 
 declare const __BUILD_TIME__: string;
@@ -18,11 +19,23 @@ declare const __BUILD_TIME__: string;
 const themeStore = useThemeStore();
 const densityStore = useDensityStore();
 const cartStore = useCartStore();
+const appMode = useAppModeStore();
 
 // ---- 購物車設定 Dialog -----------------------------------------------------
 const isCartSettingsOpen = ref(false);
 const cartSettingsTab = ref<'carts' | 'rules' | 'discounts'>('carts');
 
+type TempLabel = '常溫' | '冷藏' | '冷凍';
+/** 溫層選項：冷凍藍 (info)、冷藏綠 (success)、常溫灰 (secondary)。 */
+const TEMP_OPTIONS: {
+  label: string;
+  value: TempLabel;
+  tagType: 'info' | 'success' | 'secondary';
+}[] = [
+  { label: '常溫', value: '常溫', tagType: 'secondary' },
+  { label: '冷藏', value: '冷藏', tagType: 'success' },
+  { label: '冷凍', value: '冷凍', tagType: 'info' },
+];
 const SHIPPING_OPTS: { label: string; value: ShippingMethodId }[] = [
   { label: '宅配', value: 'home' },
   { label: '超商', value: 'store' },
@@ -43,6 +56,28 @@ const CHECKOUT_MODES: {
   { label: '棄標', value: 'abandon', desc: '允許放棄先前喊下的商品' },
   { label: '暫停', value: 'paused', desc: '僅供瀏覽，暫停結帳' },
 ];
+
+/** 從 group.tags 抓目前的溫層 label；沒有 → null（其他非溫層 tag 保留）。 */
+const getTempOf = (g: CartGroup): TempLabel | null => {
+  const tempLabels = TEMP_OPTIONS.map((o) => o.value) as string[];
+  const t = g.tags.find((tg) => tempLabels.includes(tg.label));
+  return (t?.label as TempLabel) ?? null;
+};
+const setTempOf = (g: CartGroup, temp: TempLabel | null) => {
+  const tempLabels = TEMP_OPTIONS.map((o) => o.value) as string[];
+  const others = g.tags.filter((tg) => !tempLabels.includes(tg.label));
+  if (!temp) {
+    cartStore.updateCart(g.id, { tags: others });
+    return;
+  }
+  const opt = TEMP_OPTIONS.find((o) => o.value === temp);
+  cartStore.updateCart(g.id, {
+    tags: [
+      ...others,
+      { label: temp, type: opt?.tagType ?? 'secondary' },
+    ],
+  });
+};
 
 /** 分類清單：從商品目錄抽出唯一值，給規則 Select 用。 */
 const categoryOptions = computed(() => {
@@ -336,6 +371,23 @@ const buildTimeDisplay = (() => {
               {{ cartStore.groups.length }} 台 · {{ cartStore.routingRules.length }} 規則
             </span>
           </button>
+
+          <!-- 直播主未用商城：開啟後隱藏商城首頁 / 分類 / 主題館 -->
+          <div class="mt-2 flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-slate-700">
+                直播主未用商城
+              </p>
+              <p class="mt-0.5 text-xs leading-snug text-slate-400">
+                開啟後隱藏商城首頁、主題館與分類頁，僅保留其他功能
+              </p>
+            </div>
+            <ToggleSwitch
+              :model-value="appMode.noShopMode"
+              class="mt-0.5 shrink-0"
+              @update:model-value="appMode.setNoShopMode(!!$event)"
+            />
+          </div>
         </div>
 
         <div class="h-px bg-slate-200" />
@@ -455,6 +507,19 @@ const buildTimeDisplay = (() => {
                     {{ g.items.length }} 件商品
                   </p>
                 </div>
+              </div>
+
+              <div class="mt-3">
+                <p class="mb-1 text-xs text-slate-500">溫層</p>
+                <SelectButton
+                  :model-value="getTempOf(g)"
+                  :options="TEMP_OPTIONS"
+                  option-label="label"
+                  option-value="value"
+                  :allow-empty="true"
+                  size="small"
+                  @update:model-value="setTempOf(g, $event ?? null)"
+                />
               </div>
 
               <div class="mt-3">

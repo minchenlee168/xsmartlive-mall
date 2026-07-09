@@ -32,7 +32,7 @@ export interface CartItem {
 
 export interface CartTag {
   label: string;
-  type: 'info' | 'danger' | 'secondary';
+  type: 'info' | 'danger' | 'secondary' | 'success';
 }
 
 /** 運送方式 id — 對應結帳頁的物流選單 */

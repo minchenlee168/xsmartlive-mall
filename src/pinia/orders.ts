@@ -28,6 +28,15 @@ const IMG_HAT =
 const IMG_BIB =
   'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=400&fit=crop';
 
+/** 剛結完帳的付款摘要：付款成功頁使用；redirect 進去讀完後 clear。 */
+export interface LastPaymentSummary {
+  orderNos: string[];
+  buyerName: string;
+  buyerPhone: string;
+  paymentMethod: string;
+  deliveryAddress: string;
+}
+
 export const useOrdersStore = defineStore('orders', () => {
   const orders = ref<OrderRecord[]>([
     {
@@ -481,8 +490,19 @@ export const useOrdersStore = defineStore('orders', () => {
       orderId,
       amount: input.total,
     });
-    return orderId;
+    return orderNo;
   }
 
-  return { orders, transactions, placeOrder };
+  const lastPaymentSummary = ref<LastPaymentSummary | null>(null);
+  const setLastPaymentSummary = (s: LastPaymentSummary | null) => {
+    lastPaymentSummary.value = s;
+  };
+
+  return {
+    orders,
+    transactions,
+    placeOrder,
+    lastPaymentSummary,
+    setLastPaymentSummary,
+  };
 });

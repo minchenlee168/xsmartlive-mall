@@ -6,6 +6,7 @@ import { useCartStore } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { usePrefsStore, type Currency, type Language } from '../pinia/prefs';
 import { useThemeStore } from '../pinia/theme';
+import { useAppModeStore } from '../pinia/appMode';
 
 const themeStore = useThemeStore();
 const isAurora = computed(() => themeStore.current.id === 'aurora');
@@ -18,6 +19,9 @@ const auth = useAuthStore();
 const cart = useCartStore();
 const ui = useUiStore();
 const prefs = usePrefsStore();
+const appMode = useAppModeStore();
+/** 商城模式關閉時，logo / 登出後的預設落地路徑改成 /member。 */
+const homePath = computed(() => (appMode.noShopMode ? '/member' : '/shop'));
 
 const isUserMenuOpen = ref(false);
 const isLangMenuOpen = ref(false);
@@ -71,7 +75,7 @@ const handleToggleUserMenu = () => {
 const handleLogout = () => {
   auth.logout();
   isUserMenuOpen.value = false;
-  router.push('/shop');
+  router.push(homePath.value);
 };
 const handleDocClick = (e: MouseEvent) => {
   const target = e.target as HTMLElement;
@@ -168,7 +172,7 @@ const handlePickKeyword = (kw: string) => {
         <button
           class="flex shrink-0 items-center"
           aria-label="xSmartLive"
-          @click="router.push('/shop')"
+          @click="router.push(homePath)"
         >
           <img
             src="/logo.png"

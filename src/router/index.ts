@@ -6,6 +6,7 @@ import ProductDetailPage from '../views/ProductDetailPage.vue';
 import CartPage from '../views/CartPage.vue';
 import LoginPage from '../views/LoginPage.vue';
 import CheckoutPage from '../views/CheckoutPage.vue';
+import PaymentSuccessPage from '../views/PaymentSuccessPage.vue';
 import SearchPage from '../views/SearchPage.vue';
 import MemberCenterPage from '../views/MemberCenterPage.vue';
 import RegisterPage from '../views/RegisterPage.vue';
@@ -14,6 +15,7 @@ import ForgotPasswordPage from '../views/ForgotPasswordPage.vue';
 import InfoPage from '../views/InfoPage.vue';
 import { useUiStore } from '../pinia/ui';
 import { useAuthStore } from '../pinia/auth';
+import { useAppModeStore } from '../pinia/appMode';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -25,6 +27,7 @@ const router = createRouter({
     { path: '/product/:id', component: ProductDetailPage },
     { path: '/cart', component: CartPage },
     { path: '/checkout', component: CheckoutPage },
+    { path: '/payment-success', component: PaymentSuccessPage },
     { path: '/search', component: SearchPage },
     { path: '/member', component: MemberCenterPage },
     { path: '/login', component: LoginPage },
@@ -42,10 +45,18 @@ const router = createRouter({
 
 // 需登入才能進入的頁面
 const AUTH_REQUIRED = ['/cart', '/checkout'];
+// 「直播主未用商城」模式下要擋掉的商城相關路徑
+const MALL_PATH_PREFIXES = ['/shop', '/theme', '/category'];
+const isMallPath = (path: string) =>
+  MALL_PATH_PREFIXES.some((p) => path === p || path.startsWith(p + '/'));
 
 // 換頁 loading：切換路徑時顯示載入畫面
 let loadingTimer: ReturnType<typeof setTimeout> | null = null;
 router.beforeEach((to, from) => {
+  // 直播主未用商城模式：把商城相關路徑導到會員中心
+  if (useAppModeStore().noShopMode && isMallPath(to.path)) {
+    return { path: '/member' };
+  }
   if (AUTH_REQUIRED.includes(to.path) && !useAuthStore().isLoggedIn) {
     useUiStore().toast('請先登入會員');
     return { path: '/login', query: { redirect: to.fullPath } };

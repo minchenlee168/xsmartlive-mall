@@ -32,7 +32,7 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 1,
       sellerName: '07/09 廚娘小桂の直播廚房',
-      tags: [],
+      tags: [{ label: '冷凍', type: 'info' }],
       // 冷凍商品僅支援宅配，且不收貨到付款
       shippingMethods: ['home'],
       paymentMethods: ['credit', 'atm'],
@@ -112,8 +112,8 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 2,
       sellerName: '07/08 妞妞ㄉ童裝小舖',
-      // 「禁止棄標」語意已由 checkoutMode: 'default' 表達，tag 不再重複
-      tags: [],
+      // 「禁止棄標」語意已由 checkoutMode: 'default' 表達，tag 只保留溫層資訊
+      tags: [{ label: '常溫', type: 'secondary' }],
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
       checkoutMode: 'default',

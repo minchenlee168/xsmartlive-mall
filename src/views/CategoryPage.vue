@@ -76,7 +76,7 @@ watch([() => route.params.tab, activeSubCategory], () => {
     >
       <div class="flex flex-col" style="gap: var(--stack-gap)">
         <!-- Breadcrumb -->
-        <nav class="flex items-center gap-3 py-1 text-base @7xl:text-lg">
+        <nav class="flex items-center gap-3 text-base @7xl:text-lg">
           <Button
             icon="pi pi-home"
             severity="secondary"

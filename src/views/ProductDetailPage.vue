@@ -215,7 +215,7 @@ const handleNextThumb = () => {
       <div class="flex flex-col" style="gap: var(--stack-gap)">
         <!-- Breadcrumb（手機超過容器寬 → 商品名 truncate 顯示 ...） -->
         <nav
-          class="flex min-w-0 items-center gap-3 overflow-hidden py-1 text-base @7xl:text-lg"
+          class="flex min-w-0 items-center gap-3 overflow-hidden text-base @7xl:text-lg"
         >
           <Button
             icon="pi pi-home"

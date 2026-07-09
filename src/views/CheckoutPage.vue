@@ -524,25 +524,49 @@ const handlePlaceOrder = () => {
   const method =
     PAYMENT_METHODS.find((m) => m.value === paymentMethod.value)?.label ??
     '線上信用卡';
-  const orderItems = allItems.value.map((i) => ({
-    name: i.name,
-    image: i.image,
-    spec: i.spec || '預設',
-    price: effectiveUnitPrice(i),
-    qty: i.qty,
-  }));
-  ordersStore.placeOrder({
-    items: orderItems,
-    total: finalTotal.value,
-    payment: method,
-    delivery: shippingMethodLabel.value,
+
+  // 每個群組（賣家 / 場次）拆成獨立一筆訂單，收集訂單編號
+  const orderNos: string[] = checkoutGroups.value.map((g) =>
+    ordersStore.placeOrder({
+      items: g.items.map((i) => ({
+        name: i.name,
+        image: i.image,
+        spec: i.spec || '預設',
+        price: effectiveUnitPrice(i),
+        qty: i.qty,
+      })),
+      total: groupDisplayTotal(g),
+      payment: method,
+      delivery: shippingMethodLabel.value,
+    }),
+  );
+
+  // 依目前選擇的配送方式抓取聯絡人 / 電話 / 完整地址（給付款成功頁顯示）
+  const contact =
+    shipMethod.value === 'home' ? selectedHome.value : selectedStore.value;
+  const buyerName = contact?.name ?? '';
+  const buyerPhone = contact?.phone ?? '';
+  const deliveryAddress =
+    shipMethod.value === 'home' && selectedHome.value
+      ? selectedHome.value.address
+      : shipMethod.value === 'store' && selectedStore.value
+        ? `${selectedStore.value.chain} ${selectedStore.value.storeName}（${selectedStore.value.address}）`
+        : '';
+
+  ordersStore.setLastPaymentSummary({
+    orderNos,
+    buyerName,
+    buyerPhone,
+    paymentMethod: method,
+    deliveryAddress,
   });
+
   cartStore.groups.forEach((g) => {
     g.items = g.items.filter((i) => !i.checked);
   });
   cartStore.groups = cartStore.groups.filter((g) => g.items.length > 0);
-  ui.toast('訂單已成立，感謝您的購買！');
-  router.push({ path: '/member', query: { tab: 'orders' } });
+  ui.toast('付款成功');
+  router.push('/payment-success');
 };
 </script>
 
@@ -570,7 +594,7 @@ const handlePlaceOrder = () => {
       class="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--page-pad-x)] pb-[120px] @7xl:px-0"
       style="gap: var(--stack-gap)"
     >
-      <!-- 商品明細（按購物車拆分，每台一張卡） -->
+      <!-- 訂單明細（按購物車拆分，每台一張卡） -->
       <section
         v-for="group in checkoutGroups"
         :key="group.id"
@@ -578,7 +602,7 @@ const handlePlaceOrder = () => {
       >
         <div class="cart-divider px-4 py-3">
           <span class="font-medium text-slate-700"
-            >{{ group.sellerName }} 商品明細</span
+            >{{ group.sellerName }} 訂單明細</span
           >
         </div>
         <div
@@ -680,6 +704,46 @@ const handlePlaceOrder = () => {
           </div>
         </div>
 
+        <!-- 優惠券 / 紅利點數：inline 選單，狀態仍為結帳全域共用 -->
+        <div
+          class="cart-divider-top flex flex-col gap-3 px-4 py-3 @3xl:flex-row @3xl:items-center @3xl:justify-between"
+        >
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="font-medium text-slate-700">優惠券</span>
+            <Button
+              :label="appliedCoupon ? appliedCoupon.title : '選擇優惠券'"
+              :icon="appliedCoupon ? 'pi pi-check' : 'pi pi-tag'"
+              severity="secondary"
+              outlined
+              size="small"
+              @click="handleOpenCouponDrawer"
+            />
+            <span
+              v-if="appliedCoupon && !manualCouponId"
+              class="text-xs text-slate-400"
+            >
+              （自動套用最優惠）
+            </span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+            <span class="font-medium">紅利點數</span>
+            <span>使用</span>
+            <InputNumber
+              v-model="rewardPoints"
+              :min="0"
+              show-buttons
+              button-layout="horizontal"
+              increment-button-icon="pi pi-plus"
+              decrement-button-icon="pi pi-minus"
+              class="qty-stepper"
+            />
+            <span>點</span>
+            <span class="text-xs text-slate-500">
+              / 尚有 <span style="color: var(--primary)">100</span> 點
+            </span>
+          </div>
+        </div>
+
         <div
           class="cart-divider-top flex items-center justify-end gap-4 px-4 py-4"
         >
@@ -689,59 +753,6 @@ const handlePlaceOrder = () => {
           <span class="text-2xl font-bold" style="color: var(--primary)"
             >${{ groupDisplayTotal(group).toLocaleString() }}</span
           >
-        </div>
-      </section>
-
-      <!-- Coupon -->
-      <section
-        class="shadow-card card-pad flex flex-col gap-4 rounded-xl bg-white @3xl:flex-row @3xl:flex-wrap @3xl:items-center @3xl:justify-between"
-      >
-        <span class="font-medium text-slate-700">優惠券</span>
-        <div
-          class="flex w-full flex-col gap-3 @3xl:w-auto @3xl:flex-row @3xl:flex-wrap @3xl:items-center"
-        >
-          <span
-            v-if="appliedCoupon"
-            class="flex items-center gap-1.5 text-sm text-green-600"
-          >
-            <i class="pi pi-check-circle" />
-            已套用『{{ appliedCoupon.title }}』
-            <span v-if="!manualCouponId" class="text-xs text-slate-400"
-              >（已自動套用最優惠）</span
-            >
-          </span>
-          <!-- 第一行：選擇可使用優惠券（手機獨佔一列） -->
-          <Button
-            label="選擇可使用優惠券"
-            class="!min-h-11 !w-full @3xl:!w-auto"
-            @click="handleOpenCouponDrawer"
-          />
-          <!-- 第二行（手機版）：輸入 + 掃描 QR 同列 -->
-          <div
-            class="flex w-full items-center gap-2 @3xl:w-auto @3xl:flex-wrap @3xl:gap-3"
-          >
-            <InputGroup class="min-w-0 flex-1 @3xl:w-[260px] @3xl:flex-none">
-              <InputText
-                v-model="couponCode"
-                placeholder="輸入優惠券優惠代碼"
-                @keyup.enter="handleApplyCouponCode"
-              />
-              <Button
-                label="使用"
-                severity="secondary"
-                outlined
-                @click="handleApplyCouponCode"
-              />
-            </InputGroup>
-            <Button
-              label="掃描"
-              icon="pi pi-qrcode"
-              severity="secondary"
-              outlined
-              class="shrink-0 @3xl:hidden"
-              @click="handleOpenCouponScanner"
-            />
-          </div>
         </div>
       </section>
 
@@ -807,27 +818,6 @@ const handlePlaceOrder = () => {
           <div class="flex flex-col gap-1">
             <label class="text-sm text-slate-700">Email</label>
             <InputText v-model="invoiceEmail" type="email" class="w-full" />
-          </div>
-        </div>
-      </section>
-
-      <!-- 金額折抵 -->
-      <section class="shadow-card overflow-hidden rounded-xl bg-white">
-        <div class="cart-divider px-4 py-3">
-          <span class="font-medium text-slate-700">金額折抵</span>
-        </div>
-        <div class="card-pad flex flex-col gap-4">
-          <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-            <span class="w-16 font-medium">紅利點數</span>
-            <span>使用</span>
-            <InputNumber v-model="rewardPoints" :min="0" class="w-40" />
-            <span>點</span>
-            <span class="text-slate-500">
-              <span aria-hidden="true">/</span>
-              尚有紅利點數
-              <span style="color: var(--primary)">100</span>
-              點可使用
-            </span>
           </div>
         </div>
       </section>
@@ -1589,6 +1579,11 @@ const handlePlaceOrder = () => {
   top: 0;
 }
 
+</style>
+
+<!-- 抽屜相關樣式改為非 scoped：Teleport 到 body 的節點失去 scoped attribute 時
+     backdrop / panel 會樣式失效，改用全域選擇器最穩。 -->
+<style>
 /* ===== Drawer =====
  * 抽屜以 frame 視覺座標定位（--frame-left / --frame-width / --frame-bottom 由 App.vue 設定），
  * 沒設時 fallback 到視窗座標。抽屜寬度直接等於 frame 寬度（= 視窗寬或模擬器寬），

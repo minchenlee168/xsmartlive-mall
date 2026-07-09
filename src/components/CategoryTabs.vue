@@ -10,11 +10,13 @@ import {
 import { useRoute, useRouter } from 'vue-router';
 import { useViewportStore } from '../pinia/viewport';
 import { useThemeStore } from '../pinia/theme';
+import { useAppModeStore } from '../pinia/appMode';
 
 const tabs = ['大童童裝', '小童童裝', '寶寶包屁', '親子裝', '生鮮', '廠商出清'];
 
 const themeStoreCT = useThemeStore();
 const isAurora = computed(() => themeStoreCT.current.id === 'aurora');
+const appMode = useAppModeStore();
 
 const route = useRoute();
 const router = useRouter();
@@ -103,9 +105,10 @@ watch(isMobile, () => {
 </script>
 
 <template>
-  <!-- tabs bar：sticky 在 frame 頂端，捲動內容時保持可見。Aurora 走全站 shell，不顯示。 -->
+  <!-- tabs bar：sticky 在 frame 頂端，捲動內容時保持可見。
+       Aurora shell 走全站樣式、直播主未用商城模式下皆不顯示分類 tabs。 -->
   <div
-    v-if="!isAurora"
+    v-if="!isAurora && !appMode.noShopMode"
     class="sticky top-0 z-40 w-full"
     style="background: var(--tabs-bg)"
   >
