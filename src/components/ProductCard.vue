@@ -59,14 +59,27 @@ const pickedTotal = computed(() =>
 const totalPickCount = computed(
   () => (product.value?.pickCount ?? 0) * qty.value,
 );
+/** 單一選項的限購上限：opt.maxQty × 購買組數（qty）。 */
 const optMaxQtyCard = (opt: { maxQty?: number }): number =>
-  (opt.maxQty ?? 1) * qty.value;
-const qtyOptionsForCard = (opt: { id: number; maxQty?: number }): number[] => {
-  const remaining = totalPickCount.value - pickedTotal.value;
-  const cur = pickedQty.value[opt.id] ?? 0;
-  const max = Math.min(optMaxQtyCard(opt), cur + Math.max(remaining, 0));
-  return Array.from({ length: max + 1 }, (_, i) => i);
-};
+  (opt.maxQty ?? 10) * qty.value;
+/** 是否超過總挑選數（用於紅色警示 + 阻擋送出）。 */
+const isPickOverCard = computed(
+  () =>
+    !!product.value?.isPickBundle && pickedTotal.value > totalPickCount.value,
+);
+/** 是否有任一選項超過該項限購 → 也走同一條紅色警示。 */
+const overLimitOptCard = computed(() => {
+  if (!product.value?.isPickBundle) return null;
+  return (
+    product.value.pickOptions?.find((opt) => {
+      const cur = pickedQty.value[opt.id] ?? 0;
+      return cur > optMaxQtyCard(opt);
+    }) ?? null
+  );
+});
+const hasPickWarningCard = computed(
+  () => isPickOverCard.value || !!overLimitOptCard.value,
+);
 const setPickQtyCard = (opt: { id: number; spec: string }, n: number): void => {
   pickedQty.value = { ...pickedQty.value, [opt.id]: n };
   if (n === 0) delete pickedSpecs.value[opt.id];
@@ -189,7 +202,23 @@ const handleConfirmBundleAdd = () => {
   const p = product.value;
   if (!p) return;
   if (p.isPickBundle) {
-    if (pickedTotal.value !== totalPickCount.value) {
+    // 單一子品超過該項限購 → 特定訊息
+    if (overLimitOptCard.value) {
+      const opt = overLimitOptCard.value;
+      ui.toast(
+        `「${opt.name}」限購 ${optMaxQtyCard(opt)} 個，請調整數量`,
+        'warn',
+      );
+      return;
+    }
+    if (pickedTotal.value > totalPickCount.value) {
+      ui.toast(
+        `已超過 ${totalPickCount.value} 件（目前 ${pickedTotal.value} 件），請減少數量`,
+        'warn',
+      );
+      return;
+    }
+    if (pickedTotal.value < totalPickCount.value) {
       ui.toast(`請選擇 ${totalPickCount.value} 件商品`, 'warn');
       return;
     }
@@ -505,8 +534,26 @@ const handleConfirmBundleAdd = () => {
         v-if="product?.isPickBundle && product.pickOptions?.length"
         class="flex flex-col gap-3"
       >
-        <div class="text-sm" style="color: var(--primary)">
+        <div
+          class="text-sm"
+          :class="hasPickWarningCard ? 'text-red-500' : ''"
+          :style="hasPickWarningCard ? '' : 'color: var(--primary)'"
+        >
           已選 {{ pickedTotal }} / {{ totalPickCount }}
+        </div>
+        <!-- 超選警示：單一限購超額 或 總量超過 -->
+        <div
+          v-if="hasPickWarningCard"
+          class="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
+        >
+          <i class="pi pi-exclamation-triangle mt-0.5 shrink-0" />
+          <span v-if="overLimitOptCard">
+            「{{ overLimitOptCard.name }}」限購
+            {{ optMaxQtyCard(overLimitOptCard) }} 個，請調整數量。
+          </span>
+          <span v-else>
+            已超過 {{ totalPickCount }} 件（目前 {{ pickedTotal }} 件），請減少數量。
+          </span>
         </div>
         <div
           v-for="opt in product.pickOptions"
@@ -551,12 +598,15 @@ const handleConfirmBundleAdd = () => {
               </div>
               <div class="flex items-center gap-2 text-sm text-slate-700">
                 <span class="w-[36px] shrink-0 text-slate-500">數量</span>
-                <Select
+                <!-- 不設 max：允許自由加減；超選由上方紅色 banner 提示 -->
+                <InputNumber
                   :model-value="pickedQty[opt.id] ?? 0"
-                  :options="qtyOptionsForCard(opt)"
-                  size="small"
-                  fluid
-                  class="min-w-0 flex-1"
+                  :min="0"
+                  show-buttons
+                  button-layout="horizontal"
+                  increment-button-icon="pi pi-plus"
+                  decrement-button-icon="pi pi-minus"
+                  class="qty-stepper min-w-0 flex-1"
                   @update:model-value="(v) => setPickQtyCard(opt, v)"
                 />
               </div>

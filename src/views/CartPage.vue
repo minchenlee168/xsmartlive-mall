@@ -251,9 +251,56 @@ const bundleNeedsAttention = (item: CartItem): boolean => {
   if (isPickBundleItem(item)) {
     const cat = products.find((p) => p.id === item.productId);
     const need = (cat?.pickCount ?? 0) * item.qty;
-    return subIssue || pickedTotalOf(item) !== need;
+    return subIssue || pickedTotalOf(item) !== need || pickBundleOverSub(item) !== null;
   }
   return subIssue;
+};
+
+/** 任選組合：找出「單一子品超過限購」的子品；沒有 → null。 */
+const pickBundleOverSub = (item: CartItem): CartBundleItem | null => {
+  if (!isPickBundleItem(item)) return null;
+  const cat = products.find((p) => p.id === item.productId);
+  if (!cat?.pickOptions) return null;
+  return (
+    item.bundleItems?.find((sub) => {
+      const opt = cat.pickOptions?.find((o) => o.name === sub.name);
+      const maxPerSub = (opt?.maxQty ?? 10) * item.qty;
+      return (sub.qty || 0) > maxPerSub;
+    }) ?? null
+  );
+};
+
+/**
+ * 任選組合的警示訊息：優先講超過的細節，再講不足 / 待補齊規格。
+ * 沒問題 → null；非任選組合 → 走通用「規格 / 數量未選」訊息。
+ */
+const bundleWarningMessage = (item: CartItem): string | null => {
+  if (!item.isBundle || !item.bundleItems) return null;
+  if (isPickBundleItem(item)) {
+    const cat = products.find((p) => p.id === item.productId);
+    const need = (cat?.pickCount ?? 0) * item.qty;
+    const total = pickedTotalOf(item);
+    const overSub = pickBundleOverSub(item);
+    if (overSub) {
+      const opt = cat?.pickOptions?.find((o) => o.name === overSub.name);
+      const maxPerSub = (opt?.maxQty ?? 10) * item.qty;
+      return `「${overSub.name}」限購 ${maxPerSub} 件，目前已選 ${overSub.qty} 件`;
+    }
+    if (total > need) {
+      return `已超出上限：需選 ${need} 件，目前已選 ${total} 件`;
+    }
+    if (total < need) {
+      return `需選擇 ${need} 件，目前已選 ${total} 件`;
+    }
+    // 數量剛好但某個子品有 qty>0 且缺規格
+    if (item.bundleItems.some((s) => subNeedsAttention(s, item))) {
+      return '部分品項尚未選擇規格';
+    }
+    return null;
+  }
+  return item.bundleItems.some((s) => subNeedsAttention(s, item))
+    ? '此組合商品尚未選擇規格或數量'
+    : null;
 };
 
 const subMissingText = (sub: CartBundleItem, item?: CartItem): string => {
@@ -368,12 +415,13 @@ const handleConfirmAddOn = () => {
 };
 
 const handleGoCheckout = () => {
-  // 已勾選的組合商品若有未選規格 / 數量 → 阻擋並提示
+  // 已勾選的組合商品若有未選規格 / 數量 → 阻擋並提示（訊息由 bundleWarningMessage 給細節）
   const incompleteBundle = groups.value
     .flatMap((g) => g.items)
     .find((i) => i.checked && bundleNeedsAttention(i));
   if (incompleteBundle) {
-    ui.toast(`「${incompleteBundle.name}」尚未選擇規格或數量`, 'warn');
+    const msg = bundleWarningMessage(incompleteBundle) ?? '尚未選擇規格或數量';
+    ui.toast(`「${incompleteBundle.name}」${msg}`, 'warn');
     return;
   }
   // 暫停結帳的購物車若不小心還有勾選商品 → 阻擋（正常流程 UI 已擋，這裡是最後防線）
@@ -656,15 +704,13 @@ const handleGoProduct = (productId?: number) => {
                 <span>組合商品</span>
               </button>
 
-              <!-- 未選規格 / 數量提示 banner -->
+              <!-- 未選 / 超選提示 banner：訊息由 bundleWarningMessage() 依情境給 -->
               <div
-                v-if="item.bundleExpanded && bundleNeedsAttention(item)"
+                v-if="item.bundleExpanded && bundleWarningMessage(item)"
                 class="mb-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-500"
               >
                 <i class="pi pi-exclamation-triangle text-base" />
-                <span
-                  >此組合商品尚未選擇規格或數量，請至商品頁完成選擇後再結帳</span
-                >
+                <span>{{ bundleWarningMessage(item) }}</span>
               </div>
 
               <!-- Sub-items grid：一律兩欄 -->
