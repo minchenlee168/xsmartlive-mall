@@ -50,6 +50,7 @@ export const useCartStore = defineStore('cart', () => {
           checked: true,
           isBundle: true,
           bundleExpanded: true,
+          note: '直播現場限定價，售完不補；下訂後 3–5 個工作天出貨。',
           bundleItems:
             products
               .find((p) => p.id === 100)
@@ -104,6 +105,7 @@ export const useCartStore = defineStore('cart', () => {
           price: 199,
           original: 250,
           checked: true,
+          note: '料理方式：滾水下鍋煮 8 分鐘即可食用。全程冷凍配送。',
         },
       ],
     },
@@ -128,6 +130,7 @@ export const useCartStore = defineStore('cart', () => {
           checked: true,
           isBundle: true,
           bundleExpanded: true,
+          note: '雙件為固定搭配，不接受單件替換；請於備註寫下想要的月齡。',
           bundleItems: [
             {
               name: '新款 包屁衣韓版小洋裝 秋冬刺繡款',

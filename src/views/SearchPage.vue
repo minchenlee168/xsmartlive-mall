@@ -32,16 +32,17 @@ const results = computed(() => {
     >
       <div class="flex flex-col" style="gap: var(--stack-gap)">
         <!-- Breadcrumb -->
-        <nav class="flex items-center gap-2 py-1 text-sm">
+        <nav class="flex items-center gap-3 py-1 text-base @7xl:text-lg">
           <Button
             icon="pi pi-home"
             severity="secondary"
             text
             rounded
             class="!min-h-11 !min-w-11"
+            :pt="{ icon: '!text-lg' }"
             @click="router.push('/shop')"
           />
-          <i class="pi pi-chevron-right text-xs text-slate-400" />
+          <i class="pi pi-chevron-right text-sm text-slate-400" />
           <span class="font-medium text-slate-500">搜尋結果</span>
         </nav>
 

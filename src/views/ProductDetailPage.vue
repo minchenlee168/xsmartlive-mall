@@ -215,7 +215,7 @@ const handleNextThumb = () => {
       <div class="flex flex-col" style="gap: var(--stack-gap)">
         <!-- Breadcrumb（手機超過容器寬 → 商品名 truncate 顯示 ...） -->
         <nav
-          class="flex min-w-0 items-center gap-[7px] overflow-hidden py-1 text-sm"
+          class="flex min-w-0 items-center gap-3 overflow-hidden py-1 text-base @7xl:text-lg"
         >
           <Button
             icon="pi pi-home"
@@ -223,16 +223,17 @@ const handleNextThumb = () => {
             text
             rounded
             class="!min-h-11 !min-w-11 shrink-0"
+            :pt="{ icon: '!text-lg' }"
             @click="router.push('/shop')"
           />
-          <i class="pi pi-chevron-right shrink-0 text-xs text-slate-400" />
+          <i class="pi pi-chevron-right shrink-0 text-sm text-slate-400" />
           <!-- 從主題館進來：中間段顯示「返回」回上一頁 -->
           <Button
             v-if="fromTheme"
             label="返回"
             severity="secondary"
             text
-            class="shrink-0 !font-medium !text-slate-500"
+            class="shrink-0 !text-base !font-medium !text-slate-500 @7xl:!text-lg"
             @click="router.back()"
           />
           <Button
@@ -240,12 +241,12 @@ const handleNextThumb = () => {
             :label="product.category"
             severity="secondary"
             text
-            class="shrink-0 !font-medium !text-slate-500"
+            class="shrink-0 !text-base !font-medium !text-slate-500 @7xl:!text-lg"
             @click="
               router.push(`/category/${encodeURIComponent(product.category!)}`)
             "
           />
-          <i class="pi pi-chevron-right shrink-0 text-xs text-slate-400" />
+          <i class="pi pi-chevron-right shrink-0 text-sm text-slate-400" />
           <span class="min-w-0 flex-1 truncate text-slate-500">{{
             product.name
           }}</span>
