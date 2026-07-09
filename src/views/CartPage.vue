@@ -94,6 +94,32 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
   },
 ];
 
+// Livebuy 直播回放：第一張為「最新場次」大卡（有日期 + 時間），其餘為過往回放縮圖 + 時長
+interface LiveReplay {
+  id: string;
+  title: string;
+  duration?: string;
+  isFeatured?: boolean;
+  date?: string;
+  time?: string;
+  muted?: boolean;
+}
+const LIVE_REPLAYS: LiveReplay[] = [
+  {
+    id: 'lr1',
+    title: '729',
+    isFeatured: true,
+    date: 'Jan 13, 2026',
+    time: '14:24',
+  },
+  { id: 'lr2', title: '0707', duration: '06:18', muted: true },
+  { id: 'lr3', title: '20260629', duration: '07:26', muted: true },
+  { id: 'lr4', title: '0622', duration: '04:14', muted: true },
+  { id: 'lr5', title: '0622', duration: '13:34', muted: true },
+  { id: 'lr6', title: '0615', duration: '09:52', muted: true },
+  { id: 'lr7', title: '0608', duration: '11:07', muted: true },
+];
+
 const router = useRouter();
 const ui = useUiStore();
 const cart = useCartStore();
@@ -312,6 +338,13 @@ onUnmounted(() => {
 
 const vp = computed(() => useViewportStore().current.id);
 const isPC = computed(() => vp.value === 'pc');
+/** 直播回放 Carousel 每頁張數：手機 2 / 平板 3 / PC 5 */
+const replayPerView = computed(() =>
+  vp.value === 'mobile' ? 2 : vp.value === 'tablet' ? 3 : 5,
+);
+const handleGoReplay = (r: LiveReplay) => {
+  ui.toast(`回放「${r.title}」尚未開放（示意）`);
+};
 
 const handleConfirmAddOn = () => {
   const p = addOnDialog.value;
@@ -825,6 +858,85 @@ const handleGoProduct = (productId?: number) => {
           </div>
         </div>
       </section>
+
+      <!-- Livebuy 直播回放加購區：橫向 Carousel + 第一張是最新場次大卡 -->
+      <section class="shadow-card rounded-xl bg-white">
+        <div class="border-b border-slate-200 px-6 pt-6 pb-3">
+          <h2
+            class="text-center text-xl font-semibold text-slate-800 @7xl:text-2xl"
+          >
+            Livebuy直播回放加購區
+          </h2>
+        </div>
+        <p class="pt-3 text-center text-sm text-slate-500">
+          只要點選商品的圖片，就會跳轉到直播回放介紹
+        </p>
+        <div class="live-replay-carousel px-4 py-4 @3xl:px-8">
+          <Carousel
+            :key="replayPerView"
+            :value="LIVE_REPLAYS"
+            :num-visible="replayPerView"
+            :num-scroll="1"
+          >
+            <template #item="{ data }">
+              <div class="h-full px-2">
+                <button
+                  type="button"
+                  class="flex w-full flex-col items-center gap-2 transition-transform hover:scale-[1.02]"
+                  @click="handleGoReplay(data)"
+                >
+                  <div
+                    class="relative aspect-[3/5] w-full overflow-hidden rounded-xl"
+                    style="background: #1e2530"
+                  >
+                    <!-- Featured 卡：紅色 L 底 + 日期 / 時間 疊字 -->
+                    <template v-if="data.isFeatured">
+                      <span
+                        class="absolute inset-0 flex items-center justify-center leading-none font-black select-none"
+                        style="
+                          color: #932c2c;
+                          font-family: system-ui, -apple-system, sans-serif;
+                          font-size: min(60cqw, 220px);
+                        "
+                      >
+                        L
+                      </span>
+                      <div
+                        class="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center text-white"
+                      >
+                        <span class="text-xs @7xl:text-sm">
+                          {{ data.date }}
+                        </span>
+                        <span
+                          class="text-2xl leading-tight font-bold @7xl:text-4xl"
+                        >
+                          {{ data.time }}
+                        </span>
+                      </div>
+                    </template>
+                    <!-- 一般回放卡：播放時長 + 靜音 icon -->
+                    <template v-else>
+                      <div
+                        class="absolute top-3 left-3 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-xs text-white"
+                      >
+                        <i class="pi pi-play text-[10px]" />
+                        {{ data.duration }}
+                      </div>
+                      <div
+                        v-if="data.muted"
+                        class="absolute top-3 right-3 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                      >
+                        <i class="pi pi-volume-off text-[10px]" />
+                      </div>
+                    </template>
+                  </div>
+                  <span class="text-sm text-slate-700">{{ data.title }}</span>
+                </button>
+              </div>
+            </template>
+          </Carousel>
+        </div>
+      </section>
     </main>
 
     <!-- Sticky footer -->
@@ -1010,5 +1122,41 @@ const handleGoProduct = (productId?: number) => {
 }
 .cart-divider-top::before {
   top: 0;
+}
+
+/* Livebuy 直播回放 Carousel：左右切換鈕做成白底圓形，跟主題館一致 */
+.live-replay-carousel :deep(.p-carousel-prev-button),
+.live-replay-carousel :deep(.p-carousel-next-button) {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    box-shadow 0.2s;
+}
+.live-replay-carousel :deep(.p-carousel-prev-button:hover),
+.live-replay-carousel :deep(.p-carousel-next-button:hover) {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+.live-replay-carousel :deep(.p-carousel-prev-button:disabled),
+.live-replay-carousel :deep(.p-carousel-next-button:disabled) {
+  opacity: 0.4;
+}
+.live-replay-carousel :deep(.p-carousel-prev-button .p-icon),
+.live-replay-carousel :deep(.p-carousel-next-button .p-icon) {
+  width: 18px;
+  height: 18px;
+}
+
+/* Featured card 的 L 底字使用 container query 單位：讓字大小隨卡片寬度縮放 */
+.live-replay-carousel :deep(.p-carousel-item) {
+  container-type: inline-size;
 }
 </style>

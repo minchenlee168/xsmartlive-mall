@@ -76,8 +76,7 @@ const ui = useUiStore();
 const cartStore = useCartStore();
 const ordersStore = useOrdersStore();
 
-/** 依購物車拆組的商品明細；每組只保留有勾選的商品。
- *  直接引用 cart store 的 items，讓數量調整可反寫回 store。 */
+/** 依購物車拆組的商品明細；每組只保留有勾選的商品（結帳頁只讀，不可改動）。 */
 const checkoutGroups = computed<CheckoutGroup[]>(() =>
   cartStore.groups
     .map((g) => ({
@@ -603,17 +602,8 @@ const handlePlaceOrder = () => {
                 <span class="shrink-0">規格</span>
                 <span class="truncate">{{ item.spec }}</span>
               </div>
-              <div class="flex items-center gap-3 text-sm text-slate-700">
-                <span>數量</span>
-                <InputNumber
-                  v-model="item.qty"
-                  :min="1"
-                  show-buttons
-                  button-layout="horizontal"
-                  increment-button-icon="pi pi-plus"
-                  decrement-button-icon="pi pi-minus"
-                  class="qty-stepper"
-                />
+              <div class="flex gap-4 text-sm text-slate-700">
+                <span>數量</span><span>{{ item.qty }}</span>
               </div>
               <!-- 買多優惠明細 -->
               <div

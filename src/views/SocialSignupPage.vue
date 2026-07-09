@@ -108,6 +108,8 @@ const handleGoVerify = () => {
 const verifyCountryCode = ref('+886');
 const verifyPhone = ref('');
 const verifyCode = ref('');
+/** 是否已按過「發送驗證碼」→ 決定要顯示發送按鈕 or 驗證碼輸入區。 */
+const hasSentCode = ref(false);
 const {
   remaining: resendCountdown,
   start: startResendCountdown,
@@ -121,6 +123,7 @@ const canSubmitVerify = computed(
 );
 const handleSendVerifyCode = () => {
   if (!canSendVerifyCode.value) return;
+  hasSentCode.value = true;
   startResendCountdown(RESEND_COOLDOWN_SEC);
   ui.toast('驗證碼已發送（示意）');
 };
@@ -131,6 +134,7 @@ const handleSubmitVerify = () => {
 const handleBackToReview = () => {
   resetResendCountdown();
   verifyCode.value = '';
+  hasSentCode.value = false;
   step.value = 'review';
 };
 
@@ -399,22 +403,37 @@ const handleBackToLogin = () => {
               <label class="text-sm font-medium text-slate-700"
                 >簡訊驗證碼</label
               >
-              <div class="flex items-stretch gap-2">
+              <!-- 尚未發送過：只顯示「發送驗證碼」按鈕 -->
+              <Button
+                v-if="!hasSentCode"
+                :disabled="!canSendVerifyCode"
+                label="發送驗證碼"
+                class="!min-h-11 w-full"
+                @click="handleSendVerifyCode"
+              />
+              <!-- 已發送過：顯示驗證碼輸入框 + 底下「重新發送驗證碼」連結 -->
+              <template v-else>
                 <InputText
                   v-model="verifyCode"
                   :maxlength="SMS_CODE_LENGTH"
                   placeholder="請輸入六位數驗證碼"
-                  class="min-w-0 flex-1"
+                  class="w-full"
                 />
-                <Button
+                <button
+                  type="button"
+                  class="mt-1 self-start cursor-pointer text-sm underline disabled:cursor-not-allowed disabled:no-underline"
+                  :class="canSendVerifyCode ? '' : 'text-slate-400'"
+                  :style="canSendVerifyCode ? { color: 'var(--primary)' } : {}"
                   :disabled="!canSendVerifyCode"
-                  :label="
-                    resendCountdown > 0 ? `${resendCountdown}s` : '發送驗證碼'
-                  "
-                  class="shrink-0 whitespace-nowrap"
                   @click="handleSendVerifyCode"
-                />
-              </div>
+                >
+                  {{
+                    resendCountdown > 0
+                      ? `${resendCountdown} 秒後可重新發送`
+                      : '重新發送驗證碼'
+                  }}
+                </button>
+              </template>
             </div>
           </div>
 
