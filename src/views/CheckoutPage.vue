@@ -1,27 +1,23 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
 import { useUiStore } from '../pinia/ui';
-import { useCartStore } from '../pinia/cart';
+import {
+  useCartStore,
+  type CartItem,
+  type ShippingMethodId,
+  type PaymentMethodId,
+} from '../pinia/cart';
 import { useOrdersStore } from '../pinia/orders';
 
-interface SubItem {
-  name: string;
-  image?: string;
-  spec: string;
-  qty: number;
-}
-interface Item {
-  id: string;
-  productId?: number;
-  name: string;
-  image?: string;
-  spec: string[];
-  qty: number;
-  price: number;
-  bundleItems?: SubItem[];
+interface CheckoutGroup {
+  id: number;
+  sellerName: string;
+  items: CartItem[];
+  shippingMethods: ShippingMethodId[];
+  paymentMethods: PaymentMethodId[];
 }
 interface Coupon {
   id: string;
@@ -73,7 +69,6 @@ const DRAWER_DISTRICTS = ['前鎮區', '三民區', '信義區'];
 const HOME_SHIPPING_FEE = 150;
 const STORE_SHIPPING_FEE = 60;
 const OTHER_GROUP_FEE = 100;
-const MULTI_ITEM_DISCOUNT = -100;
 const SHIPPING_DISCOUNT = -200;
 
 const router = useRouter();
@@ -81,23 +76,62 @@ const ui = useUiStore();
 const cartStore = useCartStore();
 const ordersStore = useOrdersStore();
 
-const allItems = computed<Item[]>(() =>
+/** 依購物車拆組的商品明細；每組只保留有勾選的商品。
+ *  直接引用 cart store 的 items，讓數量調整可反寫回 store。 */
+const checkoutGroups = computed<CheckoutGroup[]>(() =>
   cartStore.groups
-    .flatMap((g) => g.items)
-    .filter((i) => i.checked)
-    .map((i) => ({
-      id: i.id,
-      productId: i.productId,
-      name: i.name,
-      image: i.image,
-      spec: [i.spec],
-      qty: i.qty,
-      price: i.price,
-      bundleItems: i.bundleItems,
-    })),
+    .map((g) => ({
+      id: g.id,
+      sellerName: g.sellerName,
+      items: g.items.filter((i) => i.checked),
+      shippingMethods: g.shippingMethods,
+      paymentMethods: g.paymentMethods,
+    }))
+    .filter((g) => g.items.length > 0),
 );
+
+/** 各購物車支援的運送方式取交集 → 合併結帳可用的運送方式。 */
+const supportedShippingMethods = computed<ShippingMethodId[]>(() => {
+  const groups = checkoutGroups.value;
+  if (groups.length === 0) return [];
+  return groups[0].shippingMethods.filter((m) =>
+    groups.every((g) => g.shippingMethods.includes(m)),
+  );
+});
+/** 各購物車支援的付款方式取交集。 */
+const supportedPaymentMethods = computed<PaymentMethodId[]>(() => {
+  const groups = checkoutGroups.value;
+  if (groups.length === 0) return [];
+  return groups[0].paymentMethods.filter((m) =>
+    groups.every((g) => g.paymentMethods.includes(m)),
+  );
+});
+
+const allItems = computed<CartItem[]>(() =>
+  checkoutGroups.value.flatMap((g) => g.items),
+);
+
+/** 買多優惠判定與計算。 */
+const hasBulkDiscount = (item: CartItem): boolean =>
+  !!item.bulkDiscount && item.qty >= item.bulkDiscount.minQty;
+const effectiveUnitPrice = (item: CartItem): number =>
+  hasBulkDiscount(item) ? item.bulkDiscount!.unitPrice : item.price;
+const bulkDiscountAmount = (item: CartItem): number =>
+  hasBulkDiscount(item)
+    ? (item.price - item.bulkDiscount!.unitPrice) * item.qty
+    : 0;
+
+/** 商品總金額（未套用任何優惠）。 */
 const itemsSubtotal = computed(() =>
   allItems.value.reduce((s, i) => s + i.price * i.qty, 0),
+);
+/** 買多優惠折抵總額。 */
+const bulkDiscountTotal = computed(() =>
+  allItems.value.reduce((s, i) => s + bulkDiscountAmount(i), 0),
+);
+/** 商品總金額（扣掉買多優惠後）。 */
+const itemsAfterBulk = computed(
+  () => itemsSubtotal.value - bulkDiscountTotal.value,
 );
 
 onMounted(() => {
@@ -160,10 +194,10 @@ const isCouponDrawerVisible = ref(false);
 const couponDrawerSelected = ref<string | null>(null);
 
 const isCouponUsable = (c: Coupon) =>
-  !c.disabled && itemsSubtotal.value >= (c.minSpend ?? 0);
+  !c.disabled && itemsAfterBulk.value >= (c.minSpend ?? 0);
 const couponUnusableReason = (c: Coupon) => {
   if (c.disabled) return c.disabledReason ?? '不可使用';
-  if (c.minSpend && itemsSubtotal.value < c.minSpend) return '金額未達門檻';
+  if (c.minSpend && itemsAfterBulk.value < c.minSpend) return '金額未達門檻';
   return '';
 };
 const discountOf = (c: Coupon): number => {
@@ -173,7 +207,8 @@ const discountOf = (c: Coupon): number => {
       c.applicableItemIds!.includes(i.id),
     );
     if (!target) return 0;
-    const line = target.price * target.qty;
+    // 優惠券以買多優惠後的金額為基底再折抵
+    const line = effectiveUnitPrice(target) * target.qty;
     const fixed = c.amount.match(/折(\d+)/);
     if (fixed) return Math.min(line, Number(fixed[1]));
     const pct = c.amount.match(/(\d+)%/);
@@ -184,7 +219,7 @@ const discountOf = (c: Coupon): number => {
   if (fixed) return Number(fixed[1]);
   const pct = c.amount.match(/(\d+)%/);
   if (pct)
-    return Math.round((itemsSubtotal.value * (100 - Number(pct[1]))) / 100);
+    return Math.round((itemsAfterBulk.value * (100 - Number(pct[1]))) / 100);
   return 0;
 };
 
@@ -215,19 +250,24 @@ const couponAppliesTo = (itemId: string) => {
   if (!c || !c.applicableItemIds) return true;
   return c.applicableItemIds.includes(itemId);
 };
-const lineTotal = (item: Item) => item.price * item.qty;
-const discountedLineTotal = (item: Item): number | null => {
+/** 原始總計（單價 × 數量），不含任何優惠。 */
+const lineTotal = (item: CartItem) => item.price * item.qty;
+/** 買多優惠後總計（不含優惠券）。 */
+const lineTotalAfterBulk = (item: CartItem) =>
+  effectiveUnitPrice(item) * item.qty;
+/** 套用優惠券後的總計；沒吃到本券的商品回傳 null。 */
+const discountedLineTotal = (item: CartItem): number | null => {
   const c = appliedCoupon.value;
   if (!c || !c.applicableItemIds || !c.applicableItemIds.includes(item.id))
     return null;
-  return Math.max(0, lineTotal(item) - discountOf(c));
+  return Math.max(0, lineTotalAfterBulk(item) - discountOf(c));
 };
-const itemsDisplayTotal = computed(() =>
-  allItems.value.reduce(
-    (s, i) => s + (discountedLineTotal(i) ?? lineTotal(i)),
+/** 依購物車拆組後的每組小計（買多優惠後、優惠券後）。 */
+const groupDisplayTotal = (g: CheckoutGroup): number =>
+  g.items.reduce(
+    (s, i) => s + (discountedLineTotal(i) ?? lineTotalAfterBulk(i)),
     0,
-  ),
-);
+  );
 
 const handleOpenCouponDrawer = () => {
   couponDrawerSelected.value =
@@ -423,10 +463,43 @@ const selectedStore = computed(() =>
 );
 
 const rewardPoints = ref<number | null>(null);
-const paymentMethod = ref('credit');
+const paymentMethod = ref<PaymentMethodId>('credit');
+
+/** 依交集過濾的付款方式選項 → 直接餵給 Select。 */
+const availablePaymentMethods = computed(() =>
+  PAYMENT_METHODS.filter((m) =>
+    supportedPaymentMethods.value.includes(m.value as PaymentMethodId),
+  ),
+);
+
+// 目前選中的運送 / 付款方式若不在交集中 → 切成第一個可用的
+watch(
+  supportedShippingMethods,
+  (methods) => {
+    if (methods.length === 0) {
+      shipMethod.value = null;
+      return;
+    }
+    if (!shipMethod.value || !methods.includes(shipMethod.value)) {
+      shipMethod.value = methods[0];
+    }
+  },
+  { immediate: true },
+);
+watch(
+  supportedPaymentMethods,
+  (methods) => {
+    if (methods.length === 0) return;
+    if (!methods.includes(paymentMethod.value)) {
+      paymentMethod.value = methods[0];
+    }
+  },
+  { immediate: true },
+);
 
 const productTotal = computed(() => itemsSubtotal.value);
 const shippingTotal = computed(() => shippingFee.value + OTHER_GROUP_FEE);
+const bulkDiscount = computed(() => -bulkDiscountTotal.value);
 const couponDiscount = computed(() =>
   appliedCoupon.value ? -discountOf(appliedCoupon.value) : 0,
 );
@@ -437,14 +510,14 @@ const finalTotal = computed(
   () =>
     productTotal.value +
     shippingTotal.value +
-    MULTI_ITEM_DISCOUNT +
+    bulkDiscount.value +
     SHIPPING_DISCOUNT +
     couponDiscount.value -
     rewardPointsNum.value,
 );
 const totalSaved = computed(
   () =>
-    Math.abs(MULTI_ITEM_DISCOUNT + SHIPPING_DISCOUNT + couponDiscount.value) +
+    Math.abs(bulkDiscount.value + SHIPPING_DISCOUNT + couponDiscount.value) +
     rewardPointsNum.value,
 );
 
@@ -455,8 +528,8 @@ const handlePlaceOrder = () => {
   const orderItems = allItems.value.map((i) => ({
     name: i.name,
     image: i.image,
-    spec: i.spec.filter((s) => s && s !== '預設').join(' / ') || '預設',
-    price: i.price,
+    spec: i.spec || '預設',
+    price: effectiveUnitPrice(i),
     qty: i.qty,
   }));
   ordersStore.placeOrder({
@@ -498,15 +571,21 @@ const handlePlaceOrder = () => {
       class="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--page-pad-x)] pb-[120px] @7xl:px-0"
       style="gap: var(--stack-gap)"
     >
-      <!-- 商品明細（不分賣場，單一列表） -->
-      <section class="shadow-card rounded-xl bg-white">
+      <!-- 商品明細（按購物車拆分，每台一張卡） -->
+      <section
+        v-for="group in checkoutGroups"
+        :key="group.id"
+        class="shadow-card rounded-xl bg-white"
+      >
         <div class="cart-divider px-4 py-3">
-          <span class="font-medium text-slate-700">商品明細</span>
+          <span class="font-medium text-slate-700"
+            >{{ group.sellerName }} 商品明細</span
+          >
         </div>
         <div
-          v-for="(item, ii) in allItems"
+          v-for="(item, ii) in group.items"
           :key="item.id"
-          :class="ii !== allItems.length - 1 ? 'cart-divider' : ''"
+          :class="ii !== group.items.length - 1 ? 'cart-divider' : ''"
         >
           <div class="flex items-start gap-4 px-4 py-3">
             <div class="h-14 w-14 shrink-0 overflow-hidden rounded">
@@ -517,19 +596,35 @@ const handlePlaceOrder = () => {
                 {{ item.name }}
               </p>
               <!-- 規格列：組合商品的規格寫在底下子品，這裡不重複顯示 -->
-              <template v-if="!item.bundleItems">
-                <template v-for="(s, si) in item.spec" :key="si">
-                  <div
-                    v-if="s && s !== '預設'"
-                    class="flex gap-4 text-sm text-slate-700"
-                  >
-                    <span class="shrink-0">規格</span>
-                    <span class="truncate">{{ s }}</span>
-                  </div>
-                </template>
-              </template>
-              <div class="flex gap-4 text-sm text-slate-700">
-                <span>數量</span><span>{{ item.qty }}</span>
+              <div
+                v-if="!item.bundleItems && item.spec && item.spec !== '預設'"
+                class="flex gap-4 text-sm text-slate-700"
+              >
+                <span class="shrink-0">規格</span>
+                <span class="truncate">{{ item.spec }}</span>
+              </div>
+              <div class="flex items-center gap-3 text-sm text-slate-700">
+                <span>數量</span>
+                <InputNumber
+                  v-model="item.qty"
+                  :min="1"
+                  show-buttons
+                  button-layout="horizontal"
+                  increment-button-icon="pi pi-plus"
+                  decrement-button-icon="pi pi-minus"
+                  class="qty-stepper"
+                />
+              </div>
+              <!-- 買多優惠明細 -->
+              <div
+                v-if="hasBulkDiscount(item)"
+                class="mt-0.5 flex items-center gap-1.5 text-xs text-green-700"
+              >
+                <i class="pi pi-tag text-[10px]" />
+                <span>{{ item.bulkDiscount!.note }}</span>
+                <span class="font-medium">
+                  · 已折抵 -${{ bulkDiscountAmount(item).toLocaleString() }}
+                </span>
               </div>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-0.5 text-right">
@@ -539,12 +634,31 @@ const handlePlaceOrder = () => {
                   severity="success"
                   class="!py-0.5 !text-xs"
                 />
-                <span class="text-sm text-slate-400 line-through"
-                  >${{ lineTotal(item).toLocaleString() }}</span
+                <span class="text-sm text-slate-400 line-through">
+                  ${{ lineTotal(item).toLocaleString() }}
+                </span>
+                <span
+                  v-if="hasBulkDiscount(item)"
+                  class="text-xs text-slate-500"
                 >
-                <span class="text-base font-bold" style="color: var(--primary)"
-                  >${{ discountedLineTotal(item)?.toLocaleString() }}</span
-                >
+                  買多優惠後 ${{ lineTotalAfterBulk(item).toLocaleString() }}
+                </span>
+                <span class="text-base font-bold" style="color: var(--primary)">
+                  ${{ discountedLineTotal(item)?.toLocaleString() }}
+                </span>
+              </template>
+              <template v-else-if="hasBulkDiscount(item)">
+                <Tag
+                  value="已套用買多優惠"
+                  severity="success"
+                  class="!py-0.5 !text-xs"
+                />
+                <span class="text-sm text-slate-400 line-through">
+                  ${{ lineTotal(item).toLocaleString() }}
+                </span>
+                <span class="text-base font-bold" style="color: var(--primary)">
+                  ${{ lineTotalAfterBulk(item).toLocaleString() }}
+                </span>
               </template>
               <template v-else>
                 <Tag
@@ -553,9 +667,9 @@ const handlePlaceOrder = () => {
                   severity="secondary"
                   class="!bg-slate-100 !py-0.5 !text-xs !text-slate-400"
                 />
-                <span class="font-medium text-slate-700"
-                  >${{ lineTotal(item).toLocaleString() }}</span
-                >
+                <span class="font-medium text-slate-700">
+                  ${{ lineTotal(item).toLocaleString() }}
+                </span>
               </template>
             </div>
           </div>
@@ -580,10 +694,10 @@ const handlePlaceOrder = () => {
           class="cart-divider-top flex items-center justify-end gap-4 px-4 py-4"
         >
           <span class="text-sm text-slate-700"
-            >訂單金額小計 ({{ allItems.length }}個商品)</span
+            >訂單金額小計 ({{ group.items.length }}個商品)</span
           >
           <span class="text-2xl font-bold" style="color: var(--primary)"
-            >${{ itemsDisplayTotal.toLocaleString() }}</span
+            >${{ groupDisplayTotal(group).toLocaleString() }}</span
           >
         </div>
       </section>
@@ -737,11 +851,18 @@ const handlePlaceOrder = () => {
           <label class="mb-1 block text-sm text-slate-700">選擇付款方式</label>
           <Select
             v-model="paymentMethod"
-            :options="PAYMENT_METHODS"
+            :options="availablePaymentMethods"
             option-label="label"
             option-value="value"
             class="w-full"
           />
+          <p
+            v-if="availablePaymentMethods.length < PAYMENT_METHODS.length"
+            class="mt-2 text-xs text-slate-500"
+          >
+            <i class="pi pi-info-circle mr-1" />
+            部分付款方式因您勾選的購物車不共同支援，已自動隱藏。
+          </p>
         </div>
       </section>
 
@@ -764,12 +885,14 @@ const handlePlaceOrder = () => {
             >$ {{ shippingTotal.toLocaleString() }}</span
           >
 
-          <!-- 多件優惠折抵 -->
-          <div></div>
-          <span class="text-slate-700">多件優惠折抵</span>
-          <span class="text-right text-red-500"
-            >- $ {{ Math.abs(MULTI_ITEM_DISCOUNT).toLocaleString() }}</span
-          >
+          <!-- 多件優惠折抵（動態：買多優惠加總） -->
+          <template v-if="bulkDiscountTotal > 0">
+            <div></div>
+            <span class="text-slate-700">多件優惠折抵</span>
+            <span class="text-right text-red-500"
+              >- $ {{ bulkDiscountTotal.toLocaleString() }}</span
+            >
+          </template>
 
           <!-- 符合『滿千免運』提示 -->
           <!-- 手機：col-span-3 整列顯示在運費折抵上方 -->
@@ -1070,8 +1193,18 @@ const handlePlaceOrder = () => {
               </div>
 
               <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+                <p
+                  v-if="
+                    supportedShippingMethods.length <
+                    (['home', 'store'] as ShippingMethodId[]).length
+                  "
+                  class="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700"
+                >
+                  <i class="pi pi-info-circle mr-1" />
+                  部分運送方式因您勾選的購物車不共同支援，已自動隱藏。
+                </p>
                 <!-- Home -->
-                <div>
+                <div v-if="supportedShippingMethods.includes('home')">
                   <Button
                     severity="secondary"
                     class="!min-h-11 !w-full !justify-between"
@@ -1161,7 +1294,7 @@ const handlePlaceOrder = () => {
                 </div>
 
                 <!-- Store -->
-                <div>
+                <div v-if="supportedShippingMethods.includes('store')">
                   <Button
                     severity="secondary"
                     class="!min-h-11 !w-full !justify-between"

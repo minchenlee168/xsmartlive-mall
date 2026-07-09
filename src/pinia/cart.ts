@@ -9,6 +9,9 @@ export type {
   CartItem,
   CartBundleItem,
   CartTag,
+  BulkDiscount,
+  ShippingMethodId,
+  PaymentMethodId,
 } from '../types/cart';
 
 export const useCartStore = defineStore('cart', () => {
@@ -16,7 +19,10 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 1,
       sellerName: '春節烹飪好禮直播連線',
-      tags: [{ label: '低溫配送', type: 'info' }],
+      tags: [{ label: '冷凍', type: 'info' }],
+      // 冷凍商品僅支援宅配，且不收貨到付款
+      shippingMethods: ['home'],
+      paymentMethods: ['credit', 'atm'],
       items: [
         {
           id: 'i1',
@@ -30,6 +36,11 @@ export const useCartStore = defineStore('cart', () => {
           checked: true,
           isBundle: true,
           bundleExpanded: true,
+          bulkDiscount: {
+            minQty: 2,
+            unitPrice: 1080,
+            note: '買 2 件以上每件 $1,080（省 $200/件）',
+          },
           bundleItems:
             products
               .find((p) => p.id === 100)
@@ -90,9 +101,11 @@ export const useCartStore = defineStore('cart', () => {
       id: 2,
       sellerName: '兒童大廠清倉',
       tags: [
-        { label: '一般配送', type: 'secondary' },
+        { label: '常溫', type: 'secondary' },
         { label: '禁止棄標', type: 'danger' },
       ],
+      shippingMethods: ['home', 'store'],
+      paymentMethods: ['credit', 'atm', 'cod'],
       items: [
         {
           id: 'i4',
@@ -156,7 +169,14 @@ export const useCartStore = defineStore('cart', () => {
       (g) => !g.tags.some((t) => t.label === '禁止棄標'),
     );
     if (!target) {
-      target = { id: Date.now(), sellerName: '我的商店', tags: [], items: [] };
+      target = {
+        id: Date.now(),
+        sellerName: '我的商店',
+        tags: [],
+        items: [],
+        shippingMethods: ['home', 'store'],
+        paymentMethods: ['credit', 'atm', 'cod'],
+      };
       groups.value.unshift(target);
     }
     // 同商品（同 productId）且同規格 → 合併累加數量，不另開一列

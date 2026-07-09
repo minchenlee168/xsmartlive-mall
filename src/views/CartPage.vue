@@ -93,9 +93,6 @@ const cart = useCartStore();
 const groups = computed(() => cart.groups);
 const isEmpty = computed(() => groups.value.every((g) => g.items.length === 0));
 
-// 不同配送方式 → 阻擋共同結帳並彈窗請使用者拆單
-const isMixedShippingDialogVisible = ref(false);
-
 // 圖片放大預覽
 const isImagePreviewOpen = ref(false);
 const previewImageSrc = ref<string | undefined>();
@@ -106,13 +103,19 @@ const handleOpenImagePreview = (src: string | undefined, alt: string): void => {
   previewImageAlt.value = alt;
   isImagePreviewOpen.value = true;
 };
-const mixedShippingMethods = ref<string[]>([]);
+/** 是否命中買多優惠：qty 達 minQty。 */
+const hasBulkDiscount = (item: CartItem): boolean =>
+  !!item.bulkDiscount && item.qty >= item.bulkDiscount.minQty;
 
-/** 找到該購物車對應的配送方式 tag（label 含「配送」字樣的那個）。 */
-const getGroupShipping = (group: CartGroup): string | null => {
-  const tag = group.tags.find((tg) => tg.label.includes('配送'));
-  return tag ? tag.label : null;
-};
+/** 商品目前實際單價（達門檻 → 折抵單價；否則 → 原價）。 */
+const effectiveUnitPrice = (item: CartItem): number =>
+  hasBulkDiscount(item) ? item.bulkDiscount!.unitPrice : item.price;
+
+/** 商品折抵金額（達門檻才有）。 */
+const bulkDiscountAmount = (item: CartItem): number =>
+  hasBulkDiscount(item)
+    ? (item.price - item.bulkDiscount!.unitPrice) * item.qty
+    : 0;
 
 const isGroupAllChecked = (group: CartGroup) =>
   group.items.length > 0 && group.items.every((i) => i.checked);
@@ -138,7 +141,9 @@ const toggleGlobalAll = () => {
 };
 
 const groupSubtotal = (group: CartGroup) =>
-  group.items.filter((i) => i.checked).reduce((s, i) => s + i.price * i.qty, 0);
+  group.items
+    .filter((i) => i.checked)
+    .reduce((s, i) => s + effectiveUnitPrice(i) * i.qty, 0);
 
 const globalTotal = computed(() =>
   groups.value.reduce((s, g) => s + groupSubtotal(g), 0),
@@ -219,19 +224,6 @@ const setSubSpec = (sub: CartBundleItem, value: string) => {
   sub.spec = value;
 };
 
-/** 任選組合：單一子品可選的數量清單 0 ~ min(maxQty × itemQty, 已挑 + 剩餘額度)。 */
-const subQtyOptionsFor = (item: CartItem, sub: CartBundleItem): number[] => {
-  const cat = products.find((p) => p.id === item.productId);
-  if (!cat?.isPickBundle) return [];
-  const totalNeed = (cat.pickCount ?? 0) * item.qty;
-  const opt = cat.pickOptions?.find((o) => o.name === sub.name);
-  const perItemMax = (opt?.maxQty ?? 1) * item.qty;
-  const cur = sub.qty || 0;
-  const remaining = totalNeed - pickedTotalOf(item);
-  const max = Math.min(perItemMax, cur + Math.max(remaining, 0));
-  return Array.from({ length: max + 1 }, (_, i) => i);
-};
-
 const setSubQty = (sub: CartBundleItem, value: number) => {
   sub.qty = value;
 };
@@ -279,20 +271,6 @@ const handleGoCheckout = () => {
     ui.toast(`「${incompleteBundle.name}」尚未選擇規格或數量`, 'warn');
     return;
   }
-  // 勾選的群組若包含不同配送方式 → 不能合併結帳，跳提示請拆單
-  const checkedGroups = groups.value.filter((g) =>
-    g.items.some((i) => i.checked),
-  );
-  const methods = Array.from(
-    new Set(
-      checkedGroups.map(getGroupShipping).filter((s): s is string => !!s),
-    ),
-  );
-  if (methods.length > 1) {
-    mixedShippingMethods.value = methods;
-    isMixedShippingDialogVisible.value = true;
-    return;
-  }
   router.push('/checkout');
 };
 
@@ -317,9 +295,7 @@ const handleGoProduct = (productId?: number) => {
           class="!min-h-11 !min-w-11"
           @click="router.back()"
         />
-        <h1 class="text-xl font-bold text-slate-950 @7xl:text-2xl">
-          購物車結帳
-        </h1>
+        <h1 class="text-xl font-bold text-slate-950 @7xl:text-2xl">購物車</h1>
       </div>
     </div>
 
@@ -439,23 +415,59 @@ const handleGoProduct = (productId?: number) => {
                     class="qty-stepper"
                   />
                 </div>
+                <!-- 買多優惠提示 -->
+                <div
+                  v-if="item.bulkDiscount"
+                  class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                  :class="
+                    hasBulkDiscount(item)
+                      ? 'bg-green-50 text-green-700'
+                      : 'bg-amber-50 text-amber-700'
+                  "
+                >
+                  <i class="pi pi-tag text-[10px]" />
+                  <span>{{ item.bulkDiscount.note }}</span>
+                  <span v-if="hasBulkDiscount(item)" class="font-medium">
+                    · 已折抵 -${{ bulkDiscountAmount(item).toLocaleString() }}
+                  </span>
+                </div>
               </div>
 
               <!-- Right column：NTD 價格（上）+ 刪除（下） -->
               <div class="flex shrink-0 flex-col items-end gap-2">
                 <div class="flex flex-col items-end gap-0.5">
-                  <span
-                    class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
-                    style="color: var(--primary)"
-                  >
-                    NTD ${{ item.price.toLocaleString() }}
-                  </span>
-                  <span
-                    v-if="item.original"
-                    class="text-xs whitespace-nowrap text-slate-500 line-through"
-                  >
-                    ${{ item.original.toLocaleString() }}
-                  </span>
+                  <template v-if="hasBulkDiscount(item)">
+                    <Tag
+                      value="已達買多優惠"
+                      severity="success"
+                      class="!py-0.5 !text-[10px]"
+                    />
+                    <span
+                      class="text-xs whitespace-nowrap text-slate-500 line-through"
+                    >
+                      ${{ item.price.toLocaleString() }}
+                    </span>
+                    <span
+                      class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
+                      style="color: var(--primary)"
+                    >
+                      NTD ${{ effectiveUnitPrice(item).toLocaleString() }}
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span
+                      class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
+                      style="color: var(--primary)"
+                    >
+                      NTD ${{ item.price.toLocaleString() }}
+                    </span>
+                    <span
+                      v-if="item.original"
+                      class="text-xs whitespace-nowrap text-slate-500 line-through"
+                    >
+                      ${{ item.original.toLocaleString() }}
+                    </span>
+                  </template>
                 </div>
                 <Button
                   v-if="!isGroupLocked(group)"
@@ -640,10 +652,7 @@ const handleGoProduct = (productId?: number) => {
                 ${{ p.price }}
               </span>
               <!-- 已加入摘要：只有已加入才顯示 -->
-              <p
-                v-if="addedAddOnRecord[p.id]"
-                class="text-xs text-slate-600"
-              >
+              <p v-if="addedAddOnRecord[p.id]" class="text-xs text-slate-600">
                 已加入：{{ addedAddOnRecord[p.id].spec }} ×
                 {{ addedAddOnRecord[p.id].qty }}
               </p>
@@ -713,45 +722,6 @@ const handleGoProduct = (productId?: number) => {
       </div>
     </div>
 
-    <!-- 不同配送方式提示：阻擋共同結帳 -->
-    <Dialog
-      v-model:visible="isMixedShippingDialogVisible"
-      modal
-      :draggable="false"
-      :dismissable-mask="true"
-      :style="{ width: '420px' }"
-      :breakpoints="{ '768px': '90vw' }"
-      :pt="{
-        header: { style: 'padding: 16px 20px' },
-        content: { style: 'padding: 0 20px 16px' },
-        footer: { style: 'padding: 12px 20px' },
-      }"
-    >
-      <template #header>
-        <div class="flex items-center gap-2">
-          <i class="pi pi-exclamation-triangle text-lg text-red-500" />
-          <span class="text-base font-bold text-slate-950">無法合併結帳</span>
-        </div>
-      </template>
-      <div class="flex flex-col gap-2 text-sm text-slate-700">
-        <p>所選購物車包含不同配送方式，無法一起結帳：</p>
-        <ul class="list-disc pl-5">
-          <li v-for="m in mixedShippingMethods" :key="m">{{ m }}</li>
-        </ul>
-        <p class="text-slate-500">
-          請分別勾選同一配送方式的購物車後再進行結帳。
-        </p>
-      </div>
-      <template #footer>
-        <div class="flex w-full justify-end">
-          <Button
-            label="我知道了"
-            @click="isMixedShippingDialogVisible = false"
-          />
-        </div>
-      </template>
-    </Dialog>
-
     <!-- 加價購：選規格 + 數量 Dialog -->
     <Dialog
       :visible="!!addOnDialog"
@@ -779,10 +749,7 @@ const handleGoProduct = (productId?: number) => {
             <p class="line-clamp-2 text-base font-semibold text-slate-950">
               {{ addOnDialog.name }}
             </p>
-            <span
-              class="text-lg font-bold"
-              style="color: var(--primary)"
-            >
+            <span class="text-lg font-bold" style="color: var(--primary)">
               ${{ addOnDialog.price }}
             </span>
           </div>

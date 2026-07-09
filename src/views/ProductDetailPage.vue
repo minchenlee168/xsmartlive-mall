@@ -67,16 +67,6 @@ const isLoginPromptOpen = ref(false);
 const optMaxQty = (opt: { maxQty?: number }): number =>
   (opt.maxQty ?? 10) * qty.value;
 
-/**
- * 此選項可選的數量清單：0 ~ 單一選項上限。
- * 不再依「剩餘總額度」限縮，避免自動幫忙帶 0；
- * 若使用者超過總挑選數，在送出時另行提示或阻擋。
- */
-const qtyOptionsFor = (opt: { id: number; maxQty?: number }): number[] => {
-  const max = optMaxQty(opt);
-  return Array.from({ length: max + 1 }, (_, i) => i);
-};
-
 /** 是否超過總挑選數 → 用於警示 + 阻擋送出 */
 const isPickOver = computed(
   () => product.value.isPickBundle && pickedTotal.value > totalPickCount.value,
