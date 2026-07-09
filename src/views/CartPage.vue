@@ -631,7 +631,7 @@ const handleGoProduct = (productId?: number) => {
           <!-- 商品備註：跟在商品列下方，若有 note 才顯示 -->
           <div
             v-if="item.note"
-            class="mx-[var(--card-pad)] mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+            class="mx-[var(--card-pad)] mb-3 flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"
           >
             <i class="pi pi-info-circle mt-0.5 shrink-0" />
             <span class="min-w-0">

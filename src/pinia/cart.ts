@@ -31,7 +31,7 @@ export const useCartStore = defineStore('cart', () => {
   const groups = ref<CartGroup[]>([
     {
       id: 1,
-      sellerName: '春節烹飪好禮直播連線',
+      sellerName: '07/09 廚娘小桂の直播廚房',
       tags: [],
       // 冷凍商品僅支援宅配，且不收貨到付款
       shippingMethods: ['home'],
@@ -111,7 +111,7 @@ export const useCartStore = defineStore('cart', () => {
     },
     {
       id: 2,
-      sellerName: '兒童大廠清倉',
+      sellerName: '07/08 妞妞ㄉ童裝小舖',
       // 「禁止棄標」語意已由 checkoutMode: 'default' 表達，tag 不再重複
       tags: [],
       shippingMethods: ['home', 'store'],
@@ -177,6 +177,14 @@ export const useCartStore = defineStore('cart', () => {
     },
   ]);
 
+  /** 今天的 MM/DD 字串 — 給新建購物車 sellerName 當前綴。 */
+  const todayMMDD = (): string => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${mm}/${dd}`;
+  };
+
   /** 查詢單一商品的買多優惠設定；沒設定 → undefined。 */
   const findBulkDiscountFor = (
     productId: number | undefined,
@@ -238,7 +246,7 @@ export const useCartStore = defineStore('cart', () => {
     if (!target) {
       target = {
         id: Date.now(),
-        sellerName: '我的商店',
+        sellerName: `${todayMMDD()} 我的直播小舖`,
         tags: [],
         items: [],
         shippingMethods: ['home', 'store'],
@@ -285,7 +293,8 @@ export const useCartStore = defineStore('cart', () => {
   function addCart(patch?: Partial<Omit<CartGroup, 'id' | 'items'>>) {
     const g: CartGroup = {
       id: Date.now(),
-      sellerName: patch?.sellerName ?? `新購物車 ${groups.value.length + 1}`,
+      sellerName:
+        patch?.sellerName ?? `${todayMMDD()} 新直播小舖 ${groups.value.length + 1}`,
       tags: patch?.tags ?? [],
       items: [],
       shippingMethods: patch?.shippingMethods ?? ['home', 'store'],

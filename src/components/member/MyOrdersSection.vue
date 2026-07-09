@@ -111,6 +111,35 @@ const PROGRESS_STEPS = TIMELINE_STEPS.filter((s) => s.key !== 'unpaid');
 
 const orders = computed(() => ordersStore.orders);
 
+// ---- 電子發票證明聯 Dialog（點「線上列印」開啟） ---------------------------
+const invoicePreviewOrder = ref<OrderRecord | null>(null);
+const handleOpenInvoice = (order: OrderRecord): void => {
+  invoicePreviewOrder.value = order;
+};
+/** 依訂單編號 hash 出一個看起來像發票號碼的字串（AB-12345678）。 */
+const mockInvoiceNoOf = (order: OrderRecord): string => {
+  const letters = 'ABCDEFGHJKLMNPRSTUV';
+  const seed = Array.from(order.orderNo).reduce(
+    (s, c) => s + c.charCodeAt(0),
+    0,
+  );
+  const l1 = letters[seed % letters.length];
+  const l2 = letters[(seed >> 3) % letters.length];
+  const nums = String(100000000 + ((seed * 173) % 89999999)).slice(-8);
+  return `${l1}${l2}-${nums}`;
+};
+/** 隨機碼 4 位（demo）。 */
+const mockRandomCodeOf = (order: OrderRecord): string => {
+  const seed = Array.from(order.orderNo).reduce(
+    (s, c) => s + c.charCodeAt(0),
+    0,
+  );
+  return String(1000 + ((seed * 47) % 9000));
+};
+const handlePrintInvoice = (): void => {
+  window.print();
+};
+
 /** 套用日期區間 + 關鍵字後的訂單（不含 status tab 過濾）— 給 tab 數字 + filteredOrders 共用 */
 const dateKeywordFilteredOrders = computed(() => {
   let list = orders.value;
@@ -676,7 +705,13 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
           <div>
             <p class="text-xs text-slate-500">發票</p>
-            <Button label="線上列印" outlined size="small" class="!py-1" />
+            <Button
+              label="線上列印"
+              outlined
+              size="small"
+              class="!py-1"
+              @click="handleOpenInvoice(order)"
+            />
           </div>
           <div>
             <p class="text-xs text-slate-500">狀態</p>
@@ -748,7 +783,13 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <td class="px-3 py-3 text-slate-700">{{ order.payment }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
               <td class="px-3 py-3">
-                <Button label="線上列印" outlined size="small" class="!py-1" />
+                <Button
+                  label="線上列印"
+                  outlined
+                  size="small"
+                  class="!py-1"
+                  @click="handleOpenInvoice(order)"
+                />
               </td>
               <td
                 class="py-3 pr-4 pl-3 font-medium"
@@ -1448,6 +1489,123 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </table>
         </div>
       </div>
+    </Dialog>
+
+    <!-- 電子發票證明聯 Dialog：點「線上列印」開啟 -->
+    <Dialog
+      :visible="!!invoicePreviewOrder"
+      modal
+      :draggable="false"
+      dismissable-mask
+      header="電子發票證明聯"
+      :style="{ width: '480px' }"
+      :breakpoints="{ '768px': '92vw' }"
+      @update:visible="(v) => !v && (invoicePreviewOrder = null)"
+    >
+      <div v-if="invoicePreviewOrder" class="flex flex-col gap-4">
+        <!-- 發票標頭 -->
+        <div
+          class="rounded-lg border border-dashed border-slate-400 bg-slate-50 px-4 py-3"
+        >
+          <p class="text-center text-xs text-slate-500">
+            財政部電子發票整合服務平台
+          </p>
+          <p
+            class="mt-1 text-center text-2xl font-bold tracking-widest text-slate-900"
+          >
+            {{ mockInvoiceNoOf(invoicePreviewOrder) }}
+          </p>
+          <p class="mt-0.5 text-center text-xs text-slate-500">
+            發票日期：{{ invoicePreviewOrder.date }}
+          </p>
+        </div>
+
+        <!-- 賣 / 買方 -->
+        <div class="grid grid-cols-2 gap-3 text-xs text-slate-700">
+          <div>
+            <p class="text-slate-500">賣方統編</p>
+            <p class="font-medium">12345678</p>
+            <p class="text-slate-500">直播管家 xSmartLive 股份有限公司</p>
+          </div>
+          <div>
+            <p class="text-slate-500">買方 / 載具</p>
+            <p class="font-medium">
+              {{ invoicePreviewOrder.invoice || '個人載具' }}
+            </p>
+          </div>
+        </div>
+
+        <!-- 明細 -->
+        <div class="rounded-lg border border-slate-200">
+          <div
+            class="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600"
+          >
+            <span>品名</span>
+            <span class="text-right">數量</span>
+            <span class="text-right">單價</span>
+            <span class="text-right">小計</span>
+          </div>
+          <div
+            v-for="(it, idx) in invoicePreviewOrder.items"
+            :key="idx"
+            class="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 border-b border-slate-100 px-3 py-2 text-xs text-slate-700 last:border-b-0"
+          >
+            <span class="truncate" :title="it.name">{{ it.name }}</span>
+            <span class="text-right">{{ it.qty }}</span>
+            <span class="text-right">
+              ${{ it.price.toLocaleString() }}
+            </span>
+            <span class="text-right">
+              ${{ (it.price * it.qty).toLocaleString() }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 金額 -->
+        <div class="flex justify-end gap-6 text-sm">
+          <div class="text-right text-slate-500">
+            <p>銷售額（未稅）</p>
+            <p>營業稅（5%）</p>
+            <p class="font-bold text-slate-900">總計</p>
+          </div>
+          <div class="text-right text-slate-700">
+            <p>
+              ${{
+                Math.round(invoicePreviewOrder.total / 1.05).toLocaleString()
+              }}
+            </p>
+            <p>
+              ${{
+                (
+                  invoicePreviewOrder.total -
+                  Math.round(invoicePreviewOrder.total / 1.05)
+                ).toLocaleString()
+              }}
+            </p>
+            <p class="font-bold" style="color: var(--primary)">
+              ${{ invoicePreviewOrder.total.toLocaleString() }}
+            </p>
+          </div>
+        </div>
+
+        <!-- 隨機碼 / 訂單編號 -->
+        <div
+          class="rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-500"
+        >
+          隨機碼：{{ mockRandomCodeOf(invoicePreviewOrder) }}
+          <span class="mx-2">·</span>
+          訂單編號：{{ invoicePreviewOrder.orderNo }}
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="關閉"
+          severity="secondary"
+          outlined
+          @click="invoicePreviewOrder = null"
+        />
+        <Button label="列印" icon="pi pi-print" @click="handlePrintInvoice" />
+      </template>
     </Dialog>
 
     <!-- 訂單提問 drawer：從右側滑入，點遮罩關閉。
