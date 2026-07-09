@@ -93,16 +93,14 @@ const step = ref<Step>('review');
 
 // --- step: review ---
 const isAgreed = ref(false);
-const isReviewSubmitted = ref(false);
-const canConfirmReview = computed(() => isAgreed.value);
+/**
+ * 按主按鈕：不強制驗證手機，直接綁定並登入。
+ * 需要驗證的使用者可透過「驗證手機」連結進入 verify step（安全驗證頁）。
+ */
 const handleConfirmReview = () => {
-  isReviewSubmitted.value = true;
-  if (!canConfirmReview.value) return;
-  // 手機已驗證過（如 Google 模擬已綁定情境）→ 直接登入；其餘走手機驗證流程
-  if (profile.value.phoneAlreadyVerified) {
-    handleEnterShop();
-    return;
-  }
+  handleEnterShop();
+};
+const handleGoVerify = () => {
   step.value = 'verify';
 };
 
@@ -263,7 +261,7 @@ const handleBackToLogin = () => {
             </div>
             <div class="flex items-start gap-3 text-sm">
               <i class="pi pi-phone mt-0.5 text-slate-400" />
-              <div class="flex flex-1 flex-col">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-xs text-slate-500">電話號碼</span>
                 <span v-if="profile.phone" class="text-slate-700">
                   {{ profile.phone }}
@@ -273,12 +271,20 @@ const handleBackToLogin = () => {
                     class="ml-1 text-green-600"
                     >(已驗證)</span
                   >
-                  <span v-else class="ml-1 text-red-500">(需下一步驗證)</span>
+                  <span v-else class="ml-1 text-red-500">(未驗證)</span>
                 </span>
-                <span v-else class="text-red-500">
-                  未提供 (需於下一步驗證)
-                </span>
+                <span v-else class="text-red-500">未提供</span>
               </div>
+              <!-- 驗證手機：靠右灰色 outline 按鈕，右緣與主按鈕齊 -->
+              <Button
+                v-if="!profile.phone"
+                label="驗證手機"
+                severity="secondary"
+                outlined
+                size="small"
+                class="shrink-0"
+                @click="handleGoVerify"
+              />
             </div>
           </div>
 
@@ -309,22 +315,13 @@ const handleBackToLogin = () => {
                   隱私權政策
                 </a>
               </p>
-              <p
-                v-if="isReviewSubmitted && !isAgreed"
-                class="text-sm text-red-500"
-              >
-                為保障您的權益，請先同意服務條款與隱私政策
-              </p>
             </div>
           </div>
 
           <Button
-            :label="
-              profile.phoneAlreadyVerified
-                ? '確認註冊並開始使用'
-                : '下一步：驗證手機號碼'
-            "
+            label="確定綁定並登入"
             class="!min-h-12 w-full"
+            :disabled="!isAgreed"
             @click="handleConfirmReview"
           />
 

@@ -113,6 +113,37 @@ body {
 .qty-stepper.is-sm .p-inputnumber-button {
   width: 26px;
 }
+/* .is-fluid：讓 stepper 撐滿容器寬度（按鈕保持固定寬，input 吸收剩餘空間） */
+.qty-stepper.is-fluid.p-inputnumber {
+  width: 100%;
+}
+.qty-stepper.is-fluid .p-inputnumber-input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+/* 加入購物車按鈕（分類頁 ProductCard 與購物車加購區共用）：成功後 pop 動畫 */
+.add-cart-btn.added-pop {
+  animation: cart-added-pop 0.5s ease;
+}
+@keyframes cart-added-pop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  40% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+.add-cart-btn:disabled {
+  cursor: default;
+}
 
 /* 觸控友善：表單文字輸入框與下拉選單最小高度 44px（數量步進器維持自有尺寸） */
 .p-inputtext,

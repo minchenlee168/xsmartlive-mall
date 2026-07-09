@@ -1,7 +1,16 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { products } from '../data/products';
-import type { CartGroup, CartItem, CartBundleItem } from '../types/cart';
+import type {
+  CartGroup,
+  CartItem,
+  CartBundleItem,
+  RoutingRule,
+  RoutingCondition,
+  CheckoutMode,
+  BulkDiscount,
+  BulkDiscountRule,
+} from '../types/cart';
 
 // 型別 re-export，方便 store 使用者只 import 一處
 export type {
@@ -12,6 +21,10 @@ export type {
   BulkDiscount,
   ShippingMethodId,
   PaymentMethodId,
+  RoutingRule,
+  RoutingCondition,
+  CheckoutMode,
+  BulkDiscountRule,
 } from '../types/cart';
 
 export const useCartStore = defineStore('cart', () => {
@@ -19,10 +32,11 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 1,
       sellerName: '春節烹飪好禮直播連線',
-      tags: [{ label: '冷凍', type: 'info' }],
+      tags: [],
       // 冷凍商品僅支援宅配，且不收貨到付款
       shippingMethods: ['home'],
       paymentMethods: ['credit', 'atm'],
+      checkoutMode: 'pickable',
       items: [
         {
           id: 'i1',
@@ -36,11 +50,6 @@ export const useCartStore = defineStore('cart', () => {
           checked: true,
           isBundle: true,
           bundleExpanded: true,
-          bulkDiscount: {
-            minQty: 2,
-            unitPrice: 1080,
-            note: '買 2 件以上每件 $1,080（省 $200/件）',
-          },
           bundleItems:
             products
               .find((p) => p.id === 100)
@@ -83,6 +92,7 @@ export const useCartStore = defineStore('cart', () => {
           price: 380,
           original: 480,
           checked: true,
+          note: '本商品需冷藏保存，收貨後請立即冷凍。',
         },
         {
           id: 'i3',
@@ -100,12 +110,11 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 2,
       sellerName: '兒童大廠清倉',
-      tags: [
-        { label: '常溫', type: 'secondary' },
-        { label: '禁止棄標', type: 'danger' },
-      ],
+      // 「禁止棄標」語意已由 checkoutMode: 'default' 表達，tag 不再重複
+      tags: [],
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
+      checkoutMode: 'default',
       items: [
         {
           id: 'i4',
@@ -116,7 +125,7 @@ export const useCartStore = defineStore('cart', () => {
           qty: 1,
           price: 290,
           original: 350,
-          checked: false,
+          checked: true,
           isBundle: true,
           bundleExpanded: true,
           bundleItems: [
@@ -142,15 +151,70 @@ export const useCartStore = defineStore('cart', () => {
           spec: '66cm,藍色',
           qty: 1,
           price: 300,
-          checked: false,
+          checked: true,
+          note: '此款為直播限定色，不參與退換貨。',
         },
       ],
     },
   ]);
 
+  /** 分派規則：加入商品時，第一條命中的規則決定進哪台購物車；沒命中走 fallback。 */
+  const routingRules = ref<RoutingRule[]>([]);
+
+  /** 多件優惠規則：綁定商品 id，套用到現有 + 未來加入的購物車項目。 */
+  const bulkDiscountRules = ref<BulkDiscountRule[]>([
+    {
+      id: 'bd_seed_100',
+      productId: 100,
+      discount: {
+        minQty: 2,
+        unitPrice: 1080,
+        note: '買 2 件以上每件 $1,080（省 $200/件）',
+      },
+    },
+  ]);
+
+  /** 查詢單一商品的買多優惠設定；沒設定 → undefined。 */
+  const findBulkDiscountFor = (
+    productId: number | undefined,
+  ): BulkDiscount | undefined => {
+    if (productId == null) return undefined;
+    return bulkDiscountRules.value.find((r) => r.productId === productId)
+      ?.discount;
+  };
+
+  /** 將優惠規則同步套到所有現有購物車項目（規則新增 / 修改 / 刪除時呼叫）。 */
+  const syncBulkDiscountsToItems = () => {
+    groups.value.forEach((g) => {
+      g.items.forEach((i) => {
+        i.bulkDiscount = findBulkDiscountFor(i.productId);
+      });
+    });
+  };
+  // 首次執行一次，把 seed 規則貼到 seed 商品上
+  syncBulkDiscountsToItems();
+
   const totalCount = computed(() =>
     groups.value.reduce((sum, g) => sum + g.items.length, 0),
   );
+
+  /** 依規則挑目標購物車：先跑 routingRules（上→下），沒命中回傳 undefined。 */
+  const findRoutedCart = (productId: number): CartGroup | undefined => {
+    const product = products.find((pr) => pr.id === productId);
+    for (const rule of routingRules.value) {
+      const target = groups.value.find((g) => g.id === rule.targetCartId);
+      if (!target) continue;
+      const cond = rule.condition;
+      if (cond.type === 'productId' && cond.value === productId) return target;
+      if (
+        cond.type === 'category' &&
+        product?.category &&
+        cond.value === product.category
+      )
+        return target;
+    }
+    return undefined;
+  };
 
   function addItem(
     p: {
@@ -164,10 +228,10 @@ export const useCartStore = defineStore('cart', () => {
     qty = 1,
     customBundleItems?: CartBundleItem[],
   ) {
-    // 加入的商品一律放進第一台「可刪除」（未禁止棄標）的購物車；沒有就新建一台放最前面
-    let target = groups.value.find(
-      (g) => !g.tags.some((t) => t.label === '禁止棄標'),
-    );
+    // 先問規則：命中就進那台；否則 fallback 到第一個「非暫停」的購物車，都沒有再新建
+    let target =
+      findRoutedCart(p.id) ??
+      groups.value.find((g) => g.checkoutMode !== 'paused');
     if (!target) {
       target = {
         id: Date.now(),
@@ -176,6 +240,7 @@ export const useCartStore = defineStore('cart', () => {
         items: [],
         shippingMethods: ['home', 'store'],
         paymentMethods: ['credit', 'atm', 'cod'],
+        checkoutMode: 'default',
       };
       groups.value.unshift(target);
     }
@@ -204,6 +269,7 @@ export const useCartStore = defineStore('cart', () => {
       isBundle: cat?.isBundle,
       bundleExpanded: cat?.isBundle ? true : undefined,
       bundleItems: resolvedBundleItems,
+      bulkDiscount: findBulkDiscountFor(p.id),
     });
   }
 
@@ -212,5 +278,106 @@ export const useCartStore = defineStore('cart', () => {
     if (g) g.items = g.items.filter((i) => i.id !== itemId);
   }
 
-  return { groups, totalCount, addItem, removeItem };
+  // ---- 購物車設定：新增 / 修改 / 刪除 ---------------------------------------
+  function addCart(patch?: Partial<Omit<CartGroup, 'id' | 'items'>>) {
+    const g: CartGroup = {
+      id: Date.now(),
+      sellerName: patch?.sellerName ?? `新購物車 ${groups.value.length + 1}`,
+      tags: patch?.tags ?? [],
+      items: [],
+      shippingMethods: patch?.shippingMethods ?? ['home', 'store'],
+      paymentMethods: patch?.paymentMethods ?? ['credit', 'atm', 'cod'],
+      checkoutMode: patch?.checkoutMode ?? 'default',
+    };
+    groups.value.push(g);
+    return g.id;
+  }
+  function updateCart(id: number, patch: Partial<Omit<CartGroup, 'id'>>) {
+    const g = groups.value.find((x) => x.id === id);
+    if (!g) return;
+    Object.assign(g, patch);
+    // 模式切換後同步勾選狀態：default = 全勾，paused = 全取消（避免無法結帳但仍勾著）
+    if (patch.checkoutMode === 'default') {
+      g.items.forEach((i) => (i.checked = true));
+    } else if (patch.checkoutMode === 'paused') {
+      g.items.forEach((i) => (i.checked = false));
+    }
+  }
+  /** 刪除購物車：僅允許刪空的（避免商品憑空消失）。回傳是否成功。 */
+  function removeCart(id: number): boolean {
+    const g = groups.value.find((x) => x.id === id);
+    if (!g || g.items.length > 0) return false;
+    groups.value = groups.value.filter((x) => x.id !== id);
+    // 同時清掉指向此車的規則
+    routingRules.value = routingRules.value.filter(
+      (r) => r.targetCartId !== id,
+    );
+    return true;
+  }
+
+  // ---- 分派規則：新增 / 修改 / 刪除 / 重排 ----------------------------------
+  function addRule(condition: RoutingCondition, targetCartId: number) {
+    routingRules.value.push({
+      id: `r_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      condition,
+      targetCartId,
+    });
+  }
+  function updateRule(id: string, patch: Partial<Omit<RoutingRule, 'id'>>) {
+    const r = routingRules.value.find((x) => x.id === id);
+    if (!r) return;
+    Object.assign(r, patch);
+  }
+  function removeRule(id: string) {
+    routingRules.value = routingRules.value.filter((r) => r.id !== id);
+  }
+  /** 調整規則優先序：把 id 從目前位置移到新的 index。 */
+  function reorderRule(id: string, toIndex: number) {
+    const from = routingRules.value.findIndex((r) => r.id === id);
+    if (from < 0) return;
+    const [r] = routingRules.value.splice(from, 1);
+    const clamped = Math.max(0, Math.min(toIndex, routingRules.value.length));
+    routingRules.value.splice(clamped, 0, r);
+  }
+
+  // ---- 多件優惠規則：新增 / 修改 / 刪除 -------------------------------------
+  function addBulkDiscountRule(rule: Omit<BulkDiscountRule, 'id'>) {
+    bulkDiscountRules.value.push({
+      id: `bd_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      ...rule,
+    });
+    syncBulkDiscountsToItems();
+  }
+  function updateBulkDiscountRule(
+    id: string,
+    patch: Partial<Omit<BulkDiscountRule, 'id'>>,
+  ) {
+    const r = bulkDiscountRules.value.find((x) => x.id === id);
+    if (!r) return;
+    Object.assign(r, patch);
+    syncBulkDiscountsToItems();
+  }
+  function removeBulkDiscountRule(id: string) {
+    bulkDiscountRules.value = bulkDiscountRules.value.filter((r) => r.id !== id);
+    syncBulkDiscountsToItems();
+  }
+
+  return {
+    groups,
+    totalCount,
+    routingRules,
+    bulkDiscountRules,
+    addItem,
+    removeItem,
+    addCart,
+    updateCart,
+    removeCart,
+    addRule,
+    updateRule,
+    removeRule,
+    reorderRule,
+    addBulkDiscountRule,
+    updateBulkDiscountRule,
+    removeBulkDiscountRule,
+  };
 });
