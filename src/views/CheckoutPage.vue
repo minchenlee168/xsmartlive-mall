@@ -709,7 +709,7 @@ const handlePlaceOrder = () => {
           class="cart-divider-top flex flex-col gap-3 px-4 py-3 @3xl:flex-row @3xl:items-center @3xl:justify-between"
         >
           <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="font-medium text-slate-700">優惠券</span>
+            <span class="w-20 font-medium text-slate-700">優惠券</span>
             <Button
               :label="appliedCoupon ? appliedCoupon.title : '選擇優惠券'"
               :icon="appliedCoupon ? 'pi pi-check' : 'pi pi-tag'"
@@ -726,7 +726,7 @@ const handlePlaceOrder = () => {
             </span>
           </div>
           <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-            <span class="font-medium">紅利點數</span>
+            <span class="w-20 font-medium">紅利點數</span>
             <span>使用</span>
             <InputNumber
               v-model="rewardPoints"
@@ -742,6 +742,11 @@ const handlePlaceOrder = () => {
               / 尚有 <span style="color: var(--primary)">100</span> 點
             </span>
           </div>
+        </div>
+
+        <div class="flex items-center gap-2 px-4 pb-3 text-sm text-slate-700">
+          <span class="w-20 font-medium">運費</span>
+          <span>${{ shippingFee.toLocaleString() }}</span>
         </div>
 
         <div

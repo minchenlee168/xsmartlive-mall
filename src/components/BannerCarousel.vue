@@ -18,7 +18,7 @@ const banners = [
   >
     <template #item="{ data }">
       <div
-        class="relative flex h-[480px] items-end overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-slate-700 to-slate-900"
+        class="relative flex aspect-[2/1] items-end overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-slate-700 to-slate-900"
       >
         <!-- overlay -->
         <div class="absolute inset-0 bg-black/40" />

@@ -13,10 +13,10 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 不要憑印象改。每次接到任務先讀清楚下列檔案，尤其是使用者需求跟這幾份文件的規範衝突時，優先跟使用者確認：
 
 1. **`CLAUDE.md`** — 專案根規範（格式、命名、arbitrary value、RWD 斷點、觸控最小 44×44）
-2. **`agent/architecture.md`** — 路由 / Aurora shell / `@container` frame 的定位邏輯
-3. **`agent/design-tokens.md`** — 主色 / 品牌色 / density / `@container` 斷點對照表
-4. **`agent/primevue-conventions.md`** — PrimeVue 使用約定（`pt` 何時該用、Dialog / Drawer 定位坑）
-5. **`agent/state-stores.md`** — 需要動 store 前的健檢
+2. **`docs/architecture.md`** — 路由 / Aurora shell / `@container` frame 的定位邏輯
+3. **`docs/design-tokens.md`** — 主色 / 品牌色 / density / `@container` 斷點對照表
+4. **`docs/primevue-conventions.md`** — PrimeVue 使用約定（`pt` 何時該用、Dialog / Drawer 定位坑）
+5. **`docs/state-stores.md`** — 需要動 store 前的健檢
 6. 相關 `.vue` 檔本身
 
 ## 工作原則（順序 = 優先序）
