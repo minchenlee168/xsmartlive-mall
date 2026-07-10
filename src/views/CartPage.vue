@@ -455,7 +455,8 @@ const handleConfirmAddOn = (e: MouseEvent) => {
   burstAddToCartFromEvent(e);
   flashAddedFor(p.id);
   addOnDialog.value = null;
-  ui.showAddedToCart(p.name);
+  // 加購場景使用者已在購物車頁，不需要「點此結帳 / 繼續購物」二次跳轉；改用 toast 就好
+  ui.toast(`已加入「${p.name}」`);
 };
 
 const handleGoCheckout = () => {

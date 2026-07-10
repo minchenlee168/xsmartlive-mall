@@ -1462,7 +1462,7 @@ const handlePlaceOrder = () => {
                 />
               </div>
 
-              <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+              <div class="flex max-h-[60vh] flex-col gap-4 overflow-y-auto">
                 <p
                   v-if="
                     supportedShippingMethods.length <
@@ -1473,8 +1473,12 @@ const handlePlaceOrder = () => {
                   <i class="pi pi-info-circle mr-1" />
                   部分運送方式因您勾選的購物車不共同支援，已自動隱藏。
                 </p>
-                <!-- Home -->
-                <div v-if="supportedShippingMethods.includes('home')">
+
+                <!-- Home 方式卡 -->
+                <div
+                  v-if="supportedShippingMethods.includes('home')"
+                  class="flex flex-col gap-3"
+                >
                   <Button
                     severity="secondary"
                     class="!min-h-11 !w-full !justify-between"
@@ -1495,76 +1499,92 @@ const handlePlaceOrder = () => {
                     </span>
                   </Button>
 
-                  <div
-                    v-if="shipMethod === 'home'"
-                    class="mt-3 flex flex-col gap-2"
-                  >
-                    <div
+                  <div v-if="shipMethod === 'home'" class="flex flex-col gap-2">
+                    <span class="text-sm font-medium text-slate-500">
+                      宅配地址
+                    </span>
+                    <button
                       v-for="addr in homeAddresses"
                       :key="addr.id"
-                      class="flex items-start gap-3 px-2 py-2"
+                      type="button"
+                      class="w-full rounded-lg border-2 p-3 text-left transition-colors disabled:cursor-not-allowed"
+                      :class="
+                        selectedHomeId === addr.id
+                          ? 'border-[var(--primary)]'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      "
+                      :style="
+                        selectedHomeId === addr.id
+                          ? 'background: var(--primary-surface)'
+                          : ''
+                      "
+                      :disabled="addr.unavailable"
+                      @click="!addr.unavailable && (selectedHomeId = addr.id)"
                     >
-                      <RadioButton
-                        v-model="selectedHomeId"
-                        :value="addr.id"
-                        :disabled="addr.unavailable"
-                        class="mt-1"
-                      />
-                      <div class="min-w-0 flex-1">
-                        <div
-                          class="flex items-center gap-2 text-sm text-slate-700"
-                        >
-                          <span class="font-medium">{{ addr.name }}</span>
-                          <span>{{ addr.phone }}</span>
-                          <span
-                            v-if="addr.isDefault"
-                            class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                            style="background: var(--primary)"
-                            >預設</span
+                      <div class="flex gap-3">
+                        <div class="min-w-0 flex-1">
+                          <div
+                            class="flex flex-wrap items-center gap-2 text-sm text-slate-700"
                           >
-                        </div>
-                        <div
-                          class="mt-1 flex items-center gap-1 text-sm text-slate-700"
-                        >
-                          <i class="pi pi-map-marker text-xs" />
-                          {{ addr.address }}
-                          <span
+                            <span class="font-medium">{{ addr.name }}</span>
+                            <span>{{ addr.phone }}</span>
+                            <span
+                              v-if="addr.isDefault"
+                              class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                              style="background: var(--primary)"
+                              >預設</span
+                            >
+                          </div>
+                          <div
+                            class="mt-1 flex items-start gap-1 text-sm text-slate-700"
+                          >
+                            <i class="pi pi-map-marker mt-0.5 text-xs" />
+                            <span>{{ addr.address }}</span>
+                          </div>
+                          <p
                             v-if="addr.unavailable"
-                            class="ml-1 text-red-500"
-                            >(目前不提供配送至此地區)</span
+                            class="mt-1 text-xs text-red-500"
                           >
+                            目前不提供配送至此地區
+                          </p>
+                        </div>
+                        <div class="flex shrink-0 flex-col items-end gap-1">
+                          <button
+                            v-if="!addr.isDefault"
+                            type="button"
+                            class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white/70 hover:text-amber-500"
+                            title="設為預設"
+                            @click.stop="handleSetDefaultHome(addr.id)"
+                          >
+                            <i class="pi pi-star" />
+                          </button>
+                          <button
+                            type="button"
+                            class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white/70 hover:text-red-500"
+                            title="刪除"
+                            @click.stop="handleDeleteHome(addr.id)"
+                          >
+                            <i class="pi pi-trash" />
+                          </button>
                         </div>
                       </div>
-                      <div class="flex shrink-0 items-center gap-2">
-                        <Button
-                          v-if="!addr.isDefault"
-                          label="設為預設"
-                          outlined
-                          size="small"
-                          @click="handleSetDefaultHome(addr.id)"
-                        />
-                        <Button
-                          label="刪除"
-                          severity="danger"
-                          outlined
-                          size="small"
-                          @click="handleDeleteHome(addr.id)"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      label="新增宅配地址"
-                      icon="pi pi-plus"
-                      severity="secondary"
-                      outlined
-                      class="!min-h-11 w-full"
+                    </button>
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
                       @click="shipDrawerView = 'add-home'"
-                    />
+                    >
+                      <i class="pi pi-plus" />
+                      <span>新增宅配地址</span>
+                    </button>
                   </div>
                 </div>
 
-                <!-- Store -->
-                <div v-if="supportedShippingMethods.includes('store')">
+                <!-- Store 方式卡 -->
+                <div
+                  v-if="supportedShippingMethods.includes('store')"
+                  class="flex flex-col gap-3"
+                >
                   <Button
                     severity="secondary"
                     class="!min-h-11 !w-full !justify-between"
@@ -1587,89 +1607,103 @@ const handlePlaceOrder = () => {
 
                   <div
                     v-if="shipMethod === 'store'"
-                    class="mt-3 flex flex-col gap-2"
+                    class="flex flex-col gap-2"
                   >
-                    <div
+                    <span class="text-sm font-medium text-slate-500">
+                      取件門市
+                    </span>
+                    <button
                       v-for="addr in storeAddresses"
                       :key="addr.id"
-                      class="flex items-start gap-3 px-2 py-2"
+                      type="button"
+                      class="w-full rounded-lg border-2 p-3 text-left transition-colors"
+                      :class="
+                        selectedStoreId === addr.id
+                          ? 'border-[var(--primary)]'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      "
+                      :style="
+                        selectedStoreId === addr.id
+                          ? 'background: var(--primary-surface)'
+                          : ''
+                      "
+                      @click="selectedStoreId = addr.id"
                     >
-                      <RadioButton
-                        v-model="selectedStoreId"
-                        :value="addr.id"
-                        class="mt-1"
-                      />
-                      <div class="min-w-0 flex-1">
-                        <div
-                          class="flex items-center gap-2 text-sm text-slate-700"
-                        >
-                          <span class="font-medium">{{ addr.name }}</span>
-                          <span>{{ addr.phone }}</span>
-                          <span
-                            v-if="addr.isDefault"
-                            class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                            style="background: var(--primary)"
-                            >預設</span
+                      <div class="flex gap-3">
+                        <div class="min-w-0 flex-1">
+                          <div
+                            class="flex flex-wrap items-center gap-2 text-sm text-slate-700"
                           >
-                        </div>
-                        <div
-                          class="mt-1 flex items-center gap-2 text-sm text-slate-700"
-                        >
-                          <span
-                            class="inline-flex h-6 w-9 items-center justify-center rounded text-xs font-bold text-white"
-                            :style="
-                              addr.chain === '7-11'
-                                ? 'background: #ee1c25'
-                                : 'background: #00a040'
-                            "
-                            >{{ addr.chain === '7-11' ? '7-11' : 'FAMI' }}</span
+                            <span class="font-medium">{{ addr.name }}</span>
+                            <span>{{ addr.phone }}</span>
+                            <span
+                              v-if="addr.isDefault"
+                              class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                              style="background: var(--primary)"
+                              >預設</span
+                            >
+                          </div>
+                          <div
+                            class="mt-1 flex items-center gap-2 text-sm text-slate-700"
                           >
-                          <span class="font-medium">{{ addr.storeName }}</span>
+                            <span
+                              class="inline-flex h-6 w-9 items-center justify-center rounded text-xs font-bold text-white"
+                              :style="
+                                addr.chain === '7-11'
+                                  ? 'background: #ee1c25'
+                                  : 'background: #00a040'
+                              "
+                              >{{
+                                addr.chain === '7-11' ? '7-11' : 'FAMI'
+                              }}</span
+                            >
+                            <span class="font-medium">{{
+                              addr.storeName
+                            }}</span>
+                          </div>
+                          <div
+                            class="mt-1 ml-11 flex items-center gap-1 text-sm text-slate-700"
+                          >
+                            <i class="pi pi-map-marker text-xs" />
+                            {{ addr.address }}
+                          </div>
                         </div>
-                        <div
-                          class="mt-1 ml-11 flex items-center gap-1 text-sm text-slate-700"
-                        >
-                          <i class="pi pi-map-marker text-xs" />
-                          {{ addr.address }}
+                        <div class="flex shrink-0 flex-col items-end gap-1">
+                          <button
+                            v-if="!addr.isDefault"
+                            type="button"
+                            class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white/70 hover:text-amber-500"
+                            title="設為預設"
+                            @click.stop="handleSetDefaultStore(addr.id)"
+                          >
+                            <i class="pi pi-star" />
+                          </button>
+                          <button
+                            type="button"
+                            class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white/70 hover:text-red-500"
+                            title="刪除"
+                            @click.stop="handleDeleteStore(addr.id)"
+                          >
+                            <i class="pi pi-trash" />
+                          </button>
                         </div>
                       </div>
-                      <div class="flex shrink-0 items-center gap-2">
-                        <Button
-                          v-if="!addr.isDefault"
-                          label="設為預設"
-                          outlined
-                          size="small"
-                          @click="handleSetDefaultStore(addr.id)"
-                        />
-                        <Button
-                          label="刪除"
-                          severity="danger"
-                          outlined
-                          size="small"
-                          @click="handleDeleteStore(addr.id)"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      label="新增超商地址"
-                      icon="pi pi-plus"
-                      severity="secondary"
-                      outlined
-                      class="!min-h-11 w-full"
+                    </button>
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
                       @click="shipDrawerView = 'add-store'"
-                    />
+                    >
+                      <i class="pi pi-plus" />
+                      <span>新增超商門市</span>
+                    </button>
                   </div>
                 </div>
               </div>
 
-              <div class="mt-4 flex justify-end gap-2">
-                <Button
-                  label="取消"
-                  severity="secondary"
-                  outlined
-                  @click="isShipDrawerVisible = false"
-                />
-                <Button label="確認" @click="isShipDrawerVisible = false" />
+              <!-- 變動已即時生效，底部只留單顆「完成」關閉；X 右上也能關 -->
+              <div class="mt-4 flex justify-end">
+                <Button label="完成" @click="isShipDrawerVisible = false" />
               </div>
             </template>
 
