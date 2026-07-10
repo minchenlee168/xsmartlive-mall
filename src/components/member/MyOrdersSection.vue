@@ -1552,9 +1552,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           >
             <span class="truncate" :title="it.name">{{ it.name }}</span>
             <span class="text-right">{{ it.qty }}</span>
-            <span class="text-right">
-              ${{ it.price.toLocaleString() }}
-            </span>
+            <span class="text-right"> ${{ it.price.toLocaleString() }} </span>
             <span class="text-right">
               ${{ (it.price * it.qty).toLocaleString() }}
             </span>

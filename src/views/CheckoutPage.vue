@@ -30,6 +30,8 @@ interface Coupon {
   disabledReason?: string;
   applicableItemIds?: string[];
   minSpend?: number;
+  // 由輸入優惠碼 / QR 掃描兌換而來 → 列表置頂，方便使用者辨識
+  redeemed?: boolean;
 }
 interface HomeAddress {
   id: string;
@@ -70,6 +72,25 @@ const HOME_SHIPPING_FEE = 150;
 const STORE_SHIPPING_FEE = 60;
 const OTHER_GROUP_FEE = 100;
 const SHIPPING_DISCOUNT = -200;
+
+// Demo 用：優惠代碼 → 對應的優惠券範本。實際會由後端驗證。
+const CODE_TO_COUPON: Record<string, Omit<Coupon, 'id'>> = {
+  SAVE50: {
+    amount: '折50',
+    title: '會員專屬折50券',
+    desc: '訂單直接折抵 $50',
+    scope: '適用範圍：全站',
+    expiry: '有效期限至 2026.02.28 23:00',
+  },
+  EARLY30: {
+    amount: '30%',
+    title: '早鳥七折券',
+    desc: '訂單打 7 折（滿 $500 使用）',
+    scope: '適用範圍：全站',
+    expiry: '有效期限至 2026.02.28 23:00',
+    minSpend: 500,
+  },
+};
 
 const router = useRouter();
 const ui = useUiStore();
@@ -238,6 +259,8 @@ const appliedCoupon = computed(
 );
 const sortedCoupons = computed(() =>
   [...coupons.value].sort((a, b) => {
+    // 兌換來的券永遠置頂，讓使用者確認剛加入的是哪一張
+    if (!!a.redeemed !== !!b.redeemed) return a.redeemed ? -1 : 1;
     const ua = isCouponUsable(a),
       ub = isCouponUsable(b);
     if (ua !== ub) return ua ? -1 : 1;
@@ -261,12 +284,12 @@ const discountedLineTotal = (item: CartItem): number | null => {
     return null;
   return Math.max(0, lineTotalAfterBulk(item) - discountOf(c));
 };
-/** 依購物車拆組後的每組小計（買多優惠後、優惠券後）。 */
+/** 依購物車拆組後的每組小計（買多優惠後、優惠券後，含運費）。 */
 const groupDisplayTotal = (g: CheckoutGroup): number =>
   g.items.reduce(
     (s, i) => s + (discountedLineTotal(i) ?? lineTotalAfterBulk(i)),
     0,
-  );
+  ) + shippingFee.value;
 
 const handleOpenCouponDrawer = () => {
   couponDrawerSelected.value =
@@ -278,9 +301,29 @@ const handleConfirmCouponDrawer = () => {
   isCouponDrawerVisible.value = false;
   ui.toast('已套用選擇的優惠券');
 };
+// 兌換 code → 加入清單置頂並自動選中，但不套用；需按「確定」才生效
 const handleApplyCouponCode = () => {
-  if (!couponCode.value.trim()) return;
-  ui.toast('已套用選擇的優惠券');
+  const code = couponCode.value.trim().toUpperCase();
+  if (!code) return;
+
+  const existingId = `redeem-${code}`;
+  if (coupons.value.some((c) => c.id === existingId)) {
+    couponDrawerSelected.value = existingId;
+    couponCode.value = '';
+    ui.toast('此優惠券已在清單中，已為您選取');
+    return;
+  }
+
+  const template = CODE_TO_COUPON[code];
+  if (!template) {
+    ui.toast('查無此優惠碼');
+    return;
+  }
+
+  coupons.value.unshift({ ...template, id: existingId, redeemed: true });
+  couponDrawerSelected.value = existingId;
+  couponCode.value = '';
+  ui.toast('已兌換優惠券，請按「確定」套用');
 };
 
 const isCouponScannerVisible = ref(false);
@@ -288,7 +331,7 @@ const handleOpenCouponScanner = () => {
   isCouponScannerVisible.value = true;
 };
 const handleFakeScanResult = () => {
-  couponCode.value = `QR${Math.floor(100000 + Math.random() * 900000)}`;
+  couponCode.value = 'SAVE50';
   isCouponScannerVisible.value = false;
   handleApplyCouponCode();
 };
@@ -296,7 +339,7 @@ const handleFakeScanResult = () => {
 // --- Shipping drawer ---
 const isShipDrawerVisible = ref(false);
 const shipDrawerView = ref<ShipDrawerView>('list');
-const shipMethod = ref<ShipMethod>('home');
+const shipMethod = ref<ShipMethod>(null);
 const homeAddresses = ref<HomeAddress[]>([
   {
     id: 'h1',
@@ -471,16 +514,18 @@ const availablePaymentMethods = computed(() =>
   ),
 );
 
-// 目前選中的運送 / 付款方式若不在交集中 → 切成第一個可用的
+// 只有一種運送方式 → 直接鎖定該方式（沒選擇餘地）；
+// 多種 → 讓使用者主動選、運費等選完才顯示；
+// 目前選的方式已不支援 → 清空
 watch(
   supportedShippingMethods,
   (methods) => {
-    if (methods.length === 0) {
-      shipMethod.value = null;
+    if (methods.length === 1) {
+      shipMethod.value = methods[0];
       return;
     }
-    if (!shipMethod.value || !methods.includes(shipMethod.value)) {
-      shipMethod.value = methods[0];
+    if (shipMethod.value && !methods.includes(shipMethod.value)) {
+      shipMethod.value = null;
     }
   },
   { immediate: true },
@@ -497,7 +542,13 @@ watch(
 );
 
 const productTotal = computed(() => itemsSubtotal.value);
-const shippingTotal = computed(() => shippingFee.value + OTHER_GROUP_FEE);
+// 尚未選運送方式 → 運費相關全歸零，等使用者選完再計入
+const shippingTotal = computed(() =>
+  shipMethod.value ? shippingFee.value + OTHER_GROUP_FEE : 0,
+);
+const shippingDiscount = computed(() =>
+  shipMethod.value ? SHIPPING_DISCOUNT : 0,
+);
 const bulkDiscount = computed(() => -bulkDiscountTotal.value);
 const couponDiscount = computed(() =>
   appliedCoupon.value ? -discountOf(appliedCoupon.value) : 0,
@@ -510,14 +561,15 @@ const finalTotal = computed(
     productTotal.value +
     shippingTotal.value +
     bulkDiscount.value +
-    SHIPPING_DISCOUNT +
+    shippingDiscount.value +
     couponDiscount.value -
     rewardPointsNum.value,
 );
 const totalSaved = computed(
   () =>
-    Math.abs(bulkDiscount.value + SHIPPING_DISCOUNT + couponDiscount.value) +
-    rewardPointsNum.value,
+    Math.abs(
+      bulkDiscount.value + shippingDiscount.value + couponDiscount.value,
+    ) + rewardPointsNum.value,
 );
 
 const handlePlaceOrder = () => {
@@ -744,9 +796,19 @@ const handlePlaceOrder = () => {
           </div>
         </div>
 
-        <div class="flex items-center gap-2 px-4 pb-3 text-sm text-slate-700">
+        <div
+          v-if="shipMethod"
+          class="flex items-center gap-2 px-4 pb-3 text-sm text-slate-700"
+        >
           <span class="w-20 font-medium">運費</span>
           <span>${{ shippingFee.toLocaleString() }}</span>
+        </div>
+        <div
+          v-else
+          class="flex items-center gap-2 px-4 pb-3 text-sm text-slate-500"
+        >
+          <span class="w-20 font-medium">運費</span>
+          <span>請先選擇配送方式</span>
         </div>
 
         <div
@@ -863,12 +925,14 @@ const handlePlaceOrder = () => {
             >$ {{ productTotal.toLocaleString() }}</span
           >
 
-          <!-- 運費總金額 -->
-          <div></div>
-          <span class="text-slate-700">運費總金額</span>
-          <span class="text-right text-slate-700"
-            >$ {{ shippingTotal.toLocaleString() }}</span
-          >
+          <!-- 運費總金額 / 免運折抵：尚未選運送方式時整段隱藏 -->
+          <template v-if="shipMethod">
+            <div></div>
+            <span class="text-slate-700">運費總金額</span>
+            <span class="text-right text-slate-700"
+              >$ {{ shippingTotal.toLocaleString() }}</span
+            >
+          </template>
 
           <!-- 多件優惠折抵（動態：買多優惠加總） -->
           <template v-if="bulkDiscountTotal > 0">
@@ -879,28 +943,30 @@ const handlePlaceOrder = () => {
             >
           </template>
 
-          <!-- 符合『滿千免運』提示 -->
-          <!-- 手機：col-span-3 整列顯示在運費折抵上方 -->
-          <div
-            class="col-span-3 flex items-center justify-end gap-1 text-sm @3xl:hidden"
-            style="color: var(--primary)"
-          >
-            <i class="pi pi-truck text-xs" />
-            符合『滿千免運』
-          </div>
-          <!-- PC：與運費折抵同一行；放在 col 1 並 justify-self-end 靠右。
-               用 invisible @3xl:visible 確保手機也佔 grid cell（讓欄位對齊上方） -->
-          <div
-            class="invisible flex items-center gap-1 justify-self-end text-sm @3xl:visible"
-            style="color: var(--primary)"
-          >
-            <i class="pi pi-truck text-xs" />
-            符合『滿千免運』
-          </div>
-          <span class="text-slate-700">運費折抵</span>
-          <span class="text-right text-red-500"
-            >- $ {{ Math.abs(SHIPPING_DISCOUNT).toLocaleString() }}</span
-          >
+          <!-- 符合『滿千免運』提示 + 運費折抵：尚未選運送方式時隱藏 -->
+          <template v-if="shipMethod">
+            <!-- 手機：col-span-3 整列顯示在運費折抵上方 -->
+            <div
+              class="col-span-3 flex items-center justify-end gap-1 text-sm @3xl:hidden"
+              style="color: var(--primary)"
+            >
+              <i class="pi pi-truck text-xs" />
+              符合『滿千免運』
+            </div>
+            <!-- PC：與運費折抵同一行；放在 col 1 並 justify-self-end 靠右。
+                 用 invisible @3xl:visible 確保手機也佔 grid cell（讓欄位對齊上方） -->
+            <div
+              class="invisible flex items-center gap-1 justify-self-end text-sm @3xl:visible"
+              style="color: var(--primary)"
+            >
+              <i class="pi pi-truck text-xs" />
+              符合『滿千免運』
+            </div>
+            <span class="text-slate-700">運費折抵</span>
+            <span class="text-right text-red-500"
+              >- $ {{ Math.abs(SHIPPING_DISCOUNT).toLocaleString() }}</span
+            >
+          </template>
 
           <!-- 已套用優惠券提示 -->
           <template v-if="appliedCoupon">
@@ -1073,7 +1139,7 @@ const handlePlaceOrder = () => {
                   @keyup.enter="handleApplyCouponCode"
                 />
                 <Button
-                  label="使用"
+                  label="兌換"
                   severity="secondary"
                   outlined
                   @click="handleApplyCouponCode"
@@ -1608,7 +1674,6 @@ const handlePlaceOrder = () => {
 .cart-divider-top::before {
   top: 0;
 }
-
 </style>
 
 <!-- 抽屜相關樣式改為非 scoped：Teleport 到 body 的節點失去 scoped attribute 時

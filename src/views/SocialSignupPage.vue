@@ -421,7 +421,7 @@ const handleBackToLogin = () => {
                 />
                 <button
                   type="button"
-                  class="mt-1 self-start cursor-pointer text-sm underline disabled:cursor-not-allowed disabled:no-underline"
+                  class="mt-1 cursor-pointer self-start text-sm underline disabled:cursor-not-allowed disabled:no-underline"
                   :class="canSendVerifyCode ? '' : 'text-slate-400'"
                   :style="canSendVerifyCode ? { color: 'var(--primary)' } : {}"
                   :disabled="!canSendVerifyCode"

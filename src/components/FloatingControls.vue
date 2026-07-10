@@ -72,10 +72,7 @@ const setTempOf = (g: CartGroup, temp: TempLabel | null) => {
   }
   const opt = TEMP_OPTIONS.find((o) => o.value === temp);
   cartStore.updateCart(g.id, {
-    tags: [
-      ...others,
-      { label: temp, type: opt?.tagType ?? 'secondary' },
-    ],
+    tags: [...others, { label: temp, type: opt?.tagType ?? 'secondary' }],
   });
 };
 
@@ -108,17 +105,17 @@ const handleAddRule = () => {
   const firstCartId = cartStore.groups[0]?.id;
   const firstCategory = categoryOptions.value[0]?.value;
   if (!firstCartId || !firstCategory) return;
-  cartStore.addRule(
-    { type: 'category', value: firstCategory },
-    firstCartId,
-  );
+  cartStore.addRule({ type: 'category', value: firstCategory }, firstCartId);
 };
-const handleChangeRuleType = (rule: RoutingRule, type: 'category' | 'productId') => {
+const handleChangeRuleType = (
+  rule: RoutingRule,
+  type: 'category' | 'productId',
+) => {
   if (rule.condition.type === type) return;
   const nextValue =
     type === 'category'
-      ? categoryOptions.value[0]?.value ?? ''
-      : productOptions.value[0]?.value ?? 0;
+      ? (categoryOptions.value[0]?.value ?? '')
+      : (productOptions.value[0]?.value ?? 0);
   cartStore.updateRule(rule.id, {
     condition:
       type === 'category'
@@ -129,11 +126,8 @@ const handleChangeRuleType = (rule: RoutingRule, type: 'category' | 'productId')
 
 /** 新增多件優惠：預設抓第一個未設定的商品，門檻 2 件、單價抓 9 折。 */
 const handleAddDiscount = () => {
-  const usedIds = new Set(
-    cartStore.bulkDiscountRules.map((r) => r.productId),
-  );
-  const firstUnused =
-    products.find((p) => !usedIds.has(p.id)) ?? products[0];
+  const usedIds = new Set(cartStore.bulkDiscountRules.map((r) => r.productId));
+  const firstUnused = products.find((p) => !usedIds.has(p.id)) ?? products[0];
   if (!firstUnused) return;
   const suggested = Math.max(1, Math.round(firstUnused.price * 0.9));
   cartStore.addBulkDiscountRule({
@@ -368,16 +362,17 @@ const buildTimeDisplay = (() => {
               購物車設定
             </span>
             <span class="text-xs text-slate-400">
-              {{ cartStore.groups.length }} 台 · {{ cartStore.routingRules.length }} 規則
+              {{ cartStore.groups.length }} 台 ·
+              {{ cartStore.routingRules.length }} 規則
             </span>
           </button>
 
           <!-- 直播主未用商城：開啟後隱藏商城首頁 / 分類 / 主題館 -->
-          <div class="mt-2 flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-2.5">
+          <div
+            class="mt-2 flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-2.5"
+          >
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-slate-700">
-                直播主未用商城
-              </p>
+              <p class="text-sm font-medium text-slate-700">直播主未用商城</p>
               <p class="mt-0.5 text-xs leading-snug text-slate-400">
                 開啟後隱藏商城首頁、主題館與分類頁，僅保留其他功能
               </p>
@@ -497,7 +492,9 @@ const buildTimeDisplay = (() => {
                     :model-value="g.sellerName"
                     class="w-full"
                     @update:model-value="
-                      cartStore.updateCart(g.id, { sellerName: String($event ?? '') })
+                      cartStore.updateCart(g.id, {
+                        sellerName: String($event ?? ''),
+                      })
                     "
                   />
                 </div>
@@ -558,7 +555,9 @@ const buildTimeDisplay = (() => {
                           cartStore.updateCart(g.id, {
                             shippingMethods: $event
                               ? [...g.shippingMethods, opt.value]
-                              : g.shippingMethods.filter((m) => m !== opt.value),
+                              : g.shippingMethods.filter(
+                                  (m) => m !== opt.value,
+                                ),
                           })
                         "
                       />
@@ -634,7 +633,9 @@ const buildTimeDisplay = (() => {
                   {{ idx + 1 }}
                 </span>
                 <div class="min-w-0 flex-1">
-                  <div class="grid grid-cols-1 gap-3 md:grid-cols-[auto_1fr_auto_1fr]">
+                  <div
+                    class="grid grid-cols-1 gap-3 md:grid-cols-[auto_1fr_auto_1fr]"
+                  >
                     <div>
                       <p class="mb-1 text-xs text-slate-500">條件</p>
                       <SelectButton
@@ -661,7 +662,10 @@ const buildTimeDisplay = (() => {
                         class="w-full"
                         @update:model-value="
                           cartStore.updateRule(rule.id, {
-                            condition: { type: 'category', value: String($event ?? '') },
+                            condition: {
+                              type: 'category',
+                              value: String($event ?? ''),
+                            },
                           })
                         "
                       />
@@ -675,12 +679,17 @@ const buildTimeDisplay = (() => {
                         filter
                         @update:model-value="
                           cartStore.updateRule(rule.id, {
-                            condition: { type: 'productId', value: Number($event) },
+                            condition: {
+                              type: 'productId',
+                              value: Number($event),
+                            },
                           })
                         "
                       />
                     </div>
-                    <div class="flex items-end pb-1 text-xs text-slate-500">→</div>
+                    <div class="flex items-end pb-1 text-xs text-slate-500">
+                      →
+                    </div>
                     <div>
                       <p class="mb-1 text-xs text-slate-500">目標購物車</p>
                       <Select
@@ -745,7 +754,8 @@ const buildTimeDisplay = (() => {
         <TabPanel value="discounts">
           <div class="flex flex-col gap-3">
             <p class="text-xs text-slate-500">
-              「買到 N 件、每件變 M 元」的規則綁在商品上；修改後會即時同步到所有購物車內同商品的顯示與計價。
+              「買到 N 件、每件變 M
+              元」的規則綁在商品上；修改後會即時同步到所有購物車內同商品的顯示與計價。
             </p>
 
             <div
@@ -753,9 +763,7 @@ const buildTimeDisplay = (() => {
               :key="rule.id"
               class="rounded-xl border border-slate-200 p-3"
             >
-              <div
-                class="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr_1fr]"
-              >
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr_1fr]">
                 <div>
                   <p class="mb-1 text-xs text-slate-500">商品</p>
                   <Select

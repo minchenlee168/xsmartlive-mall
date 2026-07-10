@@ -555,7 +555,8 @@ const handleConfirmBundleAdd = () => {
             {{ optMaxQtyCard(overLimitOptCard) }} 個，請調整數量。
           </span>
           <span v-else>
-            已超過 {{ totalPickCount }} 件（目前 {{ pickedTotal }} 件），請減少數量。
+            已超過 {{ totalPickCount }} 件（目前
+            {{ pickedTotal }} 件），請減少數量。
           </span>
         </div>
         <div

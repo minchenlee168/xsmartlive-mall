@@ -77,9 +77,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 180,
     image:
       'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=400&fit=crop',
-    specs: [
-      { label: '口味', options: ['蘋果口味', '香蕉口味', '南瓜口味'] },
-    ],
+    specs: [{ label: '口味', options: ['蘋果口味', '香蕉口味', '南瓜口味'] }],
   },
   {
     id: 9006,
@@ -88,9 +86,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 480,
     image:
       'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&fit=crop',
-    specs: [
-      { label: '顏色', options: ['珍珠白', '玫瑰粉', '午夜藍'] },
-    ],
+    specs: [{ label: '顏色', options: ['珍珠白', '玫瑰粉', '午夜藍'] }],
   },
 ];
 
@@ -216,12 +212,14 @@ const isPausedMode = (g: CartGroup) => g.checkoutMode === 'paused';
 /** 群組層級是否可勾選（決定要不要把整台購物車納入結帳）；paused 以外都能。 */
 const isGroupCheckable = (g: CartGroup) => !isPausedMode(g);
 /** 商品層級是否可勾選（default 是「整台一起」不能單選；paused 也不行）。 */
-const isItemCheckable = (g: CartGroup) =>
-  isPickableMode(g) || isAbandonMode(g);
+const isItemCheckable = (g: CartGroup) => isPickableMode(g) || isAbandonMode(g);
 /** 模式徽章：只有 default 需要顯示「禁止棄標」；其他模式不特別打 tag。 */
 const modeBadgeOf = (
   g: CartGroup,
-): { label: string; severity: 'info' | 'danger' | 'secondary' | 'success' } | null => {
+): {
+  label: string;
+  severity: 'info' | 'danger' | 'secondary' | 'success';
+} | null => {
   if (isDefaultMode(g)) return { label: '禁止棄標', severity: 'danger' };
   return null;
 };
@@ -251,7 +249,11 @@ const bundleNeedsAttention = (item: CartItem): boolean => {
   if (isPickBundleItem(item)) {
     const cat = products.find((p) => p.id === item.productId);
     const need = (cat?.pickCount ?? 0) * item.qty;
-    return subIssue || pickedTotalOf(item) !== need || pickBundleOverSub(item) !== null;
+    return (
+      subIssue ||
+      pickedTotalOf(item) !== need ||
+      pickBundleOverSub(item) !== null
+    );
   }
   return subIssue;
 };
@@ -555,7 +557,11 @@ const handleGoProduct = (productId?: number) => {
           >
             <!-- Checkbox + 圖片：default 是整台一起、paused 不能結帳，都不顯示 item 勾選 -->
             <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
-              <Checkbox v-if="isItemCheckable(group)" v-model="item.checked" binary />
+              <Checkbox
+                v-if="isItemCheckable(group)"
+                v-model="item.checked"
+                binary
+              />
               <button
                 type="button"
                 class="aspect-square w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-lg @3xl:w-20 @7xl:w-[100px]"
@@ -939,7 +945,10 @@ const handleGoProduct = (productId?: number) => {
                         class="absolute inset-0 flex items-center justify-center leading-none font-black select-none"
                         style="
                           color: #932c2c;
-                          font-family: system-ui, -apple-system, sans-serif;
+                          font-family:
+                            system-ui,
+                            -apple-system,
+                            sans-serif;
                           font-size: min(60cqw, 220px);
                         "
                       >
@@ -1071,9 +1080,7 @@ const handleGoProduct = (productId?: number) => {
         <div v-if="addOnDialog.specs?.length" class="flex flex-col gap-1.5">
           <label class="text-sm font-medium text-slate-700">
             {{
-              addOnDialog.specs.length > 1
-                ? '規格'
-                : addOnDialog.specs[0].label
+              addOnDialog.specs.length > 1 ? '規格' : addOnDialog.specs[0].label
             }}
           </label>
           <Select
@@ -1085,9 +1092,7 @@ const handleGoProduct = (productId?: number) => {
 
         <!-- 數量 -->
         <div class="flex items-center gap-3">
-          <label
-            class="w-14 shrink-0 text-sm font-medium text-slate-700"
-          >
+          <label class="w-14 shrink-0 text-sm font-medium text-slate-700">
             數量
           </label>
           <InputNumber

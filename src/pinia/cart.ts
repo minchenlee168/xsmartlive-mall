@@ -294,7 +294,8 @@ export const useCartStore = defineStore('cart', () => {
     const g: CartGroup = {
       id: Date.now(),
       sellerName:
-        patch?.sellerName ?? `${todayMMDD()} 新直播小舖 ${groups.value.length + 1}`,
+        patch?.sellerName ??
+        `${todayMMDD()} 新直播小舖 ${groups.value.length + 1}`,
       tags: patch?.tags ?? [],
       items: [],
       shippingMethods: patch?.shippingMethods ?? ['home', 'store'],
@@ -370,7 +371,9 @@ export const useCartStore = defineStore('cart', () => {
     syncBulkDiscountsToItems();
   }
   function removeBulkDiscountRule(id: string) {
-    bulkDiscountRules.value = bulkDiscountRules.value.filter((r) => r.id !== id);
+    bulkDiscountRules.value = bulkDiscountRules.value.filter(
+      (r) => r.id !== id,
+    );
     syncBulkDiscountsToItems();
   }
 
