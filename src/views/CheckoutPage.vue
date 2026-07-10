@@ -1680,27 +1680,28 @@ const handlePlaceOrder = () => {
      backdrop / panel 會樣式失效，改用全域選擇器最穩。 -->
 <style>
 /* ===== Drawer =====
- * 抽屜以 frame 視覺座標定位（--frame-left / --frame-width / --frame-bottom 由 App.vue 設定），
- * 沒設時 fallback 到視窗座標。抽屜寬度直接等於 frame 寬度（= 視窗寬或模擬器寬），
- * 內容區再透過 max-w-[680px] mx-auto 自行置中，桌機才不會看起來太寬。
- * 抽屜為 position:fixed，脫離 @container 子樹，因此 RWD 用 @media，不用 Tailwind container query。
+ * 預設走純 viewport 座標，避免 --frame-bottom 首次計算時內容還沒完整撐開被算成正數，
+ * 把抽屜推離視窗底部（PC 尺寸「往上跑」的根本原因）。
+ * 只有裝置模擬器開啟時（App.vue 會加 html.frame-mode），才切到 frame 座標讓抽屜貼在
+ * 模擬視窗內。
+ * 抽屜 position:fixed 脫離 @container 子樹，RWD 用 @media，不用 container query。
  */
 .drawer-backdrop {
   position: fixed;
   top: 0;
-  left: var(--frame-left, 0);
-  width: var(--frame-width, 100vw);
-  height: calc(100vh - var(--frame-bottom, 0px));
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.4);
   z-index: 100;
 }
 .drawer-panel {
   position: fixed;
-  left: calc(var(--frame-left, 0px) + var(--frame-width, 100vw) / 2);
-  bottom: var(--frame-bottom, 0px);
+  left: 50vw;
+  bottom: 0;
   transform: translateX(-50%);
-  /* PC 版限寬 720px 貼合內容，不再吃滿整個 frame 寬 */
-  width: min(720px, var(--frame-width, 100vw));
+  /* PC 版限寬 720px 貼合內容 */
+  width: min(720px, 100vw);
   max-width: 100vw;
   z-index: 110;
   background: white;
@@ -1710,18 +1711,21 @@ const handlePlaceOrder = () => {
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
 }
 
-/* 視窗縮到手機寬時，--frame-* 可能尚未就緒或值不準，
-   強制抽屜貼在視窗底部（bottom: 0）、固定 390px（手機設計稿寬度），
-   視窗更窄就跟著縮，避免水平 overflow。
-   抽屜本體已 translateX(-50%) 置中，遮罩鋪滿不影響定位。 */
+/* 裝置模擬器模式：抽屜貼在模擬框視覺座標內 */
+html.frame-mode .drawer-backdrop {
+  left: var(--frame-left, 0);
+  width: var(--frame-width, 100vw);
+  height: calc(100vh - var(--frame-bottom, 0px));
+}
+html.frame-mode .drawer-panel {
+  left: calc(var(--frame-left, 0px) + var(--frame-width, 100vw) / 2);
+  bottom: var(--frame-bottom, 0px);
+  width: min(720px, var(--frame-width, 100vw));
+}
+
+/* 瀏覽器實體視窗窄於 768px：抽屜縮到手機設計稿寬度 */
 @media (max-width: 768px) {
-  .drawer-backdrop {
-    left: 0 !important;
-    width: 100vw !important;
-  }
   .drawer-panel {
-    left: 50vw !important;
-    bottom: 0 !important;
     width: min(390px, 100vw) !important;
   }
 }

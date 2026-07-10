@@ -135,21 +135,22 @@ const coupons: Coupon[] = [
 </template>
 
 <style>
-/* 跟 CheckoutPage 同一套手刻 drawer：用 frame CSS 變數定位、自己處理 enter / leave 動畫，
-   不再經過 PrimeVue Drawer 的 transform 動畫計算（避免在 < 768 與 frame 模式有時序衝突）。 */
+/* 跟 CheckoutPage 同一套手刻 drawer：預設走 viewport 座標避免 --frame-bottom 首次計算時
+   內容還沒撐開被算成正數把 drawer 推離視窗底部（PC「往上跑」根源），只有裝置模擬器開啟
+   時才切到 frame 座標。 */
 .coupon-drawer-backdrop {
   position: fixed;
   top: 0;
-  left: var(--frame-left, 0);
-  width: var(--frame-width, 100vw);
-  height: calc(100vh - var(--frame-bottom, 0px));
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.4);
   z-index: 1000;
 }
 .coupon-drawer-panel {
   position: fixed;
-  left: calc(var(--frame-left, 0px) + var(--frame-width, 100vw) / 2);
-  bottom: var(--frame-bottom, 0px);
+  left: 50vw;
+  bottom: 0;
   transform: translateX(-50%);
   z-index: 1010;
   background: white;
@@ -160,19 +161,15 @@ const coupons: Coupon[] = [
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
 }
 
-/* 自動 RWD 縮到手機寬：背景遮罩全螢幕；drawer 硬鎖 bottom: 0，不再依賴 --frame-bottom，
-   避免 frame 元素在 updateFrameVars 第一次跑時內容還沒完整渲染，--frame-bottom 算到正數
-   把 drawer 推離螢幕底部（要拉動視窗才正常的根本原因） */
-@media (max-width: 768px) {
-  .coupon-drawer-backdrop {
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-  }
-  .coupon-drawer-panel {
-    left: 50vw !important;
-    bottom: 0 !important;
-  }
+/* 裝置模擬器模式：抽屜貼在模擬框視覺座標內 */
+html.frame-mode .coupon-drawer-backdrop {
+  left: var(--frame-left, 0);
+  width: var(--frame-width, 100vw);
+  height: calc(100vh - var(--frame-bottom, 0px));
+}
+html.frame-mode .coupon-drawer-panel {
+  left: calc(var(--frame-left, 0px) + var(--frame-width, 100vw) / 2);
+  bottom: var(--frame-bottom, 0px);
 }
 
 .drawer-fade-enter-active,

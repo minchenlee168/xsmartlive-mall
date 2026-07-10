@@ -642,10 +642,6 @@ const handleGoProduct = (productId?: number) => {
                     >
                       NTD ${{ lineDisplayTotal(item).toLocaleString() }}
                     </span>
-                    <span class="text-xs whitespace-nowrap text-slate-500">
-                      單價 ${{ effectiveUnitPrice(item).toLocaleString() }} ×
-                      {{ item.qty }}
-                    </span>
                   </template>
                   <template v-else>
                     <span
