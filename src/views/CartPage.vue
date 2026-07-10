@@ -122,7 +122,11 @@ const ui = useUiStore();
 const cart = useCartStore();
 
 const groups = computed(() => cart.groups);
-const isEmpty = computed(() => groups.value.every((g) => g.items.length === 0));
+/** 購物車頁只顯示「有商品」的購物車；加購區 picker 另有 allCarts 涵蓋全 mall */
+const visibleGroups = computed(() =>
+  groups.value.filter((g) => g.items.length > 0),
+);
+const isEmpty = computed(() => visibleGroups.value.length === 0);
 
 // 圖片放大預覽
 const isImagePreviewOpen = ref(false);
@@ -530,7 +534,7 @@ const handleGoProduct = (productId?: number) => {
       style="gap: var(--stack-gap)"
     >
       <div
-        v-for="group in groups"
+        v-for="group in visibleGroups"
         :key="group.id"
         class="rounded-xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)]"
       >
@@ -635,6 +639,7 @@ const handleGoProduct = (productId?: number) => {
                   <InputNumber
                     v-model="item.qty"
                     :min="1"
+                    :disabled="isPausedMode(group)"
                     show-buttons
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"
@@ -816,6 +821,7 @@ const handleGoProduct = (productId?: number) => {
                       <InputNumber
                         :model-value="sub.qty"
                         :min="0"
+                        :disabled="isPausedMode(group)"
                         show-buttons
                         button-layout="horizontal"
                         increment-button-icon="pi pi-plus"
