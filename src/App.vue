@@ -8,11 +8,11 @@ import {
   nextTick,
 } from 'vue';
 import { RouterView, useRoute, useRouter } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
 import FloatingControls from './components/FloatingControls.vue';
 import AppFooter from './components/AppFooter.vue';
 import PageLoading from './components/PageLoading.vue';
 import AuroraShell from './components/AuroraShell.vue';
+import AppToast from './components/AppToast.vue';
 import { useViewportStore } from './pinia/viewport';
 import { useUiStore } from './pinia/ui';
 import { useThemeStore } from './pinia/theme';
@@ -61,8 +61,6 @@ const useAuroraShell = computed(
 );
 const appearanceId = computed(() => themeStore.current.id);
 
-// 把 PrimeVue ToastService 注入 ui store，讓全域 ui.toast() 走 PrimeVue <Toast>
-ui.setToastService(useToast());
 const frameRef = ref<HTMLElement | null>(null);
 // 商城前台：所有頁面都允許 frame；入口頁外都顯示 FloatingControls
 const isFullscreen = computed(() => false);
@@ -181,8 +179,8 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
   <!-- 換頁 loading 遮罩 -->
   <PageLoading />
 
-  <!-- PrimeVue 全域 Toast：畫面正中、一次只顯示一個（add 前會 removeAllGroups） -->
-  <Toast position="center" />
+  <!-- 全域 Toast：手刻元件、畫面正中、一次一則、由 ui.currentToast 驅動 -->
+  <AppToast />
 
   <!-- 加入購物車成功彈窗：白底、靠上、不遮罩、3 秒後自動消失 -->
   <Dialog

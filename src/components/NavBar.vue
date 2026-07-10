@@ -76,6 +76,7 @@ const handleLogout = () => {
   auth.logout();
   isUserMenuOpen.value = false;
   router.push(homePath.value);
+  ui.toast('已登出');
 };
 const handleDocClick = (e: MouseEvent) => {
   const target = e.target as HTMLElement;

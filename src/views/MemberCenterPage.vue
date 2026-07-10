@@ -144,12 +144,18 @@ const handleEditProfile = () => {
   activeSub.value = 'profile';
 };
 
-// Verification code countdown
-const { remaining: codeCountdown, start: startCodeCountdown } = useCountdown();
+// Verification code countdown + 是否已按過發送（決定顯示發送按鈕 or 驗證碼輸入區）
+const {
+  remaining: codeCountdown,
+  start: startCodeCountdown,
+  reset: resetCodeCountdown,
+} = useCountdown();
+const hasSentPhoneCode = ref(false);
 const handleSendVerifyCode = () => {
   if (codeCountdown.value > 0) return;
-  ui.toast('驗證碼已發送（示意）');
+  hasSentPhoneCode.value = true;
   startCodeCountdown(VERIFY_CODE_COOLDOWN_SEC);
+  ui.toast('驗證碼已發送（示意）');
 };
 
 watch(
@@ -175,12 +181,11 @@ readSubFromRoute();
 watch(() => route.query.sub, readSubFromRoute);
 
 // Saved baseline — updated only after a successful save
+// 手機號碼改由 auth store 管（結帳頁要跨頁讀），這裡只留其他個資
 const snapshot = reactive({
   name: '王小明',
   gender: 'male' as 'male' | 'female' | 'other',
   birthday: '1990-01-01',
-  phoneCode: '+886',
-  phone: '09123456789',
   email: 'abc@gmail.com',
 });
 
@@ -189,9 +194,9 @@ const name = ref(snapshot.name);
 const gender = ref<'male' | 'female' | 'other'>(snapshot.gender);
 const birthday = ref<Date>(parseDashDate(snapshot.birthday));
 
-// Phone form
-const phoneCode = ref(snapshot.phoneCode);
-const phone = ref(snapshot.phone);
+// Phone form（跟 auth store 的已綁定值做 dirty 比對；儲存後回寫 auth）
+const phoneCode = ref(auth.phoneCode);
+const phone = ref(auth.phone);
 const verifyCode = ref('');
 
 // Email form
@@ -204,8 +209,7 @@ const isProfileDirty = computed(
     formatDashDate(birthday.value) !== snapshot.birthday,
 );
 const isPhoneDirty = computed(
-  () =>
-    phoneCode.value !== snapshot.phoneCode || phone.value !== snapshot.phone,
+  () => phoneCode.value !== auth.phoneCode || phone.value !== auth.phone,
 );
 const isEmailDirty = computed(() => email.value !== snapshot.email);
 
@@ -217,10 +221,19 @@ const handleSaveProfile = () => {
 };
 const handleSavePhone = () => {
   if (!isPhoneDirty.value) return;
-  snapshot.phoneCode = phoneCode.value;
-  snapshot.phone = phone.value;
+  auth.setPhone(phoneCode.value, phone.value);
   verifyCode.value = '';
+  hasSentPhoneCode.value = false;
+  resetCodeCountdown();
+  ui.toast('手機號碼已更新');
 };
+// 手機號碼被改動 → 之前送的驗證碼作廢，回到「發送驗證碼」狀態
+watch([phoneCode, phone], () => {
+  if (!hasSentPhoneCode.value) return;
+  hasSentPhoneCode.value = false;
+  verifyCode.value = '';
+  resetCodeCountdown();
+});
 const handleSaveEmail = () => {
   if (!isEmailDirty.value) return;
   snapshot.email = email.value;
@@ -1374,25 +1387,37 @@ const handleSaveAddr = () => {
                   <InputText v-model="phone" type="tel" class="flex-1" />
                 </div>
               </div>
-              <div class="flex gap-2">
+              <!-- 尚未發送過：全寬「發送驗證碼」按鈕
+                   已發送過：驗證碼輸入框 + 底下「重新發送」連結（跟登入 / 註冊頁一致） -->
+              <div v-if="!hasSentPhoneCode">
+                <Button
+                  :disabled="!phone"
+                  label="發送驗證碼"
+                  class="!min-h-11 w-full"
+                  @click="handleSendVerifyCode"
+                />
+              </div>
+              <div v-else class="flex flex-col gap-1">
                 <InputText
                   v-model="verifyCode"
                   placeholder="請輸入六位數驗證碼"
                   maxlength="6"
-                  class="flex-1"
+                  class="w-full"
                 />
-                <Button
+                <button
+                  type="button"
+                  class="mt-1 cursor-pointer self-start text-sm underline disabled:cursor-not-allowed disabled:no-underline"
+                  :class="codeCountdown > 0 ? 'text-slate-400' : ''"
+                  :style="codeCountdown > 0 ? {} : { color: 'var(--primary)' }"
                   :disabled="codeCountdown > 0"
-                  :label="
-                    codeCountdown > 0
-                      ? `${codeCountdown}s 後重新發送`
-                      : '發送驗證碼'
-                  "
-                  severity="secondary"
-                  outlined
-                  class="whitespace-nowrap"
                   @click="handleSendVerifyCode"
-                />
+                >
+                  {{
+                    codeCountdown > 0
+                      ? `${codeCountdown} 秒後可重新發送`
+                      : '重新發送驗證碼'
+                  }}
+                </button>
               </div>
             </div>
             <div class="mt-6 flex justify-end">

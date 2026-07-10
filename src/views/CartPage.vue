@@ -366,15 +366,12 @@ const handleOpenAddOnDialog = (p: AddOnProduct) => {
   addOnDialogQty.value = 1;
 };
 
-// 加購區流程：先按「更多加購商品 N 件」→ 彈窗選 cart → 回到頁面顯示該 cart 的加購區
-/** 有加購商品的購物車清單（picker Dialog 只列這些）。 */
-const cartsWithAddOns = computed(() =>
-  groups.value.filter((g) => (g.addOnProductIds?.length ?? 0) > 0),
-);
-/** 全站加購商品總類數（給「更多加購商品 N 件」按鈕顯示）。 */
+// 加購區流程：先按「更多加購商品 N 件」→ 彈窗列出全商城購物車 → 選一台顯示該 cart 的加購區
+/** 商城全部購物車清單（picker Dialog 列出所有 seed，不侷限於使用者已加購物的） */
+const allCarts = computed(() => groups.value);
+/** 全站加購商品總類數（給「更多加購商品 N 件」按鈕顯示，跨全部購物車去重） */
 const totalAddOnCount = computed(
-  () =>
-    new Set(cartsWithAddOns.value.flatMap((g) => g.addOnProductIds ?? [])).size,
+  () => new Set(allCarts.value.flatMap((g) => g.addOnProductIds ?? [])).size,
 );
 const isCartPickerVisible = ref(false);
 /** 已選擇的加購目標 cart id；null 表示還在初始「按鈕」狀態。 */
@@ -855,7 +852,7 @@ const handleGoProduct = (productId?: number) => {
       <!-- 加購區：初始只有「更多加購商品 N 件」按鈕；
            選完 cart 後顯示該 cart 專屬加購清單 -->
       <section
-        v-if="cartsWithAddOns.length > 0"
+        v-if="allCarts.length > 0"
         class="shadow-card rounded-xl bg-white"
       >
         <!-- Header：兩種狀態 -->
@@ -898,6 +895,15 @@ const handleGoProduct = (productId?: number) => {
             class="!min-h-12 !px-6"
             @click="handleOpenCartPicker"
           />
+        </div>
+
+        <!-- State B-空：選中的 cart 沒有加購商品 -->
+        <div
+          v-else-if="addOnsOfSelectedCart.length === 0"
+          class="flex flex-col items-center gap-2 px-4 py-8 text-center"
+        >
+          <i class="pi pi-inbox text-3xl text-slate-300" />
+          <p class="text-sm text-slate-500">此購物車目前沒有可加購的商品</p>
         </div>
 
         <!-- State B：已選 cart → 該 cart 加購清單 -->
@@ -1120,16 +1126,16 @@ const handleGoProduct = (productId?: number) => {
       modal
       :draggable="false"
       dismissable-mask
-      header="選擇要加購的購物車"
+      header="選擇購物車"
       :style="{ width: '440px' }"
       :breakpoints="{ '768px': '92vw' }"
     >
-      <div class="flex flex-col gap-2">
+      <div class="flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
         <p class="mb-1 text-sm text-slate-600">
           選好購物車後，下方將顯示該台的加購商品。
         </p>
         <button
-          v-for="g in cartsWithAddOns"
+          v-for="g in allCarts"
           :key="g.id"
           class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-3 text-left transition-colors hover:border-[var(--primary)] hover:bg-slate-50"
           :class="

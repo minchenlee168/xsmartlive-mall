@@ -11,6 +11,8 @@ import {
   type PaymentMethodId,
 } from '../pinia/cart';
 import { useOrdersStore } from '../pinia/orders';
+import { useAuthStore } from '../pinia/auth';
+import { useCountdown } from '../composables/useCountdown';
 
 interface CheckoutGroup {
   id: number;
@@ -98,6 +100,57 @@ const router = useRouter();
 const ui = useUiStore();
 const cartStore = useCartStore();
 const ordersStore = useOrdersStore();
+const authStore = useAuthStore();
+
+// 手機未綁定 → 按「去付款」時擋下，跳綁定 Dialog 走 inline 綁定流程（不離開結帳頁）
+const BIND_CODE_LENGTH = 6;
+const BIND_RESEND_COOLDOWN_SEC = 60;
+const isBindPhoneDialogVisible = ref(false);
+const bindPhoneCode = ref('+886');
+const bindPhone = ref('');
+const bindVerifyCode = ref('');
+const hasSentBindCode = ref(false);
+const {
+  remaining: bindCountdown,
+  start: startBindCountdown,
+  reset: resetBindCountdown,
+} = useCountdown();
+const canSendBindCode = computed(
+  () => !!bindPhone.value.trim() && bindCountdown.value === 0,
+);
+const canCompleteBind = computed(
+  () =>
+    hasSentBindCode.value && bindVerifyCode.value.length === BIND_CODE_LENGTH,
+);
+const openBindPhoneDialog = () => {
+  bindPhoneCode.value = authStore.phoneCode || '+886';
+  bindPhone.value = authStore.phone;
+  bindVerifyCode.value = '';
+  hasSentBindCode.value = false;
+  resetBindCountdown();
+  isBindPhoneDialogVisible.value = true;
+};
+const handleSendBindCode = () => {
+  if (!canSendBindCode.value) return;
+  hasSentBindCode.value = true;
+  startBindCountdown(BIND_RESEND_COOLDOWN_SEC);
+  ui.toast('驗證碼已發送（示意）');
+};
+const handleCompleteBind = () => {
+  if (!canCompleteBind.value) return;
+  authStore.setPhone(bindPhoneCode.value, bindPhone.value);
+  isBindPhoneDialogVisible.value = false;
+  ui.toast('手機號碼綁定完成');
+  // 綁完後直接繼續走結帳流程（此時 hasPhoneBound 已 true，不會再被攔）
+  handlePlaceOrder();
+};
+// 手機號碼改動 → 之前送的驗證碼作廢，回到未發送狀態
+watch([bindPhoneCode, bindPhone], () => {
+  if (!hasSentBindCode.value) return;
+  hasSentBindCode.value = false;
+  bindVerifyCode.value = '';
+  resetBindCountdown();
+});
 
 /** 依購物車拆組的商品明細；每組只保留有勾選的商品（結帳頁只讀，不可改動）。 */
 const checkoutGroups = computed<CheckoutGroup[]>(() =>
@@ -609,6 +662,11 @@ const totalSaved = computed(
 );
 
 const handlePlaceOrder = () => {
+  // 未綁定手機 → 攔下、開 inline 綁定 Dialog；綁完會自動再跑一次這個函式
+  if (!authStore.hasPhoneBound) {
+    openBindPhoneDialog();
+    return;
+  }
   const method =
     PAYMENT_METHODS.find((m) => m.value === paymentMethod.value)?.label ??
     '線上信用卡';
@@ -1090,6 +1148,89 @@ const handlePlaceOrder = () => {
         />
       </div>
     </div>
+
+    <!-- ============== 綁定手機 Dialog（inline 流程，綁完直接回到結帳） ============== -->
+    <Dialog
+      v-model:visible="isBindPhoneDialogVisible"
+      modal
+      :draggable="false"
+      :style="{ width: '440px' }"
+      :breakpoints="{ '768px': '92vw' }"
+    >
+      <template #header>
+        <span class="text-base font-bold text-slate-950">綁定手機號碼</span>
+      </template>
+      <div class="flex flex-col gap-4 py-1">
+        <p class="text-sm text-slate-600">
+          結帳前需要一組手機號碼作為訂單聯絡方式，輸入並完成驗證即可繼續。
+        </p>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-sm font-medium text-slate-700">手機號碼</label>
+          <div class="flex gap-2">
+            <Select
+              v-model="bindPhoneCode"
+              :options="DRAWER_COUNTRY_CODES"
+              class="w-[110px] shrink-0"
+            />
+            <InputText
+              v-model="bindPhone"
+              type="tel"
+              placeholder="請輸入手機號碼"
+              class="flex-1"
+            />
+          </div>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-sm font-medium text-slate-700">簡訊驗證碼</label>
+          <!-- 尚未發送：全寬「發送驗證碼」；已發送：顯示驗證碼輸入框 + 重新發送連結 -->
+          <div v-if="!hasSentBindCode">
+            <Button
+              :disabled="!canSendBindCode"
+              label="發送驗證碼"
+              class="!min-h-11 w-full"
+              @click="handleSendBindCode"
+            />
+          </div>
+          <div v-else class="flex flex-col gap-1">
+            <InputText
+              v-model="bindVerifyCode"
+              :maxlength="BIND_CODE_LENGTH"
+              placeholder="請輸入六位數驗證碼"
+              class="w-full"
+            />
+            <button
+              type="button"
+              class="mt-1 cursor-pointer self-start text-sm underline disabled:cursor-not-allowed disabled:no-underline"
+              :class="bindCountdown > 0 ? 'text-slate-400' : ''"
+              :style="bindCountdown > 0 ? {} : { color: 'var(--primary)' }"
+              :disabled="bindCountdown > 0"
+              @click="handleSendBindCode"
+            >
+              {{
+                bindCountdown > 0
+                  ? `${bindCountdown} 秒後可重新發送`
+                  : '重新發送驗證碼'
+              }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <Button
+            label="取消"
+            severity="secondary"
+            outlined
+            @click="isBindPhoneDialogVisible = false"
+          />
+          <Button
+            label="完成綁定"
+            :disabled="!canCompleteBind"
+            @click="handleCompleteBind"
+          />
+        </div>
+      </template>
+    </Dialog>
 
     <!-- ============== Coupon QR Scanner ============== -->
     <Dialog

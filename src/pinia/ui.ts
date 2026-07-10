@@ -3,43 +3,45 @@ import { ref } from 'vue';
 
 export type ToastSeverity = 'success' | 'info' | 'warn' | 'error';
 
-/**
- * 最小 PrimeVue ToastService 介面，避開直接 import PrimeVue 型別。
- * App.vue 在 setup() 內呼叫 useToast()，再透過 setToastService 注入這裡。
- */
-interface ToastServiceLike {
-  add: (options: {
-    severity?: ToastSeverity;
-    summary?: string;
-    detail?: string;
-    life?: number;
-    closable?: boolean;
-  }) => void;
-  removeAllGroups: () => void;
+export interface ToastState {
+  id: number;
+  severity: ToastSeverity;
+  summary: string;
+  detail?: string;
 }
 
 const TOAST_LIFE_MS = 2500;
+let toastSeq = 0;
+let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useUiStore = defineStore('ui', () => {
-  let toastService: ToastServiceLike | null = null;
-  const setToastService = (svc: ToastServiceLike) => {
-    toastService = svc;
-  };
+  /** 目前顯示的 toast；一次一則。 */
+  const currentToast = ref<ToastState | null>(null);
 
   /**
-   * 顯示一則 PrimeVue Toast。預設視為「成功訊息」；
-   * 失敗（error）或警告（warn）請在呼叫端明確帶入 severity，
+   * 顯示一則 toast。預設「成功訊息」；失敗（error）或警告（warn）由呼叫端指定，
    * 例如 `ui.toast('複製失敗', 'error')`。
-   * 一次只顯示一則，避免堆疊。
+   * 新的 toast 會直接覆蓋舊的、重置倒數。
    */
-  const toast = (message: string, severity: ToastSeverity = 'success') => {
-    if (!toastService) return;
-    toastService.removeAllGroups();
-    toastService.add({
-      severity,
-      summary: message,
-      life: TOAST_LIFE_MS,
-    });
+  const toast = (
+    message: string,
+    severity: ToastSeverity = 'success',
+    detail?: string,
+  ) => {
+    toastSeq += 1;
+    if (toastHideTimer) clearTimeout(toastHideTimer);
+    currentToast.value = { id: toastSeq, severity, summary: message, detail };
+    toastHideTimer = setTimeout(() => {
+      currentToast.value = null;
+      toastHideTimer = null;
+    }, TOAST_LIFE_MS);
+  };
+  const hideToast = () => {
+    if (toastHideTimer) {
+      clearTimeout(toastHideTimer);
+      toastHideTimer = null;
+    }
+    currentToast.value = null;
   };
 
   // 換頁 loading 狀態（由 router 導航守衛切換）
@@ -64,8 +66,9 @@ export const useUiStore = defineStore('ui', () => {
   };
 
   return {
-    setToastService,
+    currentToast,
     toast,
+    hideToast,
     routeLoading,
     setRouteLoading,
     frameScrollLocked,

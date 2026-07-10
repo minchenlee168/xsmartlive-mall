@@ -291,6 +291,17 @@ const orderCanCancel = (order: OrderRecord): boolean => {
   return steps.length > 0 && steps.every(canCancelStep);
 };
 
+/** 更換配送地址階段：備貨中（to_receive）以前才允許（unpaid / to_ship / to_receive）。 */
+const canChangeAddressStep = (step: TimelineStep['key']): boolean => {
+  return step === 'unpaid' || step === 'to_ship' || step === 'to_receive';
+};
+/** 整筆訂單是否可更換地址：已取消 / 已退貨 → false；否則所有包裹都要在 to_receive 以前。 */
+const orderCanChangeAddress = (order: OrderRecord): boolean => {
+  if (order.status === 'cancelled' || order.status === 'returned') return false;
+  const steps = allPackageSteps(order);
+  return steps.length > 0 && steps.every(canChangeAddressStep);
+};
+
 /** 手機版狀態 chip：根據 currentStep 給對應 icon。 */
 const stepIcon = (key: TimelineStep['key']): string => {
   return TIMELINE_STEPS.find((s) => s.key === key)?.icon ?? 'pi-circle';
@@ -868,12 +879,13 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 class="w-full"
                 @click="handleCancelOrder(order)"
               />
-              <!-- 更換地址 tab：全寬「更換配送地址」按鈕 -->
+              <!-- 更換地址 tab：全寬「更換配送地址」按鈕；備貨中之後不可改 -->
               <Button
                 v-if="order.detailTab === 'address'"
                 label="更換配送地址"
                 outlined
                 class="w-full"
+                :disabled="!orderCanChangeAddress(order)"
                 @click="handleOpenChangeAddress"
               />
             </div>
@@ -923,13 +935,14 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               class="shrink-0"
               @click="handleCancelOrder(order)"
             />
-            <!-- 更換地址 tab：右側「更換配送地址」按鈕 -->
+            <!-- 更換地址 tab：右側「更換配送地址」按鈕；備貨中之後不可改 -->
             <Button
               v-if="order.detailTab === 'address'"
               label="更換配送地址"
               outlined
               size="small"
               class="shrink-0"
+              :disabled="!orderCanChangeAddress(order)"
               @click="handleOpenChangeAddress"
             />
           </div>

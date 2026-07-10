@@ -1,7 +1,6 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import PrimeVue from 'primevue/config';
-import ToastService from 'primevue/toastservice';
 import ConfirmationService from 'primevue/confirmationservice';
 import Tooltip from 'primevue/tooltip';
 import Aura from '@primeuix/themes/aura';
@@ -27,7 +26,6 @@ import Carousel from 'primevue/carousel';
 import Tag from 'primevue/tag';
 import Badge from 'primevue/badge';
 import OverlayBadge from 'primevue/overlaybadge';
-import Toast from 'primevue/toast';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
@@ -97,7 +95,6 @@ app
       },
     },
   })
-  .use(ToastService)
   .use(ConfirmationService);
 
 app.component('FontAwesomeIcon', FontAwesomeIcon);
@@ -118,7 +115,6 @@ app.component('Carousel', Carousel);
 app.component('Tag', Tag);
 app.component('Badge', Badge);
 app.component('OverlayBadge', OverlayBadge);
-app.component('Toast', Toast);
 app.component('Tabs', Tabs);
 app.component('TabList', TabList);
 app.component('Tab', Tab);
