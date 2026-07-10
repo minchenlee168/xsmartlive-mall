@@ -206,3 +206,107 @@ html.frame-mode .p-drawer-mask {
   width: var(--frame-width, 100vw) !important;
   height: calc(100vh - var(--frame-bottom, 0px)) !important;
 }
+
+/* ═════════════ PrimeVue Toast 全站樣式 ═════════════
+   目標：icon 在上、訊息在下，中央置中；白底深字。
+   - position="center" 由 App.vue 設定
+   - 關閉 X 固定右上
+   - Icon 依 severity 上色（綠 / 藍 / 琥珀 / 紅），深字襯白底 */
+.p-toast {
+  width: min(360px, calc(100vw - 32px));
+  z-index: 9999;
+}
+.p-toast .p-toast-message {
+  position: relative;
+  overflow: hidden;
+  padding: 20px 40px 18px 20px;
+  margin-bottom: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow:
+    0 20px 40px -12px rgba(15, 23, 42, 0.18),
+    0 8px 16px -8px rgba(15, 23, 42, 0.1);
+  color: #0f172a;
+}
+/* 內容 stack 垂直居中：icon 在上、字在下 */
+.p-toast .p-toast-message-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 0;
+  border: none;
+}
+.p-toast .p-toast-message-icon,
+.p-toast .p-toast-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 26px;
+  line-height: 1;
+}
+.p-toast .p-toast-summary {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #0f172a;
+  letter-spacing: 0.01em;
+}
+.p-toast .p-toast-detail {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #475569;
+}
+/* 關閉 X 固定右上 */
+.p-toast .p-toast-close-button,
+.p-toast .p-toast-icon-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  color: #94a3b8;
+  transition: color 0.15s ease;
+}
+.p-toast .p-toast-close-button:hover,
+.p-toast .p-toast-icon-close:hover {
+  color: #334155;
+}
+
+/* Severity icon 配色：亮版綠 / 藍 / 琥珀 / 紅，深底高對比 */
+.p-toast .p-toast-message.p-toast-message-success .p-toast-message-icon,
+.p-toast .p-toast-message.p-toast-message-success .p-toast-icon {
+  color: #34d399;
+}
+.p-toast .p-toast-message.p-toast-message-info .p-toast-message-icon,
+.p-toast .p-toast-message.p-toast-message-info .p-toast-icon {
+  color: #60a5fa;
+}
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-message-icon,
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-icon {
+  color: #fbbf24;
+}
+.p-toast .p-toast-message.p-toast-message-error .p-toast-message-icon,
+.p-toast .p-toast-message.p-toast-message-error .p-toast-icon {
+  color: #f87171;
+}
+
+/* 進場 / 離場：從中央輕微縮放 + 淡入 */
+.p-toast-message-enter-from,
+.p-toast-message-leave-to {
+  opacity: 0;
+  transform: scale(0.94);
+}
+.p-toast-message-enter-active {
+  transition:
+    opacity 0.22s ease-out,
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.p-toast-message-leave-active {
+  transition:
+    opacity 0.18s ease-in,
+    transform 0.18s ease-in;
+}

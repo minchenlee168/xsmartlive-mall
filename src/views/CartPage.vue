@@ -411,7 +411,7 @@ const handleConfirmAddOn = () => {
   );
   flashAddedFor(p.id);
   addOnDialog.value = null;
-  ui.toast(`已加入「${p.name}」× ${qty}`);
+  ui.showAddedToCart(p.name);
 };
 
 const handleGoCheckout = () => {
@@ -654,12 +654,6 @@ const handleGoProduct = (productId?: number) => {
                     >
                       ${{ lineOriginalTotal(item).toLocaleString() }}
                     </span>
-                    <span
-                      v-if="item.qty > 1"
-                      class="text-xs whitespace-nowrap text-slate-500"
-                    >
-                      單價 ${{ item.price.toLocaleString() }} × {{ item.qty }}
-                    </span>
                   </template>
                 </div>
                 <Button
@@ -718,12 +712,16 @@ const handleGoProduct = (productId?: number) => {
               <div
                 v-if="item.bundleExpanded"
                 class="grid gap-3"
-                :class="isPickBundleItem(item) ? 'grid-cols-1' : 'grid-cols-2'"
+                :class="
+                  isPickBundleItem(item)
+                    ? 'grid-cols-1'
+                    : 'grid-cols-1 @3xl:grid-cols-2'
+                "
               >
                 <div
                   v-for="(sub, si) in item.bundleItems"
                   :key="si"
-                  class="flex items-center gap-3"
+                  class="flex items-start gap-3"
                   :style="
                     subNeedsAttention(sub, item)
                       ? 'outline: 1px solid #ef4444; border-radius: 8px; padding: 4px'

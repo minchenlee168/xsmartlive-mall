@@ -14,7 +14,7 @@ import { useCountdown } from '../composables/useCountdown';
 interface SocialAccount {
   key: string;
   label: string;
-  icon: 'fb' | 'google' | 'line' | 'ig' | 'tiktok';
+  icon: 'fb' | 'google' | 'line' | 'ig' | 'tiktok' | 'whatsapp';
   bound: boolean;
   idLabel: string;
   accountId: string;
@@ -266,6 +266,14 @@ const socialAccounts = ref<SocialAccount[]>([
     icon: 'tiktok',
     bound: false,
     idLabel: 'TikTok ID',
+    accountId: '',
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    icon: 'whatsapp',
+    bound: false,
+    idLabel: 'WhatsApp 電話',
     accountId: '',
   },
 ]);

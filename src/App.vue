@@ -7,7 +7,7 @@ import {
   watch,
   nextTick,
 } from 'vue';
-import { RouterView, useRoute } from 'vue-router';
+import { RouterView, useRoute, useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import FloatingControls from './components/FloatingControls.vue';
 import AppFooter from './components/AppFooter.vue';
@@ -21,6 +21,35 @@ const viewportStore = useViewportStore();
 const ui = useUiStore();
 const themeStore = useThemeStore();
 const route = useRoute();
+const router = useRouter();
+
+/** 加入購物車彈窗：按下「點此結帳」→ 導 /cart 並關閉。 */
+const handleGoCartFromAdded = () => {
+  ui.hideAddedToCart();
+  router.push('/cart');
+};
+
+/** 加入購物車彈窗自動關閉：出現 3 秒後自動 hide；重新彈出會重置倒數。 */
+const ADDED_TO_CART_AUTO_HIDE_MS = 3000;
+let addedAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  () => ui.addedProductName,
+  (name) => {
+    if (addedAutoHideTimer) {
+      clearTimeout(addedAutoHideTimer);
+      addedAutoHideTimer = null;
+    }
+    if (name !== null) {
+      addedAutoHideTimer = setTimeout(() => {
+        ui.hideAddedToCart();
+        addedAutoHideTimer = null;
+      }, ADDED_TO_CART_AUTO_HIDE_MS);
+    }
+  },
+);
+onBeforeUnmount(() => {
+  if (addedAutoHideTimer) clearTimeout(addedAutoHideTimer);
+});
 
 // 入口頁與 auth 頁；不顯示 Footer、不套 Aurora shell
 const AUTH_PATHS = ['/login', '/register', '/forgot', '/social-signup'];
@@ -152,8 +181,33 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
   <!-- 換頁 loading 遮罩 -->
   <PageLoading />
 
-  <!-- PrimeVue 全域 Toast：靠上置中、一次只顯示一個（add 前會 removeAllGroups） -->
-  <Toast position="top-center" />
+  <!-- PrimeVue 全域 Toast：畫面正中、一次只顯示一個（add 前會 removeAllGroups） -->
+  <Toast position="center" />
+
+  <!-- 加入購物車成功彈窗：白底、靠上、不遮罩、3 秒後自動消失 -->
+  <Dialog
+    :visible="ui.addedProductName !== null"
+    :modal="false"
+    position="top"
+    header="加入購物車"
+    :draggable="false"
+    :style="{ width: '380px' }"
+    :breakpoints="{ '768px': '88vw' }"
+    @update:visible="(v) => !v && ui.hideAddedToCart()"
+  >
+    <p class="mb-5 text-sm text-slate-700">
+      商品名稱：{{ ui.addedProductName }}
+    </p>
+    <div class="flex flex-wrap items-center gap-2">
+      <Button label="點此結帳" @click="handleGoCartFromAdded" />
+      <Button
+        label="繼續購物"
+        severity="secondary"
+        outlined
+        @click="ui.hideAddedToCart()"
+      />
+    </div>
+  </Dialog>
 </template>
 
 <style scoped>

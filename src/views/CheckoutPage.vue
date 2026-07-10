@@ -1059,6 +1059,31 @@ const handlePlaceOrder = () => {
               />
             </div>
 
+            <!-- 手動輸入優惠碼 + 掃描 QR：手機版兩者同列，桌機加寬 -->
+            <div class="mb-4 flex items-center gap-2">
+              <InputGroup class="min-w-0 flex-1">
+                <InputText
+                  v-model="couponCode"
+                  placeholder="輸入優惠券優惠代碼"
+                  @keyup.enter="handleApplyCouponCode"
+                />
+                <Button
+                  label="使用"
+                  severity="secondary"
+                  outlined
+                  @click="handleApplyCouponCode"
+                />
+              </InputGroup>
+              <Button
+                icon="pi pi-qrcode"
+                severity="secondary"
+                outlined
+                class="!min-h-11 shrink-0"
+                aria-label="掃描優惠券 QR"
+                @click="handleOpenCouponScanner"
+              />
+            </div>
+
             <!-- Coupon list -->
             <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
               <label

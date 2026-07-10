@@ -167,7 +167,7 @@ const handleAddToCart = () => {
     qty.value,
     customBundle,
   );
-  ui.toast('已加入購物車');
+  ui.showAddedToCart(product.value.name);
 };
 
 const handleShareTo = (platform: SharePlatform) => {

@@ -121,6 +121,7 @@ const addToCart = (spec: string, n: number) => {
     n,
   );
   flashAddedFeedback();
+  ui.showAddedToCart(props.name);
 };
 
 const handlePrimaryAction = (e: MouseEvent) => {
@@ -195,6 +196,7 @@ const handlePendingBundleAdd = () => {
     );
   }
   flashAddedFeedback();
+  ui.showAddedToCart(props.name);
   isBundleDialogVisible.value = false;
 };
 
@@ -266,6 +268,7 @@ const handleConfirmBundleAdd = () => {
     );
   }
   flashAddedFeedback();
+  ui.showAddedToCart(props.name);
   isBundleDialogVisible.value = false;
 };
 </script>

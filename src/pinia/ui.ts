@@ -54,6 +54,15 @@ export const useUiStore = defineStore('ui', () => {
     frameScrollLocked.value = v;
   };
 
+  /** 加入購物車後跳的成功彈窗（App.vue 統一渲染）：null 表示關閉。 */
+  const addedProductName = ref<string | null>(null);
+  const showAddedToCart = (productName: string) => {
+    addedProductName.value = productName;
+  };
+  const hideAddedToCart = () => {
+    addedProductName.value = null;
+  };
+
   return {
     setToastService,
     toast,
@@ -61,5 +70,8 @@ export const useUiStore = defineStore('ui', () => {
     setRouteLoading,
     frameScrollLocked,
     setFrameScrollLocked,
+    addedProductName,
+    showAddedToCart,
+    hideAddedToCart,
   };
 });
