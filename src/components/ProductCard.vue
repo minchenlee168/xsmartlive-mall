@@ -5,6 +5,7 @@ import { useViewportStore } from '../pinia/viewport';
 import { useCartStore } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { products } from '../data/products';
+import { burstAddToCartFromEvent } from '../utils/cart-burst';
 
 const props = defineProps<{
   id: number;
@@ -108,7 +109,7 @@ onUnmounted(() => {
   if (addedTimer) clearTimeout(addedTimer);
 });
 
-const addToCart = (spec: string, n: number) => {
+const addToCart = (spec: string, n: number, event?: MouseEvent) => {
   cart.addItem(
     {
       id: props.id,
@@ -120,6 +121,7 @@ const addToCart = (spec: string, n: number) => {
     spec,
     n,
   );
+  if (event) burstAddToCartFromEvent(event);
   flashAddedFeedback();
   ui.showAddedToCart(props.name);
 };
@@ -139,19 +141,19 @@ const handlePrimaryAction = (e: MouseEvent) => {
     dialogSize.value = sizes.value[0] ?? '';
     isSpecDialogVisible.value = true;
   } else {
-    addToCart('預設', qty.value);
+    addToCart('預設', qty.value, e);
   }
 };
 
-const handleConfirmSpecAdd = () => {
+const handleConfirmSpecAdd = (e: MouseEvent) => {
   if (sizes.value.length && !dialogSize.value) return;
-  addToCart(dialogSize.value || '預設', qty.value);
+  addToCart(dialogSize.value || '預設', qty.value, e);
   isSpecDialogVisible.value = false;
 };
 
 /** 先加入待選擇：不要求挑滿規格，把組合商品先放進購物車，
  *  之後在購物車頁的內嵌挑選器補齊組合內容。 */
-const handlePendingBundleAdd = () => {
+const handlePendingBundleAdd = (e: MouseEvent) => {
   const p = product.value;
   if (!p) return;
   if (p.isPickBundle) {
@@ -172,7 +174,7 @@ const handlePendingBundleAdd = () => {
       },
       '待選擇',
       qty.value,
-      placeholderItems,
+      { customBundleItems: placeholderItems },
     );
   } else {
     // 固定組合：以目錄子品為基礎、規格清空，由購物車頁面補挑
@@ -192,15 +194,16 @@ const handlePendingBundleAdd = () => {
       },
       '待選擇',
       qty.value,
-      placeholderItems,
+      { customBundleItems: placeholderItems },
     );
   }
+  burstAddToCartFromEvent(e);
   flashAddedFeedback();
   ui.showAddedToCart(props.name);
   isBundleDialogVisible.value = false;
 };
 
-const handleConfirmBundleAdd = () => {
+const handleConfirmBundleAdd = (e: MouseEvent) => {
   const p = product.value;
   if (!p) return;
   if (p.isPickBundle) {
@@ -249,7 +252,7 @@ const handleConfirmBundleAdd = () => {
       },
       specLabel,
       qty.value,
-      picked,
+      { customBundleItems: picked },
     );
   } else {
     const specLabel = bundleSelections.value.length
@@ -267,6 +270,7 @@ const handleConfirmBundleAdd = () => {
       qty.value,
     );
   }
+  burstAddToCartFromEvent(e);
   flashAddedFeedback();
   ui.showAddedToCart(props.name);
   isBundleDialogVisible.value = false;

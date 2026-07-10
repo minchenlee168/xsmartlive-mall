@@ -72,6 +72,8 @@ const HOME_SHIPPING_FEE = 150;
 const STORE_SHIPPING_FEE = 60;
 const OTHER_GROUP_FEE = 100;
 const SHIPPING_DISCOUNT = -200;
+// 使用者的紅利點數總餘額（原型固定）；每組獨立使用、跨組合計不能超過此值
+const TOTAL_REWARD_BALANCE = 100;
 
 // Demo 用：優惠代碼 → 對應的優惠券範本。實際會由後端驗證。
 const CODE_TO_COUPON: Record<string, Omit<Coupon, 'id'>> = {
@@ -284,12 +286,15 @@ const discountedLineTotal = (item: CartItem): number | null => {
     return null;
   return Math.max(0, lineTotalAfterBulk(item) - discountOf(c));
 };
-/** 依購物車拆組後的每組小計（買多優惠後、優惠券後，含運費）。 */
-const groupDisplayTotal = (g: CheckoutGroup): number =>
+/** 每組扣紅利前的金額（商品含買多與優惠券折抵 + 運費）；作為紅利上限與 UI 顯示基底。 */
+const groupSubtotalBeforeRewards = (g: CheckoutGroup): number =>
   g.items.reduce(
     (s, i) => s + (discountedLineTotal(i) ?? lineTotalAfterBulk(i)),
     0,
   ) + shippingFee.value;
+/** 每組最終小計（買多、優惠券、運費、該組紅利折抵都算完）。 */
+const groupDisplayTotal = (g: CheckoutGroup): number =>
+  Math.max(0, groupSubtotalBeforeRewards(g) - rewardPointsOfGroup(g));
 
 const handleOpenCouponDrawer = () => {
   couponDrawerSelected.value =
@@ -504,7 +509,41 @@ const selectedStore = computed(() =>
   storeAddresses.value.find((a) => a.id === selectedStoreId.value),
 );
 
-const rewardPoints = ref<number | null>(null);
+// 紅利點數改成每組獨立：key = group.id，value = 該組已使用點數
+const rewardPointsByGroup = ref<Record<number, number>>({});
+// checkoutGroups 變動時同步鍵：新組補 0、消失組移除、舊值保留
+watch(
+  checkoutGroups,
+  (groups) => {
+    const next: Record<number, number> = {};
+    for (const g of groups) {
+      next[g.id] = Math.max(
+        0,
+        Math.floor(Number(rewardPointsByGroup.value[g.id]) || 0),
+      );
+    }
+    rewardPointsByGroup.value = next;
+  },
+  { immediate: true },
+);
+const rewardPointsOfGroup = (g: CheckoutGroup): number =>
+  Math.max(0, Math.floor(Number(rewardPointsByGroup.value[g.id]) || 0));
+const rewardPointsUsedTotal = computed(() =>
+  checkoutGroups.value.reduce((s, g) => s + rewardPointsOfGroup(g), 0),
+);
+const remainingRewardPoints = computed(() =>
+  Math.max(0, TOTAL_REWARD_BALANCE - rewardPointsUsedTotal.value),
+);
+// 每組上限 = min(該組扣紅利前的金額, 全域剩餘 + 本組已用)
+const maxRewardPointsFor = (g: CheckoutGroup): number =>
+  Math.max(
+    0,
+    Math.min(
+      groupSubtotalBeforeRewards(g),
+      remainingRewardPoints.value + rewardPointsOfGroup(g),
+    ),
+  );
+
 const paymentMethod = ref<PaymentMethodId>('credit');
 
 /** 依交集過濾的付款方式選項 → 直接餵給 Select。 */
@@ -553,9 +592,6 @@ const bulkDiscount = computed(() => -bulkDiscountTotal.value);
 const couponDiscount = computed(() =>
   appliedCoupon.value ? -discountOf(appliedCoupon.value) : 0,
 );
-const rewardPointsNum = computed(() =>
-  Math.max(0, Number(rewardPoints.value) || 0),
-);
 const finalTotal = computed(
   () =>
     productTotal.value +
@@ -563,13 +599,13 @@ const finalTotal = computed(
     bulkDiscount.value +
     shippingDiscount.value +
     couponDiscount.value -
-    rewardPointsNum.value,
+    rewardPointsUsedTotal.value,
 );
 const totalSaved = computed(
   () =>
     Math.abs(
       bulkDiscount.value + shippingDiscount.value + couponDiscount.value,
-    ) + rewardPointsNum.value,
+    ) + rewardPointsUsedTotal.value,
 );
 
 const handlePlaceOrder = () => {
@@ -636,7 +672,7 @@ const handlePlaceOrder = () => {
           text
           rounded
           class="!min-h-11 !min-w-11"
-          @click="router.back()"
+          @click="router.push('/cart')"
         />
         <h1 class="text-2xl font-bold text-slate-950">結帳</h1>
       </div>
@@ -779,20 +815,37 @@ const handlePlaceOrder = () => {
           </div>
           <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700">
             <span class="w-20 font-medium">紅利點數</span>
-            <span>使用</span>
-            <InputNumber
-              v-model="rewardPoints"
-              :min="0"
-              show-buttons
-              button-layout="horizontal"
-              increment-button-icon="pi pi-plus"
-              decrement-button-icon="pi pi-minus"
-              class="qty-stepper"
-            />
-            <span>點</span>
-            <span class="text-xs text-slate-500">
-              / 尚有 <span style="color: var(--primary)">100</span> 點
-            </span>
+            <template v-if="TOTAL_REWARD_BALANCE > 0">
+              <span>使用</span>
+              <InputNumber
+                :model-value="rewardPointsByGroup[group.id] ?? 0"
+                :min="0"
+                :max="maxRewardPointsFor(group)"
+                show-buttons
+                button-layout="horizontal"
+                increment-button-icon="pi pi-plus"
+                decrement-button-icon="pi pi-minus"
+                class="qty-stepper"
+                @update:model-value="
+                  (v) =>
+                    (rewardPointsByGroup[group.id] = Math.max(
+                      0,
+                      Math.floor(Number(v) || 0),
+                    ))
+                "
+              />
+              <span>點</span>
+              <span class="text-xs text-slate-500">
+                / 尚有
+                <span style="color: var(--primary)">{{
+                  remainingRewardPoints
+                }}</span>
+                點
+              </span>
+            </template>
+            <span v-else class="text-xs text-slate-500"
+              >目前無可用紅利點數</span
+            >
           </div>
         </div>
 
@@ -990,12 +1043,12 @@ const handlePlaceOrder = () => {
             >
           </template>
 
-          <!-- 紅利點數 -->
-          <template v-if="rewardPointsNum > 0">
+          <!-- 紅利點數（跨組加總） -->
+          <template v-if="rewardPointsUsedTotal > 0">
             <div></div>
             <span class="text-slate-700">紅利點數折抵</span>
             <span class="text-right text-red-500"
-              >- $ {{ rewardPointsNum.toLocaleString() }}</span
+              >- $ {{ rewardPointsUsedTotal.toLocaleString() }}</span
             >
           </template>
 

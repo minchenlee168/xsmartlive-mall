@@ -37,6 +37,8 @@ export const useCartStore = defineStore('cart', () => {
       shippingMethods: ['home'],
       paymentMethods: ['credit', 'atm'],
       checkoutMode: 'pickable',
+      // 直播商品加購區：這台推薦的加購商品 id（對應 CartPage 的 ADD_ON_PRODUCTS）
+      addOnProductIds: [9001, 9002, 9006],
       items: [
         {
           id: 'i1',
@@ -117,6 +119,7 @@ export const useCartStore = defineStore('cart', () => {
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
       checkoutMode: 'default',
+      addOnProductIds: [9003, 9004, 9005, 9006],
       items: [
         {
           id: 'i4',
@@ -237,12 +240,24 @@ export const useCartStore = defineStore('cart', () => {
     },
     spec = '預設',
     qty = 1,
-    customBundleItems?: CartBundleItem[],
+    options?: {
+      customBundleItems?: CartBundleItem[];
+      /** 強制加到指定 cart（跳過分派規則）；用於加購區「選定 cart 加購」 */
+      targetCartId?: number;
+      /** 新增（非合併）時放在該台最上面而不是最後面；加購區用 */
+      prepend?: boolean;
+    },
   ) {
-    // 先問規則：命中就進那台；否則 fallback 到第一個「非暫停」的購物車，都沒有再新建
-    let target =
-      findRoutedCart(p.id) ??
-      groups.value.find((g) => g.checkoutMode !== 'paused');
+    // targetCartId 指定 → 直接找那台；否則走分派規則 / fallback / 新建
+    let target: CartGroup | undefined;
+    if (options?.targetCartId != null) {
+      target = groups.value.find((g) => g.id === options.targetCartId);
+    }
+    if (!target) {
+      target =
+        findRoutedCart(p.id) ??
+        groups.value.find((g) => g.checkoutMode !== 'paused');
+    }
     if (!target) {
       target = {
         id: Date.now(),
@@ -266,8 +281,8 @@ export const useCartStore = defineStore('cart', () => {
     }
     // 依商品 id 從商品目錄補齊組合商品內容；任選組合則由呼叫端帶入實際挑選的 customBundleItems
     const cat = products.find((pr) => pr.id === p.id);
-    const resolvedBundleItems = customBundleItems ?? cat?.bundleItems;
-    target.items.push({
+    const resolvedBundleItems = options?.customBundleItems ?? cat?.bundleItems;
+    const newItem: CartItem = {
       id: `i_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
       productId: p.id,
       name: p.name,
@@ -281,7 +296,12 @@ export const useCartStore = defineStore('cart', () => {
       bundleExpanded: cat?.isBundle ? true : undefined,
       bundleItems: resolvedBundleItems,
       bulkDiscount: findBulkDiscountFor(p.id),
-    });
+    };
+    if (options?.prepend) {
+      target.items.unshift(newItem);
+    } else {
+      target.items.push(newItem);
+    }
   }
 
   function removeItem(groupId: number, itemId: string) {

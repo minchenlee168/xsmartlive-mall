@@ -116,6 +116,20 @@ const invoicePreviewOrder = ref<OrderRecord | null>(null);
 const handleOpenInvoice = (order: OrderRecord): void => {
   invoicePreviewOrder.value = order;
 };
+
+// 發票狀態對應前台顯示：只有 issued 顯示「線上列印」按鈕，其餘顯示文字
+const INVOICE_STATUS_LABEL: Record<
+  Exclude<OrderRecord['invoiceStatus'], 'issued'>,
+  string
+> = {
+  pending: '尚未開立',
+  voided: '已作廢',
+  none: '不開立',
+};
+const invoiceLabelOf = (order: OrderRecord): string =>
+  INVOICE_STATUS_LABEL[
+    order.invoiceStatus as Exclude<OrderRecord['invoiceStatus'], 'issued'>
+  ] ?? '';
 /** 依訂單編號 hash 出一個看起來像發票號碼的字串（AB-12345678）。 */
 const mockInvoiceNoOf = (order: OrderRecord): string => {
   const letters = 'ABCDEFGHJKLMNPRSTUV';
@@ -706,12 +720,16 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <div>
             <p class="text-xs text-slate-500">發票</p>
             <Button
+              v-if="order.invoiceStatus === 'issued'"
               label="線上列印"
               outlined
               size="small"
               class="!py-1"
               @click="handleOpenInvoice(order)"
             />
+            <p v-else class="font-medium text-slate-500">
+              {{ invoiceLabelOf(order) }}
+            </p>
           </div>
           <div>
             <p class="text-xs text-slate-500">狀態</p>
@@ -784,12 +802,16 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
               <td class="px-3 py-3">
                 <Button
+                  v-if="order.invoiceStatus === 'issued'"
                   label="線上列印"
                   outlined
                   size="small"
                   class="!py-1"
                   @click="handleOpenInvoice(order)"
                 />
+                <span v-else class="text-slate-500">
+                  {{ invoiceLabelOf(order) }}
+                </span>
               </td>
               <td
                 class="py-3 pr-4 pl-3 font-medium"

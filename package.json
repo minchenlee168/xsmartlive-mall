@@ -18,6 +18,7 @@
     "@fortawesome/vue-fontawesome": "^3.2.0",
     "@primeuix/themes": "^2.0.3",
     "@primevue/forms": "^4.5.5",
+    "canvas-confetti": "^1.9.4",
     "dompurify": "^3.4.8",
     "pinia": "^3.0.4",
     "primeicons": "^7.0.0",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@primevue/auto-import-resolver": "^4.5.5",
     "@tailwindcss/vite": "^4.3.0",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^24.12.3",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/tsconfig": "^0.7.0",

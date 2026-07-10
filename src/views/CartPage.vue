@@ -12,6 +12,7 @@ import {
 import { useUiStore } from '../pinia/ui';
 import { useViewportStore } from '../pinia/viewport';
 import { products } from '../data/products';
+import { burstAddToCartFromEvent } from '../utils/cart-burst';
 
 /** 單一規格維度（顏色 / 尺寸 / 口味 之類）。 */
 interface AddOnSpec {
@@ -365,6 +366,41 @@ const handleOpenAddOnDialog = (p: AddOnProduct) => {
   addOnDialogQty.value = 1;
 };
 
+// 加購區流程：先按「更多加購商品 N 件」→ 彈窗選 cart → 回到頁面顯示該 cart 的加購區
+/** 有加購商品的購物車清單（picker Dialog 只列這些）。 */
+const cartsWithAddOns = computed(() =>
+  groups.value.filter((g) => (g.addOnProductIds?.length ?? 0) > 0),
+);
+/** 全站加購商品總類數（給「更多加購商品 N 件」按鈕顯示）。 */
+const totalAddOnCount = computed(
+  () =>
+    new Set(cartsWithAddOns.value.flatMap((g) => g.addOnProductIds ?? [])).size,
+);
+const isCartPickerVisible = ref(false);
+/** 已選擇的加購目標 cart id；null 表示還在初始「按鈕」狀態。 */
+const selectedAddOnCartId = ref<number | null>(null);
+const selectedAddOnCart = computed(() =>
+  groups.value.find((g) => g.id === selectedAddOnCartId.value),
+);
+/** 該 cart 的加購商品（依 addOnProductIds 篩 ADD_ON_PRODUCTS）。 */
+const addOnsOfSelectedCart = computed<AddOnProduct[]>(() => {
+  const c = selectedAddOnCart.value;
+  if (!c?.addOnProductIds) return [];
+  return c.addOnProductIds
+    .map((id) => ADD_ON_PRODUCTS.find((p) => p.id === id))
+    .filter((p): p is AddOnProduct => p != null);
+});
+const handleOpenCartPicker = () => {
+  isCartPickerVisible.value = true;
+};
+const handlePickAddOnCart = (cartId: number) => {
+  selectedAddOnCartId.value = cartId;
+  isCartPickerVisible.value = false;
+};
+const handleClearAddOnCart = () => {
+  selectedAddOnCartId.value = null;
+};
+
 // 按下確認後短暫的綠色 ✓ 回饋（跟 ProductCard 同款，作用在卡片按鈕上）
 const justAddedMap = ref<Record<number, boolean>>({});
 const addedTimers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -395,7 +431,7 @@ const handleGoReplay = (r: LiveReplay) => {
   ui.toast(`回放「${r.title}」尚未開放（示意）`);
 };
 
-const handleConfirmAddOn = () => {
+const handleConfirmAddOn = (e: MouseEvent) => {
   const p = addOnDialog.value;
   if (!p) return;
   const spec = addOnDialogSpec.value || p.spec || '預設';
@@ -410,7 +446,12 @@ const handleConfirmAddOn = () => {
     },
     spec,
     qty,
+    // 加購區：如果有選定 cart 就進那台且置頂；否則走預設分派
+    selectedAddOnCartId.value != null
+      ? { targetCartId: selectedAddOnCartId.value, prepend: true }
+      : undefined,
   );
+  burstAddToCartFromEvent(e);
   flashAddedFor(p.id);
   addOnDialog.value = null;
   ui.showAddedToCart(p.name);
@@ -456,7 +497,7 @@ const handleGoProduct = (productId?: number) => {
           text
           rounded
           class="!min-h-11 !min-w-11"
-          @click="router.back()"
+          @click="router.push('/shop')"
         />
         <h1 class="text-xl font-bold text-slate-950 @7xl:text-2xl">購物車</h1>
       </div>
@@ -811,27 +852,61 @@ const handleGoProduct = (productId?: number) => {
         </div>
       </div>
 
-      <!-- 直播商品加購區 -->
-      <section class="shadow-card rounded-xl bg-white">
+      <!-- 加購區：初始只有「更多加購商品 N 件」按鈕；
+           選完 cart 後顯示該 cart 專屬加購清單 -->
+      <section
+        v-if="cartsWithAddOns.length > 0"
+        class="shadow-card rounded-xl bg-white"
+      >
+        <!-- Header：兩種狀態 -->
         <div
-          class="flex items-center border-b-2 px-4 py-2"
+          class="flex items-center justify-between gap-3 border-b-2 px-4 py-2"
           style="
             background: color-mix(in srgb, var(--primary) 8%, transparent);
             border-color: var(--primary);
             border-radius: 12px 12px 0 0;
           "
         >
-          <span class="text-lg font-semibold text-slate-700"
-            >直播商品加購區</span
-          >
+          <div class="flex min-w-0 flex-1 flex-col leading-tight">
+            <span class="text-lg font-semibold text-slate-700">加購區</span>
+            <span
+              v-if="selectedAddOnCart"
+              class="text-sm break-words text-slate-600"
+            >
+              {{ selectedAddOnCart.sellerName }}
+            </span>
+          </div>
+          <Button
+            v-if="selectedAddOnCart"
+            label="更換購物車"
+            icon="pi pi-refresh"
+            outlined
+            size="small"
+            class="shrink-0 !bg-white"
+            @click="handleOpenCartPicker"
+          />
         </div>
 
-        <!-- 加價購卡片：手機 2 欄避免跑版，平板以上改 auto-fill -->
+        <!-- State A：還沒選 cart → 大按鈕 -->
         <div
+          v-if="!selectedAddOnCart"
+          class="flex items-center justify-center p-[var(--card-pad)]"
+        >
+          <Button
+            :label="`更多加購商品 ${totalAddOnCount} 件`"
+            icon="pi pi-plus-circle"
+            class="!min-h-12 !px-6"
+            @click="handleOpenCartPicker"
+          />
+        </div>
+
+        <!-- State B：已選 cart → 該 cart 加購清單 -->
+        <div
+          v-else
           class="grid grid-cols-2 gap-2 p-[var(--card-pad)] @3xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]"
         >
           <div
-            v-for="p in ADD_ON_PRODUCTS"
+            v-for="p in addOnsOfSelectedCart"
             :key="p.id"
             class="flex min-w-0 flex-col gap-2 rounded-lg p-2"
           >
@@ -1038,6 +1113,45 @@ const handleGoProduct = (productId?: number) => {
         </div>
       </div>
     </div>
+
+    <!-- 加購區：選擇要加入的購物車 Dialog -->
+    <Dialog
+      v-model:visible="isCartPickerVisible"
+      modal
+      :draggable="false"
+      dismissable-mask
+      header="選擇要加購的購物車"
+      :style="{ width: '440px' }"
+      :breakpoints="{ '768px': '92vw' }"
+    >
+      <div class="flex flex-col gap-2">
+        <p class="mb-1 text-sm text-slate-600">
+          選好購物車後，下方將顯示該台的加購商品。
+        </p>
+        <button
+          v-for="g in cartsWithAddOns"
+          :key="g.id"
+          class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-3 text-left transition-colors hover:border-[var(--primary)] hover:bg-slate-50"
+          :class="
+            selectedAddOnCartId === g.id
+              ? 'border-[var(--primary)] bg-slate-50'
+              : ''
+          "
+          @click="handlePickAddOnCart(g.id)"
+        >
+          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span class="text-base font-medium break-words text-slate-950">
+              {{ g.sellerName }}
+            </span>
+            <span class="text-xs text-slate-500">
+              {{ g.items.length }} 件商品 ·
+              {{ g.addOnProductIds?.length ?? 0 }} 件加購商品可選
+            </span>
+          </div>
+          <i class="pi pi-chevron-right text-sm text-slate-400" />
+        </button>
+      </div>
+    </Dialog>
 
     <!-- 加價購：選規格 + 數量 Dialog（跟商品分類頁的規格挑選一致） -->
     <Dialog

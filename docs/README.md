@@ -6,6 +6,7 @@
 
 | 檔案 | 什麼時候該打開 |
 | --- | --- |
+| [livestream-patterns.md](./livestream-patterns.md) | 直播電商領域 8 條 pattern（購物車拆組、checkoutMode、優惠券層級、加車節奏、未用商城模式等）—做 UI / UX 決策前先過一遍 |
 | [architecture.md](./architecture.md) | 摸清路由 / 頁面關係、Aurora shell 與 `@container` frame 的定位邏輯、換頁 loading / 登入守衛 |
 | [state-stores.md](./state-stores.md) | 動 Pinia store（cart / orders / ui / theme / density / viewport / auth）— 資料格式、常用操作、跨頁面連動 |
 | [design-tokens.md](./design-tokens.md) | 顏色 / 間距 / 陰影 token；新增主題 preset；跟著 density 縮的間距；在 `@container` 內寫 RWD 的取捨 |

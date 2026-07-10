@@ -9,6 +9,7 @@ import { useCartStore } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { useAuthStore } from '../pinia/auth';
 import { products } from '../data/products';
+import { burstAddToCartFromEvent } from '../utils/cart-burst';
 import lineIcon from '../assets/line.svg';
 import instagramIcon from '../assets/instagram.svg';
 
@@ -104,7 +105,7 @@ const handleGoLogin = () => {
   router.push({ path: '/login', query: { redirect: route.fullPath } });
 };
 
-const handleAddToCart = () => {
+const handleAddToCart = (e: MouseEvent) => {
   if (product.value.isPickBundle) {
     // 檢查是否有單一選項超過該項限購 maxQty
     const overOpt = product.value.pickOptions?.find((opt) => {
@@ -165,8 +166,9 @@ const handleAddToCart = () => {
     },
     specLabel,
     qty.value,
-    customBundle,
+    { customBundleItems: customBundle },
   );
+  burstAddToCartFromEvent(e);
   ui.showAddedToCart(product.value.name);
 };
 

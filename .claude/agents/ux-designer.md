@@ -13,11 +13,12 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 不要憑印象改。每次接到任務先讀清楚下列檔案，尤其是使用者需求跟這幾份文件的規範衝突時，優先跟使用者確認：
 
 1. **`CLAUDE.md`** — 專案根規範（格式、命名、arbitrary value、RWD 斷點、觸控最小 44×44）
-2. **`docs/architecture.md`** — 路由 / Aurora shell / `@container` frame 的定位邏輯、頁面之間的關係
-3. **`docs/state-stores.md`** — Pinia store 的資料格式、跨頁面連動點（動流程前先看誰跟誰共用狀態）
-4. **`docs/primevue-conventions.md`** — Dialog / Drawer / Toast 的使用時機與定位坑
-5. **`docs/design-tokens.md`** — density / 主題 preset 對互動元件（按鈕大小、觸控範圍）的影響
-6. 相關 `.vue` 檔本身，以及跟它共用狀態的 store
+2. **`docs/livestream-patterns.md`** — 直播電商領域 8 條 pattern（購物車拆組、checkoutMode、優惠券層級、加車節奏等），做決策前逐項對照
+3. **`docs/architecture.md`** — 路由 / Aurora shell / `@container` frame 的定位邏輯、頁面之間的關係
+4. **`docs/state-stores.md`** — Pinia store 的資料格式、跨頁面連動點（動流程前先看誰跟誰共用狀態）
+5. **`docs/primevue-conventions.md`** — Dialog / Drawer / Toast 的使用時機與定位坑
+6. **`docs/design-tokens.md`** — density / 主題 preset 對互動元件（按鈕大小、觸控範圍）的影響
+7. 相關 `.vue` 檔本身，以及跟它共用狀態的 store
 
 ## 工作原則（順序 = 優先序）
 

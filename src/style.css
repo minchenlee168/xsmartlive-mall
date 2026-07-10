@@ -145,6 +145,30 @@ body {
   cursor: default;
 }
 
+/* 加入購物車水波紋（由 utils/cart-burst.ts 動態插入 <span class="add-cart-ripple">）
+   宿主元素會被 JS 補上 overflow: hidden 與 position: relative；粒子彩帶由 canvas-confetti 畫。 */
+.add-cart-ripple {
+  position: absolute;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  transform: scale(0);
+  opacity: 0.9;
+  animation: cart-ripple 0.6s ease-out forwards;
+}
+@keyframes cart-ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .add-cart-ripple {
+    animation: none;
+    display: none;
+  }
+}
+
 /* 觸控友善：表單文字輸入框與下拉選單最小高度 44px（數量步進器維持自有尺寸） */
 .p-inputtext,
 .p-select {

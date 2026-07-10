@@ -60,6 +60,8 @@ export interface CartGroup {
   paymentMethods: PaymentMethodId[];
   /** 結帳模式（見 CheckoutMode） */
   checkoutMode: CheckoutMode;
+  /** 該台的加購推薦商品 ID 清單；空 / undefined 表示該台沒有加購區 */
+  addOnProductIds?: number[];
 }
 
 /** 分派規則條件：目前支援分類、單一商品 id 兩種。 */
