@@ -33,9 +33,18 @@ export const useCartStore = defineStore('cart', () => {
       id: 1,
       sellerName: '07/09 廚娘小桂の直播廚房',
       tags: [{ label: '冷凍', type: 'info' }],
-      // 冷凍商品僅支援宅配，且不收貨到付款
-      shippingMethods: ['home'],
-      paymentMethods: ['credit', 'atm'],
+      // 冷凍商品四種物流皆支援（超商走冷凍取貨），但不收貨到付款 / 自取付款
+      shippingMethods: ['home', 'store', 'pickup', 'post'],
+      paymentMethods: [
+        'credit',
+        'credit-digital',
+        'apple-pay',
+        'atm',
+        'cvs-code',
+        'transfer',
+        'line-pay',
+        'ipass',
+      ],
       checkoutMode: 'pickable',
       // 直播商品加購區：這台推薦的加購商品 id（對應 CartPage 的 ADD_ON_PRODUCTS）
       addOnProductIds: [9001, 9002, 9006],
@@ -116,8 +125,19 @@ export const useCartStore = defineStore('cart', () => {
       sellerName: '07/08 妞妞ㄉ童裝小舖',
       // 「禁止棄標」語意已由 checkoutMode: 'default' 表達，tag 只保留溫層資訊
       tags: [{ label: '常溫', type: 'secondary' }],
-      shippingMethods: ['home', 'store'],
-      paymentMethods: ['credit', 'atm', 'cod'],
+      shippingMethods: ['home', 'store', 'pickup', 'post'],
+      paymentMethods: [
+        'credit',
+        'credit-digital',
+        'apple-pay',
+        'atm',
+        'cvs-code',
+        'transfer',
+        'line-pay',
+        'ipass',
+        'cod',
+        'self-pickup',
+      ],
       checkoutMode: 'default',
       addOnProductIds: [9003, 9004, 9005, 9006],
       items: [

@@ -35,10 +35,20 @@ export interface CartTag {
   type: 'info' | 'danger' | 'secondary' | 'success';
 }
 
-/** 運送方式 id — 對應結帳頁的物流選單 */
-export type ShippingMethodId = 'home' | 'store';
+/** 運送方式 id — 對應結帳頁的物流選單（home 宅配 / store 超商取貨 / pickup 自取 / post 郵局宅配） */
+export type ShippingMethodId = 'home' | 'store' | 'pickup' | 'post';
 /** 付款方式 id — 對應結帳頁的金流選單 */
-export type PaymentMethodId = 'credit' | 'atm' | 'cod';
+export type PaymentMethodId =
+  | 'credit'
+  | 'credit-digital'
+  | 'apple-pay'
+  | 'atm'
+  | 'cvs-code'
+  | 'transfer'
+  | 'line-pay'
+  | 'ipass'
+  | 'cod'
+  | 'self-pickup';
 
 /**
  * 每台購物車的結帳模式：
@@ -66,8 +76,7 @@ export interface CartGroup {
 
 /** 分派規則條件：目前支援分類、單一商品 id 兩種。 */
 export type RoutingCondition =
-  | { type: 'category'; value: string }
-  | { type: 'productId'; value: number };
+  { type: 'category'; value: string } | { type: 'productId'; value: number };
 
 /** 分派規則：加入商品時第一條命中的規則決定進哪台購物車。 */
 export interface RoutingRule {

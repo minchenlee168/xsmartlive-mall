@@ -7,6 +7,7 @@ import { useUiStore } from '../pinia/ui';
 import {
   useCartStore,
   type CartItem,
+  type CartTag,
   type ShippingMethodId,
   type PaymentMethodId,
 } from '../pinia/cart';
@@ -14,9 +15,12 @@ import { useOrdersStore } from '../pinia/orders';
 import { useAuthStore } from '../pinia/auth';
 import { useCountdown } from '../composables/useCountdown';
 
+type TempLayer = '常溫' | '冷藏' | '冷凍';
+
 interface CheckoutGroup {
   id: number;
   sellerName: string;
+  tempLayer: TempLayer;
   items: CartItem[];
   shippingMethods: ShippingMethodId[];
   paymentMethods: PaymentMethodId[];
@@ -43,39 +47,103 @@ interface HomeAddress {
   isDefault: boolean;
   unavailable?: boolean;
 }
-interface StoreAddress {
-  id: string;
-  name: string;
-  phone: string;
-  chain: '7-11' | 'FamilyMart';
-  storeName: string;
-  address: string;
-  isDefault: boolean;
-}
 
-type ShipDrawerView = 'list' | 'add-home' | 'add-store';
-type ShipMethod = 'home' | 'store' | null;
+type ShipDrawerView = 'list' | 'add-home';
 
-const INVOICE_CARRIERS = [
-  { label: '會員載具（電子信箱）', value: 'member-email' },
+const INVOICE_TYPES = [
+  { label: '個人發票（紙本）', value: 'personal-paper' },
+  { label: '公司統編', value: 'company' },
+  { label: '捐贈', value: 'donate' },
   { label: '手機條碼', value: 'mobile' },
   { label: '自然人憑證', value: 'natural' },
+  { label: '會員載具', value: 'member' },
 ];
-const PAYMENT_METHODS = [
-  { label: '線上信用卡', value: 'credit' },
-  { label: 'ATM 轉帳', value: 'atm' },
+const PAYMENT_METHODS: { label: string; value: PaymentMethodId }[] = [
+  { label: '線上信用卡（藍新）', value: 'credit' },
+  { label: '線上信用卡（數位鑑）', value: 'credit-digital' },
+  { label: 'Apple Pay', value: 'apple-pay' },
+  { label: 'ATM 繳費帳號', value: 'atm' },
+  { label: '超商代碼繳費', value: 'cvs-code' },
+  { label: '轉帳匯款', value: 'transfer' },
+  { label: 'LINE Pay', value: 'line-pay' },
+  { label: 'iPASS MONEY', value: 'ipass' },
   { label: '貨到付款', value: 'cod' },
+  { label: '自取', value: 'self-pickup' },
 ];
+const BANK_TRANSFER_INFO = ['銀行：台新008', '分行：13456-111333'];
 const DRAWER_COUNTRY_CODES = ['+886', '+852'];
 const DRAWER_COUNTRIES = ['台灣', '香港'];
 const DRAWER_CITIES = ['高雄市', '台北市', '桃園市'];
 const DRAWER_DISTRICTS = ['前鎮區', '三民區', '信義區'];
-const HOME_SHIPPING_FEE = 150;
-const STORE_SHIPPING_FEE = 60;
-const OTHER_GROUP_FEE = 100;
-const SHIPPING_DISCOUNT = -200;
+
+// 收據式明細的網格版型（僅版面結構）：手機三欄（標籤｜操作｜金額）、
+// @3xl 四欄插入說明欄；操作欄固定 132px 讓按鈕 / stepper 左右對齊。
+// 視覺一律沿用專案標準元件樣式，不另外覆蓋尺寸與字級。
+const RECEIPT_ROW_CLASS =
+  'grid min-h-9 grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-1 @3xl:grid-cols-[96px_132px_minmax(0,1fr)_auto]';
+const RECEIPT_BUTTON_CLASS = 'w-[132px]';
+const RECEIPT_HINT_CLASS =
+  'col-span-2 col-start-2 row-start-2 flex min-w-0 items-center gap-2 @3xl:col-span-1 @3xl:col-start-3 @3xl:row-start-1';
+const RECEIPT_AMOUNT_CLASS =
+  'col-start-3 row-start-1 justify-self-end text-sm @3xl:col-start-4';
+
+/** 各訂單商品金額（扣買多優惠後）滿此門檻免運 — 逐筆訂單判定。 */
+const FREE_SHIPPING_MIN = 1000;
 // 使用者的紅利點數總餘額（原型固定）；每組獨立使用、跨組合計不能超過此值
-const TOTAL_REWARD_BALANCE = 100;
+const TOTAL_REWARD_BALANCE = 500;
+
+const SHIPPING_METHOD_LABELS: Record<ShippingMethodId, string> = {
+  home: '宅配',
+  pickup: '自取',
+  store: '超商取貨',
+  post: '郵局宅配',
+};
+const SHIPPING_METHOD_ICONS: Record<ShippingMethodId, string> = {
+  home: 'pi-truck',
+  pickup: 'pi-shop',
+  store: 'pi-shopping-bag',
+  post: 'pi-envelope',
+};
+/** 運送方式在選單中的固定順序。 */
+const SHIPPING_METHOD_ORDER: ShippingMethodId[] = [
+  'home',
+  'pickup',
+  'store',
+  'post',
+];
+/** 宅配運費：依訂單溫層計價。 */
+const HOME_FEES: Record<TempLayer, number> = { 冷凍: 150, 冷藏: 150, 常溫: 80 };
+/** 郵局宅配運費：依訂單溫層計價。 */
+const POST_FEES: Record<TempLayer, number> = { 冷凍: 100, 冷藏: 100, 常溫: 70 };
+/** 超商取貨品牌選項：冷凍 / 冷藏走低溫清單，常溫走一般清單。 */
+const CVS_BRANDS: Record<
+  'low' | 'normal',
+  { name: string; fee: number; pickedStore: string }[]
+> = {
+  low: [
+    { name: '7-11 冷凍取貨', fee: 120, pickedStore: '7-11 信義冷凍門市' },
+    { name: '全家 冷凍取貨', fee: 110, pickedStore: '全家 信義冷凍門市' },
+    { name: '7-11 黑貓低溫', fee: 150, pickedStore: '7-11 信義冷凍門市' },
+  ],
+  normal: [
+    { name: '7-11', fee: 60, pickedStore: '7-11 板橋門市' },
+    { name: '全家', fee: 60, pickedStore: '全家 板橋門市' },
+  ],
+};
+const PICKUP_LOCATIONS = [
+  {
+    id: 'p1',
+    name: '台北門市',
+    address: '台北市信義區忠孝東路五段 100 號',
+    hours: '11:00–21:00',
+  },
+  {
+    id: 'p2',
+    name: '板橋門市',
+    address: '新北市板橋區文化路一段 25 號',
+    hours: '12:00–21:00',
+  },
+];
 
 // Demo 用：優惠代碼 → 對應的優惠券範本。實際會由後端驗證。
 const CODE_TO_COUPON: Record<string, Omit<Coupon, 'id'>> = {
@@ -152,12 +220,18 @@ watch([bindPhoneCode, bindPhone], () => {
   resetBindCountdown();
 });
 
+const TEMP_LABELS: TempLayer[] = ['常溫', '冷藏', '冷凍'];
+const tempOfTags = (tags: CartTag[]): TempLayer =>
+  (tags.find((t) => TEMP_LABELS.includes(t.label as TempLayer))
+    ?.label as TempLayer) ?? '常溫';
+
 /** 依購物車拆組的商品明細；每組只保留有勾選的商品（結帳頁只讀，不可改動）。 */
 const checkoutGroups = computed<CheckoutGroup[]>(() =>
   cartStore.groups
     .map((g) => ({
       id: g.id,
       sellerName: g.sellerName,
+      tempLayer: tempOfTags(g.tags),
       items: g.items.filter((i) => i.checked),
       shippingMethods: g.shippingMethods,
       paymentMethods: g.paymentMethods,
@@ -165,11 +239,11 @@ const checkoutGroups = computed<CheckoutGroup[]>(() =>
     .filter((g) => g.items.length > 0),
 );
 
-/** 各購物車支援的運送方式取交集 → 合併結帳可用的運送方式。 */
+/** 各購物車支援的運送方式取交集 → 合併結帳可用的運送方式（固定順序）。 */
 const supportedShippingMethods = computed<ShippingMethodId[]>(() => {
   const groups = checkoutGroups.value;
   if (groups.length === 0) return [];
-  return groups[0].shippingMethods.filter((m) =>
+  return SHIPPING_METHOD_ORDER.filter((m) =>
     groups.every((g) => g.shippingMethods.includes(m)),
   );
 });
@@ -196,28 +270,209 @@ const bulkDiscountAmount = (item: CartItem): number =>
     ? (item.price - item.bulkDiscount!.unitPrice) * item.qty
     : 0;
 
-/** 商品總金額（未套用任何優惠）。 */
-const itemsSubtotal = computed(() =>
-  allItems.value.reduce((s, i) => s + i.price * i.qty, 0),
-);
-/** 買多優惠折抵總額。 */
-const bulkDiscountTotal = computed(() =>
-  allItems.value.reduce((s, i) => s + bulkDiscountAmount(i), 0),
-);
-/** 商品總金額（扣掉買多優惠後）。 */
-const itemsAfterBulk = computed(
-  () => itemsSubtotal.value - bulkDiscountTotal.value,
-);
+/** 原始總計（單價 × 數量），不含任何優惠。 */
+const lineTotal = (item: CartItem) => item.price * item.qty;
+/** 買多優惠後總計（不含優惠券）。 */
+const lineTotalAfterBulk = (item: CartItem) =>
+  effectiveUnitPrice(item) * item.qty;
+
+/** 該組商品金額（未套用任何優惠）。 */
+const groupGoodsTotal = (g: CheckoutGroup): number =>
+  g.items.reduce((s, i) => s + lineTotal(i), 0);
+/** 該組買多優惠折抵總額。 */
+const groupBulkDiscount = (g: CheckoutGroup): number =>
+  g.items.reduce((s, i) => s + bulkDiscountAmount(i), 0);
+/** 該組商品金額（扣買多優惠後）— 免運門檻、優惠券門檻皆以此為基底。 */
+const groupAfterBulk = (g: CheckoutGroup): number =>
+  groupGoodsTotal(g) - groupBulkDiscount(g);
 
 onMounted(() => {
   if (allItems.value.length === 0) router.replace('/cart');
 });
 
-const couponCode = ref('');
-const invoiceCarrierType = ref('member-email');
-const invoiceEmail = ref('abc@gmail.com');
+// ---- 配送方式（全訂單共用一種方式；超商門市各訂單各自選）--------------------
+const shipMethod = ref<ShippingMethodId | null>(null);
+const selectedPickupId = ref(PICKUP_LOCATIONS[0].id);
+/** 超商取貨：各訂單選的品牌 index（依溫層清單）；未選 = 無紀錄。 */
+const cvsBrandByGroup = ref<Record<number, number>>({});
 
-// --- Coupon drawer ---
+const cvsBrandsOf = (g: CheckoutGroup) =>
+  g.tempLayer === '常溫' ? CVS_BRANDS.normal : CVS_BRANDS.low;
+const cvsPickOf = (g: CheckoutGroup) => {
+  const idx = cvsBrandByGroup.value[g.id] ?? -1;
+  return idx >= 0 ? cvsBrandsOf(g)[idx] : null;
+};
+const handlePickCvsBrand = (g: CheckoutGroup, index: number) => {
+  cvsBrandByGroup.value = { ...cvsBrandByGroup.value, [g.id]: index };
+};
+const handleClearCvsPick = (g: CheckoutGroup) => {
+  const next = { ...cvsBrandByGroup.value };
+  delete next[g.id];
+  cvsBrandByGroup.value = next;
+};
+
+const selectedPickup = computed(
+  () =>
+    PICKUP_LOCATIONS.find((p) => p.id === selectedPickupId.value) ??
+    PICKUP_LOCATIONS[0],
+);
+
+/** 該組運費；null = 尚未能計算（未選方式，或超商未選門市）。 */
+const groupShippingFee = (g: CheckoutGroup): number | null => {
+  switch (shipMethod.value) {
+    case 'home':
+      return HOME_FEES[g.tempLayer];
+    case 'post':
+      return POST_FEES[g.tempLayer];
+    case 'pickup':
+      return 0;
+    case 'store':
+      return cvsPickOf(g)?.fee ?? null;
+    default:
+      return null;
+  }
+};
+/** 該組是否達免運門檻（逐筆訂單判定）。 */
+const isGroupFreeShipping = (g: CheckoutGroup): boolean =>
+  groupAfterBulk(g) >= FREE_SHIPPING_MIN;
+/** 該組運費折抵（達免運門檻 → 折抵全額運費）。 */
+const groupShippingDiscount = (g: CheckoutGroup): number => {
+  const fee = groupShippingFee(g);
+  return fee !== null && fee > 0 && isGroupFreeShipping(g) ? fee : 0;
+};
+/** 明細列的運送標籤，例如「冷凍宅配」「自取 · 台北門市」。 */
+const groupShippingLabel = (g: CheckoutGroup): string => {
+  switch (shipMethod.value) {
+    case 'home':
+      return `${g.tempLayer}宅配`;
+    case 'post':
+      return `${g.tempLayer}郵局宅配`;
+    case 'pickup':
+      return `自取 · ${selectedPickup.value.name}`;
+    case 'store': {
+      const pick = cvsPickOf(g);
+      return pick
+        ? `${g.tempLayer}超商取貨 · ${pick.pickedStore}`
+        : `${g.tempLayer}超商取貨（尚未選門市）`;
+    }
+    default:
+      return '';
+  }
+};
+
+const shippingMethodLabel = computed(() =>
+  shipMethod.value ? SHIPPING_METHOD_LABELS[shipMethod.value] : '尚未選擇',
+);
+
+/** 運送方式選單 header 顯示的「$X 起」。 */
+const shippingMethodFeeHint = (m: ShippingMethodId): string => {
+  if (m === 'pickup') return '$0';
+  const fees = checkoutGroups.value.map((g) => {
+    if (m === 'home') return HOME_FEES[g.tempLayer];
+    if (m === 'post') return POST_FEES[g.tempLayer];
+    return Math.min(...cvsBrandsOf(g).map((b) => b.fee));
+  });
+  return fees.length ? `$${Math.min(...fees)} 起` : '';
+};
+
+// ---- 宅配 / 郵局宅配共用的收件地址 ------------------------------------------
+const homeAddresses = ref<HomeAddress[]>([
+  {
+    id: 'h1',
+    name: '王小明',
+    phone: '+886 912****56',
+    address: '台北市信義區忠孝東路五段 100 號 10 樓',
+    isDefault: true,
+  },
+  {
+    id: 'h2',
+    name: '王小明',
+    phone: '+886 912****56',
+    address: '高雄市前鎮區中山路一段 50 號 8 樓',
+    isDefault: false,
+    unavailable: true,
+  },
+]);
+const selectedHomeId = ref<string | null>('h1');
+const selectedHome = computed(() =>
+  homeAddresses.value.find((a) => a.id === selectedHomeId.value),
+);
+
+const handleSetDefaultHome = (id: string) => {
+  homeAddresses.value.forEach((a) => {
+    a.isDefault = a.id === id;
+  });
+};
+const handleDeleteHome = (id: string) => {
+  const wasDefault = homeAddresses.value.find((a) => a.id === id)?.isDefault;
+  homeAddresses.value = homeAddresses.value.filter((a) => a.id !== id);
+  if (
+    wasDefault &&
+    homeAddresses.value.length > 0 &&
+    !homeAddresses.value.some((a) => a.isDefault)
+  ) {
+    homeAddresses.value[0].isDefault = true;
+  }
+  if (selectedHomeId.value === id)
+    selectedHomeId.value = homeAddresses.value[0]?.id ?? null;
+};
+
+// Add-home form
+const newHomeName = ref('');
+const newHomeCountryCode = ref('+886');
+const newHomePhone = ref('');
+const newHomeCountry = ref('台灣');
+const newHomeCity = ref('高雄市');
+const newHomeDistrict = ref('前鎮區');
+const newHomeAddress = ref('');
+const resetAddHomeForm = () => {
+  newHomeName.value = '';
+  newHomePhone.value = '';
+  newHomeAddress.value = '';
+};
+const handleSubmitAddHome = () => {
+  if (!newHomeName.value.trim()) return;
+  const isTW = newHomeCountry.value === '台灣';
+  const address = isTW
+    ? `${newHomeCity.value}${newHomeDistrict.value} ${newHomeAddress.value}`
+    : `${newHomeCountry.value} ${newHomeAddress.value}`;
+  homeAddresses.value.push({
+    id: 'h' + (homeAddresses.value.length + 1),
+    name: newHomeName.value,
+    phone: `${newHomeCountryCode.value} ${newHomePhone.value || '000****00'}`,
+    address,
+    isDefault: false,
+  });
+  resetAddHomeForm();
+  shipDrawerView.value = 'list';
+};
+
+// ---- 運送方式抽屜 -----------------------------------------------------------
+const isShipDrawerVisible = ref(false);
+const shipDrawerView = ref<ShipDrawerView>('list');
+const handleOpenShipDrawer = () => {
+  shipDrawerView.value = 'list';
+  isShipDrawerVisible.value = true;
+};
+
+// 只有一種運送方式 → 直接鎖定該方式（沒選擇餘地）；
+// 多種 → 讓使用者主動選、運費等選完才顯示；
+// 目前選的方式已不支援 → 清空
+watch(
+  supportedShippingMethods,
+  (methods) => {
+    if (methods.length === 1) {
+      shipMethod.value = methods[0];
+      return;
+    }
+    if (shipMethod.value && !methods.includes(shipMethod.value)) {
+      shipMethod.value = null;
+    }
+  },
+  { immediate: true },
+);
+
+// ---- 優惠券（各訂單獨立選用）------------------------------------------------
 const coupons = ref<Coupon[]>([
   {
     id: 'cp1',
@@ -265,25 +520,44 @@ const coupons = ref<Coupon[]>([
     minSpend: 3000,
   },
 ]);
-const isCouponDrawerVisible = ref(false);
-const couponDrawerSelected = ref<string | null>(null);
+/** 各訂單套用的優惠券 id；未選 = 無紀錄。 */
+const couponByGroup = ref<Record<number, string | null>>({});
+const appliedCouponOf = (g: CheckoutGroup): Coupon | null =>
+  coupons.value.find((c) => c.id === couponByGroup.value[g.id]) ?? null;
 
-const isCouponUsable = (c: Coupon) =>
-  !c.disabled && itemsAfterBulk.value >= (c.minSpend ?? 0);
-const couponUnusableReason = (c: Coupon) => {
+/** 同一張券只能用在一筆訂單上。 */
+const isCouponUsedByOtherGroup = (g: CheckoutGroup, c: Coupon): boolean =>
+  Object.entries(couponByGroup.value).some(
+    ([gid, cid]) => Number(gid) !== g.id && cid === c.id,
+  );
+const isCouponUsableFor = (g: CheckoutGroup, c: Coupon): boolean => {
+  if (c.disabled) return false;
+  if (isCouponUsedByOtherGroup(g, c)) return false;
+  if (
+    c.applicableItemIds &&
+    !g.items.some((i) => c.applicableItemIds!.includes(i.id))
+  )
+    return false;
+  return groupAfterBulk(g) >= (c.minSpend ?? 0);
+};
+const couponUnusableReasonFor = (g: CheckoutGroup, c: Coupon): string => {
   if (c.disabled) return c.disabledReason ?? '不可使用';
-  if (c.minSpend && itemsAfterBulk.value < c.minSpend) return '金額未達門檻';
+  if (isCouponUsedByOtherGroup(g, c)) return '已用於其他訂單';
+  if (
+    c.applicableItemIds &&
+    !g.items.some((i) => c.applicableItemIds!.includes(i.id))
+  )
+    return '本訂單無適用商品';
+  if (c.minSpend && groupAfterBulk(g) < c.minSpend) return '金額未達門檻';
   return '';
 };
-const discountOf = (c: Coupon): number => {
-  if (!isCouponUsable(c)) return 0;
+/** 該券套在該訂單上的折抵金額（以買多優惠後金額為基底）。 */
+const discountOfFor = (g: CheckoutGroup, c: Coupon): number => {
+  if (!isCouponUsableFor(g, c) && couponByGroup.value[g.id] !== c.id) return 0;
   if (c.applicableItemIds) {
-    const target = allItems.value.find((i) =>
-      c.applicableItemIds!.includes(i.id),
-    );
+    const target = g.items.find((i) => c.applicableItemIds!.includes(i.id));
     if (!target) return 0;
-    // 優惠券以買多優惠後的金額為基底再折抵
-    const line = effectiveUnitPrice(target) * target.qty;
+    const line = lineTotalAfterBulk(target);
     const fixed = c.amount.match(/折(\d+)/);
     if (fixed) return Math.min(line, Number(fixed[1]));
     const pct = c.amount.match(/(\d+)%/);
@@ -294,68 +568,64 @@ const discountOf = (c: Coupon): number => {
   if (fixed) return Number(fixed[1]);
   const pct = c.amount.match(/(\d+)%/);
   if (pct)
-    return Math.round((itemsAfterBulk.value * (100 - Number(pct[1]))) / 100);
+    return Math.round((groupAfterBulk(g) * (100 - Number(pct[1]))) / 100);
   return 0;
 };
-
-const manualCouponId = ref<string | null>(null);
-const bestCouponId = computed(() => {
-  const usable = coupons.value.filter(isCouponUsable);
-  if (!usable.length) return null;
-  return usable.reduce((best, c) =>
-    discountOf(c) > discountOf(best) ? c : best,
-  ).id;
-});
-const appliedCouponId = computed(
-  () => manualCouponId.value ?? bestCouponId.value,
-);
-const appliedCoupon = computed(
-  () => coupons.value.find((c) => c.id === appliedCouponId.value) ?? null,
-);
-const sortedCoupons = computed(() =>
-  [...coupons.value].sort((a, b) => {
-    // 兌換來的券永遠置頂，讓使用者確認剛加入的是哪一張
-    if (!!a.redeemed !== !!b.redeemed) return a.redeemed ? -1 : 1;
-    const ua = isCouponUsable(a),
-      ub = isCouponUsable(b);
-    if (ua !== ub) return ua ? -1 : 1;
-    return discountOf(b) - discountOf(a);
-  }),
-);
-const couponAppliesTo = (itemId: string) => {
-  const c = appliedCoupon.value;
+const groupCouponDiscount = (g: CheckoutGroup): number => {
+  const c = appliedCouponOf(g);
+  return c ? discountOfFor(g, c) : 0;
+};
+const couponAppliesTo = (g: CheckoutGroup, itemId: string) => {
+  const c = appliedCouponOf(g);
   if (!c || !c.applicableItemIds) return true;
   return c.applicableItemIds.includes(itemId);
 };
-/** 原始總計（單價 × 數量），不含任何優惠。 */
-const lineTotal = (item: CartItem) => item.price * item.qty;
-/** 買多優惠後總計（不含優惠券）。 */
-const lineTotalAfterBulk = (item: CartItem) =>
-  effectiveUnitPrice(item) * item.qty;
-/** 套用優惠券後的總計；沒吃到本券的商品回傳 null。 */
-const discountedLineTotal = (item: CartItem): number | null => {
-  const c = appliedCoupon.value;
+/** 套用優惠券後的單品總計；沒吃到本券的商品回傳 null。 */
+const discountedLineTotal = (
+  g: CheckoutGroup,
+  item: CartItem,
+): number | null => {
+  const c = appliedCouponOf(g);
   if (!c || !c.applicableItemIds || !c.applicableItemIds.includes(item.id))
     return null;
-  return Math.max(0, lineTotalAfterBulk(item) - discountOf(c));
+  return Math.max(0, lineTotalAfterBulk(item) - discountOfFor(g, c));
 };
-/** 每組扣紅利前的金額（商品含買多與優惠券折抵 + 運費）；作為紅利上限與 UI 顯示基底。 */
-const groupSubtotalBeforeRewards = (g: CheckoutGroup): number =>
-  g.items.reduce(
-    (s, i) => s + (discountedLineTotal(i) ?? lineTotalAfterBulk(i)),
-    0,
-  ) + shippingFee.value;
-/** 每組最終小計（買多、優惠券、運費、該組紅利折抵都算完）。 */
-const groupDisplayTotal = (g: CheckoutGroup): number =>
-  Math.max(0, groupSubtotalBeforeRewards(g) - rewardPointsOfGroup(g));
 
-const handleOpenCouponDrawer = () => {
-  couponDrawerSelected.value =
-    appliedCouponId.value ?? coupons.value.find(isCouponUsable)?.id ?? null;
+// --- Coupon drawer（依訂單開啟） ---
+const couponCode = ref('');
+const isCouponDrawerVisible = ref(false);
+const couponDrawerGroupId = ref<number | null>(null);
+const couponDrawerSelected = ref<string | null>(null);
+const couponDrawerGroup = computed(
+  () =>
+    checkoutGroups.value.find((g) => g.id === couponDrawerGroupId.value) ??
+    null,
+);
+const drawerSortedCoupons = computed(() => {
+  const g = couponDrawerGroup.value;
+  if (!g) return [];
+  return [...coupons.value].sort((a, b) => {
+    // 兌換來的券永遠置頂，讓使用者確認剛加入的是哪一張
+    if (!!a.redeemed !== !!b.redeemed) return a.redeemed ? -1 : 1;
+    const ua = isCouponUsableFor(g, a),
+      ub = isCouponUsableFor(g, b);
+    if (ua !== ub) return ua ? -1 : 1;
+    return discountOfFor(g, b) - discountOfFor(g, a);
+  });
+});
+
+const handleOpenCouponDrawer = (g: CheckoutGroup) => {
+  couponDrawerGroupId.value = g.id;
+  couponDrawerSelected.value = couponByGroup.value[g.id] ?? null;
   isCouponDrawerVisible.value = true;
 };
 const handleConfirmCouponDrawer = () => {
-  manualCouponId.value = couponDrawerSelected.value;
+  if (couponDrawerGroupId.value !== null) {
+    couponByGroup.value = {
+      ...couponByGroup.value,
+      [couponDrawerGroupId.value]: couponDrawerSelected.value,
+    };
+  }
   isCouponDrawerVisible.value = false;
   ui.toast('已套用選擇的優惠券');
 };
@@ -394,175 +664,7 @@ const handleFakeScanResult = () => {
   handleApplyCouponCode();
 };
 
-// --- Shipping drawer ---
-const isShipDrawerVisible = ref(false);
-const shipDrawerView = ref<ShipDrawerView>('list');
-const shipMethod = ref<ShipMethod>(null);
-const homeAddresses = ref<HomeAddress[]>([
-  {
-    id: 'h1',
-    name: '王小明',
-    phone: '+886 912****56',
-    address: '台北市信義區忠孝東路五段 100 號 10 樓',
-    isDefault: true,
-  },
-  {
-    id: 'h2',
-    name: '王小明',
-    phone: '+886 912****56',
-    address: '高雄市前鎮區中山路一段 50 號 8 樓',
-    isDefault: false,
-    unavailable: true,
-  },
-]);
-const storeAddresses = ref<StoreAddress[]>([
-  {
-    id: 's1',
-    name: '王小明',
-    phone: '+886 912****56',
-    chain: '7-11',
-    storeName: '雄鎮門市',
-    address: '806高雄市前鎮區東一街7號',
-    isDefault: true,
-  },
-  {
-    id: 's2',
-    name: '王小明',
-    phone: '+886 912****56',
-    chain: 'FamilyMart',
-    storeName: '平鎮上海店',
-    address: '324桃園市平鎮區上海路205號',
-    isDefault: false,
-  },
-]);
-const selectedHomeId = ref<string | null>('h1');
-const selectedStoreId = ref<string | null>('s1');
-
-const handleOpenShipDrawer = () => {
-  shipDrawerView.value = 'list';
-  isShipDrawerVisible.value = true;
-};
-const handleSetDefaultHome = (id: string) => {
-  homeAddresses.value.forEach((a) => {
-    a.isDefault = a.id === id;
-  });
-};
-const handleSetDefaultStore = (id: string) => {
-  storeAddresses.value.forEach((a) => {
-    a.isDefault = a.id === id;
-  });
-};
-const handleDeleteHome = (id: string) => {
-  const wasDefault = homeAddresses.value.find((a) => a.id === id)?.isDefault;
-  homeAddresses.value = homeAddresses.value.filter((a) => a.id !== id);
-  if (
-    wasDefault &&
-    homeAddresses.value.length > 0 &&
-    !homeAddresses.value.some((a) => a.isDefault)
-  ) {
-    homeAddresses.value[0].isDefault = true;
-  }
-  if (selectedHomeId.value === id)
-    selectedHomeId.value = homeAddresses.value[0]?.id ?? null;
-};
-const handleDeleteStore = (id: string) => {
-  const wasDefault = storeAddresses.value.find((a) => a.id === id)?.isDefault;
-  storeAddresses.value = storeAddresses.value.filter((a) => a.id !== id);
-  if (
-    wasDefault &&
-    storeAddresses.value.length > 0 &&
-    !storeAddresses.value.some((a) => a.isDefault)
-  ) {
-    storeAddresses.value[0].isDefault = true;
-  }
-  if (selectedStoreId.value === id)
-    selectedStoreId.value = storeAddresses.value[0]?.id ?? null;
-};
-
-// Add-home form
-const newHomeName = ref('');
-const newHomeCountryCode = ref('+886');
-const newHomePhone = ref('');
-const newHomeCountry = ref('台灣');
-const newHomeCity = ref('高雄市');
-const newHomeDistrict = ref('前鎮區');
-const newHomeAddress = ref('');
-const resetAddHomeForm = () => {
-  newHomeName.value = '';
-  newHomePhone.value = '';
-  newHomeAddress.value = '';
-};
-const handleSubmitAddHome = () => {
-  if (!newHomeName.value.trim()) return;
-  const isTW = newHomeCountry.value === '台灣';
-  const address = isTW
-    ? `${newHomeCity.value}${newHomeDistrict.value} ${newHomeAddress.value}`
-    : `${newHomeCountry.value} ${newHomeAddress.value}`;
-  homeAddresses.value.push({
-    id: 'h' + (homeAddresses.value.length + 1),
-    name: newHomeName.value,
-    phone: `${newHomeCountryCode.value} ${newHomePhone.value || '000****00'}`,
-    address,
-    isDefault: false,
-  });
-  resetAddHomeForm();
-  shipDrawerView.value = 'list';
-};
-
-// Add-store form
-const newStoreChain = ref<'7-11' | 'FamilyMart' | null>(null);
-const newStoreName = ref('王小明');
-const newStorePhone = ref('09123456');
-const pickedStoreName = ref('');
-const pickedStoreAddr = ref('');
-const handlePickChain = (c: '7-11' | 'FamilyMart') => {
-  newStoreChain.value = c;
-  if (c === '7-11') {
-    pickedStoreName.value = '7-11 鑫工門市';
-    pickedStoreAddr.value = '台北市信義區忠孝東路五段 100 號 10 樓';
-  } else {
-    pickedStoreName.value = '全家 上海店';
-    pickedStoreAddr.value = '324桃園市平鎮區上海路205號';
-  }
-};
-const resetAddStoreForm = () => {
-  newStoreChain.value = null;
-  pickedStoreName.value = '';
-  pickedStoreAddr.value = '';
-};
-const handleSubmitAddStore = () => {
-  if (!newStoreChain.value || !pickedStoreName.value) return;
-  storeAddresses.value.push({
-    id: 's' + (storeAddresses.value.length + 1),
-    name: newStoreName.value,
-    phone: `+886 ${newStorePhone.value.replace(/(\d{3})\d+(\d{2})/, '$1****$2')}`,
-    chain: newStoreChain.value,
-    storeName: pickedStoreName.value,
-    address: pickedStoreAddr.value,
-    isDefault: false,
-  });
-  resetAddStoreForm();
-  shipDrawerView.value = 'list';
-};
-
-const shippingFee = computed(() => {
-  if (shipMethod.value === 'home') return HOME_SHIPPING_FEE;
-  if (shipMethod.value === 'store') return STORE_SHIPPING_FEE;
-  return 0;
-});
-const shippingMethodLabel = computed(() => {
-  if (shipMethod.value === 'home') return '宅配';
-  if (shipMethod.value === 'store') return '超商配送';
-  return '請選擇';
-});
-const selectedHome = computed(() =>
-  homeAddresses.value.find((a) => a.id === selectedHomeId.value),
-);
-const selectedStore = computed(() =>
-  storeAddresses.value.find((a) => a.id === selectedStoreId.value),
-);
-
-// 紅利點數改成每組獨立：key = group.id，value = 該組已使用點數
+// ---- 紅利點數（每組獨立；跨組合計不能超過餘額）------------------------------
 const rewardPointsByGroup = ref<Record<number, number>>({});
 // checkoutGroups 變動時同步鍵：新組補 0、消失組移除、舊值保留
 watch(
@@ -587,6 +689,13 @@ const rewardPointsUsedTotal = computed(() =>
 const remainingRewardPoints = computed(() =>
   Math.max(0, TOTAL_REWARD_BALANCE - rewardPointsUsedTotal.value),
 );
+
+/** 每組扣紅利前的金額（商品 − 買多 − 優惠券 + 運費 − 運費折抵）。 */
+const groupSubtotalBeforeRewards = (g: CheckoutGroup): number =>
+  groupAfterBulk(g) -
+  groupCouponDiscount(g) +
+  (groupShippingFee(g) ?? 0) -
+  groupShippingDiscount(g);
 // 每組上限 = min(該組扣紅利前的金額, 全域剩餘 + 本組已用)
 const maxRewardPointsFor = (g: CheckoutGroup): number =>
   Math.max(
@@ -596,32 +705,19 @@ const maxRewardPointsFor = (g: CheckoutGroup): number =>
       remainingRewardPoints.value + rewardPointsOfGroup(g),
     ),
   );
+/** 每組最終小計（買多、優惠券、運費、免運、該組紅利折抵都算完）。 */
+const groupDisplayTotal = (g: CheckoutGroup): number =>
+  Math.max(0, groupSubtotalBeforeRewards(g) - rewardPointsOfGroup(g));
 
+// ---- 付款方式 / 發票 ---------------------------------------------------------
 const paymentMethod = ref<PaymentMethodId>('credit');
-
 /** 依交集過濾的付款方式選項 → 直接餵給 Select。 */
 const availablePaymentMethods = computed(() =>
   PAYMENT_METHODS.filter((m) =>
-    supportedPaymentMethods.value.includes(m.value as PaymentMethodId),
+    supportedPaymentMethods.value.includes(m.value),
   ),
 );
-
-// 只有一種運送方式 → 直接鎖定該方式（沒選擇餘地）；
-// 多種 → 讓使用者主動選、運費等選完才顯示；
-// 目前選的方式已不支援 → 清空
-watch(
-  supportedShippingMethods,
-  (methods) => {
-    if (methods.length === 1) {
-      shipMethod.value = methods[0];
-      return;
-    }
-    if (shipMethod.value && !methods.includes(shipMethod.value)) {
-      shipMethod.value = null;
-    }
-  },
-  { immediate: true },
-);
+const isBankInfoVisible = computed(() => paymentMethod.value === 'transfer');
 watch(
   supportedPaymentMethods,
   (methods) => {
@@ -633,35 +729,66 @@ watch(
   { immediate: true },
 );
 
-const productTotal = computed(() => itemsSubtotal.value);
+const invoiceType = ref('personal-paper');
+const invoiceEmail = ref('abc@gmail.com');
+
+// ---- 全域金額（底部可展開費用明細）------------------------------------------
+const productTotal = computed(() =>
+  checkoutGroups.value.reduce((s, g) => s + groupGoodsTotal(g), 0),
+);
+const bulkDiscountTotal = computed(() =>
+  checkoutGroups.value.reduce((s, g) => s + groupBulkDiscount(g), 0),
+);
 // 尚未選運送方式 → 運費相關全歸零，等使用者選完再計入
 const shippingTotal = computed(() =>
-  shipMethod.value ? shippingFee.value + OTHER_GROUP_FEE : 0,
+  checkoutGroups.value.reduce((s, g) => s + (groupShippingFee(g) ?? 0), 0),
 );
-const shippingDiscount = computed(() =>
-  shipMethod.value ? SHIPPING_DISCOUNT : 0,
+const shippingDiscountTotal = computed(() =>
+  checkoutGroups.value.reduce((s, g) => s + groupShippingDiscount(g), 0),
 );
-const bulkDiscount = computed(() => -bulkDiscountTotal.value);
-const couponDiscount = computed(() =>
-  appliedCoupon.value ? -discountOf(appliedCoupon.value) : 0,
+const couponDiscountTotal = computed(() =>
+  checkoutGroups.value.reduce((s, g) => s + groupCouponDiscount(g), 0),
 );
-const finalTotal = computed(
-  () =>
-    productTotal.value +
-    shippingTotal.value +
-    bulkDiscount.value +
-    shippingDiscount.value +
-    couponDiscount.value -
-    rewardPointsUsedTotal.value,
+const finalTotal = computed(() =>
+  checkoutGroups.value.reduce((s, g) => s + groupDisplayTotal(g), 0),
 );
 const totalSaved = computed(
   () =>
-    Math.abs(
-      bulkDiscount.value + shippingDiscount.value + couponDiscount.value,
-    ) + rewardPointsUsedTotal.value,
+    bulkDiscountTotal.value +
+    shippingDiscountTotal.value +
+    couponDiscountTotal.value +
+    rewardPointsUsedTotal.value,
 );
 
+const isPayPanelOpen = ref(false);
+const handleTogglePayPanel = () => {
+  isPayPanelOpen.value = !isPayPanelOpen.value;
+};
+
+// ---- 下單 --------------------------------------------------------------------
 const handlePlaceOrder = () => {
+  // 未選配送方式 / 超商未選門市 → 擋下並帶回抽屜
+  if (!shipMethod.value) {
+    ui.toast('請先選擇配送方式');
+    handleOpenShipDrawer();
+    return;
+  }
+  if (
+    shipMethod.value === 'store' &&
+    checkoutGroups.value.some((g) => !cvsPickOf(g))
+  ) {
+    ui.toast('請為各訂單選擇取貨門市');
+    handleOpenShipDrawer();
+    return;
+  }
+  if (
+    (shipMethod.value === 'home' || shipMethod.value === 'post') &&
+    !selectedHome.value
+  ) {
+    ui.toast('請選擇配送地址');
+    handleOpenShipDrawer();
+    return;
+  }
   // 未綁定手機 → 攔下、開 inline 綁定 Dialog；綁完會自動再跑一次這個函式
   if (!authStore.hasPhoneBound) {
     openBindPhoneDialog();
@@ -669,7 +796,7 @@ const handlePlaceOrder = () => {
   }
   const method =
     PAYMENT_METHODS.find((m) => m.value === paymentMethod.value)?.label ??
-    '線上信用卡';
+    '線上信用卡（藍新）';
 
   // 每個群組（賣家 / 場次）拆成獨立一筆訂單，收集訂單編號
   const orderNos: string[] = checkoutGroups.value.map((g) =>
@@ -688,16 +815,16 @@ const handlePlaceOrder = () => {
   );
 
   // 依目前選擇的配送方式抓取聯絡人 / 電話 / 完整地址（給付款成功頁顯示）
-  const contact =
-    shipMethod.value === 'home' ? selectedHome.value : selectedStore.value;
-  const buyerName = contact?.name ?? '';
-  const buyerPhone = contact?.phone ?? '';
+  const buyerName = selectedHome.value?.name ?? '';
+  const buyerPhone = selectedHome.value?.phone ?? '';
   const deliveryAddress =
-    shipMethod.value === 'home' && selectedHome.value
-      ? selectedHome.value.address
-      : shipMethod.value === 'store' && selectedStore.value
-        ? `${selectedStore.value.chain} ${selectedStore.value.storeName}（${selectedStore.value.address}）`
-        : '';
+    shipMethod.value === 'home' || shipMethod.value === 'post'
+      ? (selectedHome.value?.address ?? '')
+      : shipMethod.value === 'pickup'
+        ? `自取 ${selectedPickup.value.name}（${selectedPickup.value.address}）`
+        : checkoutGroups.value
+            .map((g) => `${g.sellerName}：${cvsPickOf(g)?.pickedStore ?? ''}`)
+            .join('；');
 
   ordersStore.setLastPaymentSummary({
     orderNos,
@@ -740,16 +867,75 @@ const handlePlaceOrder = () => {
       class="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--page-pad-x)] pb-[120px] @7xl:px-0"
       style="gap: var(--stack-gap)"
     >
+      <!-- 配送資訊（共用，置頂） -->
+      <section class="shadow-card overflow-hidden rounded-xl bg-white">
+        <div class="cart-divider px-4 py-3">
+          <span class="font-medium text-slate-700">配送資訊</span>
+        </div>
+        <div class="card-pad flex flex-col gap-3">
+          <div class="text-sm text-slate-500">配送方式</div>
+          <div class="flex items-center gap-3">
+            <span
+              class="text-sm"
+              :class="shipMethod ? 'text-slate-700' : 'text-slate-500'"
+              >{{ shippingMethodLabel }}</span
+            >
+            <Button
+              label="選擇運送方式"
+              icon="pi pi-chevron-right"
+              icon-pos="right"
+              link
+              size="small"
+              @click="handleOpenShipDrawer"
+            />
+          </div>
+          <template v-if="shipMethod === 'home' || shipMethod === 'post'">
+            <div class="mt-1 text-sm text-slate-500">配送地址</div>
+            <div v-if="selectedHome" class="text-sm text-slate-700">
+              {{ selectedHome.name }} {{ selectedHome.phone }}
+              {{ selectedHome.address }}
+            </div>
+            <div v-else class="text-sm text-slate-500">尚未選擇配送地址</div>
+          </template>
+          <template v-else-if="shipMethod === 'pickup'">
+            <div class="mt-1 text-sm text-slate-500">自取門市</div>
+            <div class="text-sm text-slate-700">
+              {{ selectedPickup.name }}　{{ selectedPickup.address }} ·
+              {{ selectedPickup.hours }}
+            </div>
+          </template>
+          <template v-else-if="shipMethod === 'store'">
+            <div class="mt-1 text-sm text-slate-500">取貨門市（各訂單）</div>
+            <div
+              v-for="g in checkoutGroups"
+              :key="g.id"
+              class="flex flex-wrap items-center gap-2 text-sm"
+            >
+              <span class="text-slate-500">{{ g.sellerName }}</span>
+              <span v-if="cvsPickOf(g)" class="text-slate-700">
+                {{ cvsPickOf(g)!.pickedStore }}
+              </span>
+              <span v-else class="text-red-500">尚未選門市</span>
+            </div>
+          </template>
+        </div>
+      </section>
+
       <!-- 訂單明細（按購物車拆分，每台一張卡） -->
       <section
         v-for="group in checkoutGroups"
         :key="group.id"
         class="shadow-card rounded-xl bg-white"
       >
-        <div class="cart-divider px-4 py-3">
+        <div class="cart-divider flex items-center gap-2 px-4 py-3">
           <span class="font-medium text-slate-700"
             >{{ group.sellerName }} 訂單明細</span
           >
+          <Tag
+            :value="group.tempLayer"
+            :severity="group.tempLayer === '常溫' ? 'secondary' : 'info'"
+            class="!py-0.5 !text-xs"
+          />
         </div>
         <div
           v-for="(item, ii) in group.items"
@@ -764,18 +950,30 @@ const handlePlaceOrder = () => {
               <p class="truncate text-base font-semibold text-slate-700">
                 {{ item.name }}
               </p>
-              <!-- 規格列：組合商品的規格寫在底下子品，這裡不重複顯示 -->
+              <!-- 規格列：一律先規格、後數量（含組合商品；spec 為預設值時不顯示） -->
               <div
-                v-if="!item.bundleItems && item.spec && item.spec !== '預設'"
+                v-if="item.spec && item.spec !== '預設'"
                 class="flex gap-4 text-sm text-slate-700"
               >
                 <span class="shrink-0">規格</span>
                 <span class="truncate">{{ item.spec }}</span>
               </div>
-              <div class="flex gap-4 text-sm text-slate-700">
-                <span>數量</span><span>{{ item.qty }}</span>
-              </div>
-              <!-- 買多優惠明細 -->
+              <!-- 組合商品內容（不可收合，直接列出） -->
+              <p
+                v-if="item.bundleItems"
+                class="text-sm leading-relaxed text-slate-700"
+              >
+                <span class="font-medium">組合商品內容：</span
+                >{{
+                  item.bundleItems
+                    .map(
+                      (s) =>
+                        `${s.name}${s.spec && s.spec !== '預設' ? ` - ${s.spec}` : ''} ×${s.qty * item.qty}`,
+                    )
+                    .join('、')
+                }}
+              </p>
+              <!-- 買多優惠明細（組合商品下方、數量上方） -->
               <div
                 v-if="hasBulkDiscount(item)"
                 class="mt-0.5 flex items-center gap-1.5 text-xs text-green-700"
@@ -786,11 +984,15 @@ const handlePlaceOrder = () => {
                   · 已折抵 -${{ bulkDiscountAmount(item).toLocaleString() }}
                 </span>
               </div>
+              <!-- 數量列固定放最後 -->
+              <div class="flex gap-4 text-sm text-slate-700">
+                <span>數量</span><span>{{ item.qty }}</span>
+              </div>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-0.5 text-right">
-              <template v-if="discountedLineTotal(item) !== null">
+              <template v-if="discountedLineTotal(group, item) !== null">
                 <Tag
-                  :value="'已套用 ' + appliedCoupon?.amount"
+                  :value="'已套用 ' + appliedCouponOf(group)?.amount"
                   severity="success"
                   class="!py-0.5 !text-xs"
                 />
@@ -804,15 +1006,10 @@ const handlePlaceOrder = () => {
                   買多優惠後 ${{ lineTotalAfterBulk(item).toLocaleString() }}
                 </span>
                 <span class="text-base font-bold" style="color: var(--primary)">
-                  ${{ discountedLineTotal(item)?.toLocaleString() }}
+                  ${{ discountedLineTotal(group, item)?.toLocaleString() }}
                 </span>
               </template>
               <template v-else-if="hasBulkDiscount(item)">
-                <Tag
-                  value="已套用買多優惠"
-                  severity="success"
-                  class="!py-0.5 !text-xs"
-                />
                 <span class="text-sm text-slate-400 line-through">
                   ${{ lineTotal(item).toLocaleString() }}
                 </span>
@@ -822,7 +1019,9 @@ const handlePlaceOrder = () => {
               </template>
               <template v-else>
                 <Tag
-                  v-if="appliedCoupon && !couponAppliesTo(item.id)"
+                  v-if="
+                    appliedCouponOf(group) && !couponAppliesTo(group, item.id)
+                  "
                   value="本券不適用"
                   severity="secondary"
                   class="!bg-slate-100 !py-0.5 !text-xs !text-slate-400"
@@ -833,48 +1032,124 @@ const handlePlaceOrder = () => {
               </template>
             </div>
           </div>
-
-          <!-- Bundle（不可收合，直接列出；左緣對齊「數量」label） -->
-          <div v-if="item.bundleItems" class="pr-4 pb-4 pl-[88px]">
-            <p class="text-sm leading-relaxed text-slate-700">
-              <span class="font-medium">組合商品內容：</span
-              >{{
-                item.bundleItems
-                  .map(
-                    (s) =>
-                      `${s.name}${s.spec && s.spec !== '預設' ? ` - ${s.spec}` : ''} ×${s.qty * item.qty}`,
-                  )
-                  .join('、')
-              }}
-            </p>
-          </div>
         </div>
 
-        <!-- 優惠券 / 紅利點數：inline 選單，狀態仍為結帳全域共用 -->
-        <div
-          class="cart-divider-top flex flex-col gap-3 px-4 py-3 @3xl:flex-row @3xl:items-center @3xl:justify-between"
-        >
-          <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="w-20 font-medium text-slate-700">優惠券</span>
-            <Button
-              :label="appliedCoupon ? appliedCoupon.title : '選擇優惠券'"
-              :icon="appliedCoupon ? 'pi pi-check' : 'pi pi-tag'"
-              severity="secondary"
-              outlined
-              size="small"
-              @click="handleOpenCouponDrawer"
-            />
-            <span
-              v-if="appliedCoupon && !manualCouponId"
-              class="text-xs text-slate-400"
+        <!-- 全寬收據式明細：標籤左、金額右，操作行內 -->
+        <!-- 收據式明細：網格對齊（標籤｜操作 132px｜說明｜金額靠右）；
+             手機版說明列換行到操作按鈕下方 -->
+        <div class="cart-divider-top flex flex-col px-4 py-3">
+          <!-- 商品金額 -->
+          <div :class="RECEIPT_ROW_CLASS">
+            <span class="text-sm text-slate-700">商品金額</span>
+            <span :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'"
+              >$ {{ groupGoodsTotal(group).toLocaleString() }}</span
             >
-              （自動套用最優惠）
-            </span>
           </div>
-          <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-            <span class="w-20 font-medium">紅利點數</span>
-            <template v-if="TOTAL_REWARD_BALANCE > 0">
-              <span>使用</span>
+
+          <!-- 多件優惠折抵 -->
+          <div v-if="groupBulkDiscount(group) > 0" :class="RECEIPT_ROW_CLASS">
+            <span class="text-sm text-slate-700">多件優惠折抵</span>
+            <span :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
+              >- $ {{ groupBulkDiscount(group).toLocaleString() }}</span
+            >
+          </div>
+
+          <!-- 運費：操作欄放按鈕（同寬），說明欄放運送標籤與免運提示 -->
+          <div :class="RECEIPT_ROW_CLASS">
+            <span class="text-sm text-slate-700">運費</span>
+            <div class="col-start-2 row-start-1">
+              <Button
+                :label="shipMethod ? '變更' : '選擇配送方式'"
+                severity="secondary"
+                outlined
+                size="small"
+                :class="RECEIPT_BUTTON_CLASS"
+                @click="handleOpenShipDrawer"
+              />
+            </div>
+            <div v-if="shipMethod" :class="RECEIPT_HINT_CLASS">
+              <span class="truncate text-sm text-slate-500">{{
+                groupShippingLabel(group)
+              }}</span>
+              <Tag
+                v-if="
+                  groupShippingFee(group) !== null &&
+                  groupShippingFee(group)! > 0 &&
+                  !isGroupFreeShipping(group)
+                "
+                value="未達免運門檻"
+                severity="secondary"
+                class="shrink-0 !bg-slate-100 !py-0.5 !text-xs !text-slate-400"
+              />
+            </div>
+            <span
+              v-if="groupShippingFee(group) === null"
+              :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'"
+              >—</span
+            >
+            <span
+              v-else-if="groupShippingFee(group) === 0"
+              :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'"
+              >免運</span
+            >
+            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'"
+              >$ {{ groupShippingFee(group)!.toLocaleString() }}</span
+            >
+          </div>
+
+          <!-- 運費折抵：達免運門檻標籤放操作欄，與按鈕同寬對齊 -->
+          <div
+            v-if="groupShippingDiscount(group) > 0"
+            :class="RECEIPT_ROW_CLASS"
+          >
+            <span class="text-sm text-slate-700">運費折抵</span>
+            <Tag
+              value="達免運門檻"
+              class="col-start-2 row-start-1 !w-[132px] !justify-center !py-0.5 !text-xs"
+              :pt="{
+                root: {
+                  style:
+                    'background: var(--primary-surface); color: var(--primary)',
+                },
+              }"
+            />
+            <span :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
+              >- $ {{ groupShippingDiscount(group).toLocaleString() }}</span
+            >
+          </div>
+
+          <!-- 優惠券：操作欄放按鈕，說明欄放券名 -->
+          <div :class="RECEIPT_ROW_CLASS">
+            <span class="text-sm text-slate-700">優惠券</span>
+            <div class="col-start-2 row-start-1">
+              <Button
+                :label="appliedCouponOf(group) ? '變更' : '選擇優惠券'"
+                severity="secondary"
+                outlined
+                size="small"
+                :class="RECEIPT_BUTTON_CLASS"
+                @click="handleOpenCouponDrawer(group)"
+              />
+            </div>
+            <div v-if="appliedCouponOf(group)" :class="RECEIPT_HINT_CLASS">
+              <span class="truncate text-sm text-slate-500">{{
+                appliedCouponOf(group)!.title
+              }}</span>
+            </div>
+            <span
+              v-if="groupCouponDiscount(group) > 0"
+              :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
+              >- $ {{ groupCouponDiscount(group).toLocaleString() }}</span
+            >
+            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'"
+              >—</span
+            >
+          </div>
+
+          <!-- 紅利點數：操作欄放 stepper（同寬），點數餘額放操作後方的說明欄 -->
+          <div :class="RECEIPT_ROW_CLASS">
+            <span class="text-sm text-slate-700">紅利點數</span>
+            <div class="col-start-2 row-start-1 w-[132px]">
               <InputNumber
                 :model-value="rewardPointsByGroup[group.id] ?? 0"
                 :min="0"
@@ -883,7 +1158,7 @@ const handlePlaceOrder = () => {
                 button-layout="horizontal"
                 increment-button-icon="pi pi-plus"
                 decrement-button-icon="pi pi-minus"
-                class="qty-stepper"
+                class="qty-stepper is-fluid"
                 @update:model-value="
                   (v) =>
                     (rewardPointsByGroup[group.id] = Math.max(
@@ -892,88 +1167,35 @@ const handlePlaceOrder = () => {
                     ))
                 "
               />
-              <span>點</span>
+            </div>
+            <div :class="RECEIPT_HINT_CLASS">
               <span class="text-xs text-slate-500">
-                / 尚有
+                尚有
                 <span style="color: var(--primary)">{{
                   remainingRewardPoints
                 }}</span>
                 點
               </span>
-            </template>
-            <span v-else class="text-xs text-slate-500"
-              >目前無可用紅利點數</span
+            </div>
+            <span
+              v-if="rewardPointsOfGroup(group) > 0"
+              :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
+              >- $ {{ rewardPointsOfGroup(group).toLocaleString() }}</span
+            >
+            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'"
+              >—</span
             >
           </div>
         </div>
 
+        <!-- 訂單金額小計 -->
         <div
-          v-if="shipMethod"
-          class="flex items-center gap-2 px-4 pb-3 text-sm text-slate-700"
+          class="cart-divider-top flex items-center justify-between gap-4 px-4 py-4"
         >
-          <span class="w-20 font-medium">運費</span>
-          <span>${{ shippingFee.toLocaleString() }}</span>
-        </div>
-        <div
-          v-else
-          class="flex items-center gap-2 px-4 pb-3 text-sm text-slate-500"
-        >
-          <span class="w-20 font-medium">運費</span>
-          <span>請先選擇配送方式</span>
-        </div>
-
-        <div
-          class="cart-divider-top flex items-center justify-end gap-4 px-4 py-4"
-        >
-          <span class="text-sm text-slate-700"
-            >訂單金額小計 ({{ group.items.length }}個商品)</span
-          >
+          <span class="text-base font-bold text-slate-950">訂單金額小計</span>
           <span class="text-2xl font-bold" style="color: var(--primary)"
             >${{ groupDisplayTotal(group).toLocaleString() }}</span
           >
-        </div>
-      </section>
-
-      <!-- 配送資訊 -->
-      <section class="shadow-card overflow-hidden rounded-xl bg-white">
-        <div class="cart-divider px-4 py-3">
-          <span class="font-medium text-slate-700">配送資訊</span>
-        </div>
-        <div class="card-pad flex flex-col gap-3">
-          <div class="flex items-center gap-3">
-            <span class="text-sm text-slate-700">配送方式</span>
-          </div>
-          <div class="flex items-center gap-3">
-            <span class="text-sm text-slate-700">{{
-              shippingMethodLabel
-            }}</span>
-            <Button
-              label="選擇運送方式"
-              icon="pi pi-chevron-right"
-              icon-pos="right"
-              link
-              size="small"
-              @click="handleOpenShipDrawer"
-            />
-          </div>
-          <div class="mt-1 text-sm text-slate-700">配送地址</div>
-          <div
-            v-if="shipMethod === 'home' && selectedHome"
-            class="text-sm text-slate-700"
-          >
-            {{ selectedHome.name }} {{ selectedHome.phone }} 　
-            {{ selectedHome.address }}
-          </div>
-          <div
-            v-else-if="shipMethod === 'store' && selectedStore"
-            class="text-sm text-slate-700"
-          >
-            {{ selectedStore.name }} {{ selectedStore.phone }} 　
-            {{ selectedStore.chain }} {{ selectedStore.storeName }}（{{
-              selectedStore.address
-            }}）
-          </div>
-          <div v-else class="text-sm text-slate-500">尚未選擇配送地址</div>
         </div>
       </section>
 
@@ -984,10 +1206,10 @@ const handlePlaceOrder = () => {
         </div>
         <div class="card-pad flex max-w-[440px] flex-col gap-3">
           <div class="flex flex-col gap-1">
-            <label class="text-sm text-slate-700">發票載具</label>
+            <label class="text-sm text-slate-700">發票類型</label>
             <Select
-              v-model="invoiceCarrierType"
-              :options="INVOICE_CARRIERS"
+              v-model="invoiceType"
+              :options="INVOICE_TYPES"
               option-label="label"
               option-value="value"
               class="w-full"
@@ -1014,6 +1236,20 @@ const handlePlaceOrder = () => {
             option-value="value"
             class="w-full"
           />
+          <!-- 轉帳匯款 → 帶出銀行戶頭資料 -->
+          <div
+            v-if="isBankInfoVisible"
+            class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
+          >
+            <p class="mb-1 text-sm font-bold text-slate-700">銀行戶頭資料</p>
+            <p
+              v-for="line in BANK_TRANSFER_INFO"
+              :key="line"
+              class="py-0.5 text-sm text-slate-500"
+            >
+              {{ line }}
+            </p>
+          </div>
           <p
             v-if="availablePaymentMethods.length < PAYMENT_METHODS.length"
             class="mt-2 text-xs text-slate-500"
@@ -1023,112 +1259,102 @@ const handlePlaceOrder = () => {
           </p>
         </div>
       </section>
-
-      <!-- 金額明細 -->
-      <section class="shadow-card overflow-hidden rounded-xl bg-white">
-        <div
-          class="card-pad grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 text-sm"
-        >
-          <!-- 商品總金額 -->
-          <div></div>
-          <span class="text-slate-700">商品總金額</span>
-          <span class="min-w-20 text-right text-slate-700"
-            >$ {{ productTotal.toLocaleString() }}</span
-          >
-
-          <!-- 運費總金額 / 免運折抵：尚未選運送方式時整段隱藏 -->
-          <template v-if="shipMethod">
-            <div></div>
-            <span class="text-slate-700">運費總金額</span>
-            <span class="text-right text-slate-700"
-              >$ {{ shippingTotal.toLocaleString() }}</span
-            >
-          </template>
-
-          <!-- 多件優惠折抵（動態：買多優惠加總） -->
-          <template v-if="bulkDiscountTotal > 0">
-            <div></div>
-            <span class="text-slate-700">多件優惠折抵</span>
-            <span class="text-right text-red-500"
-              >- $ {{ bulkDiscountTotal.toLocaleString() }}</span
-            >
-          </template>
-
-          <!-- 符合『滿千免運』提示 + 運費折抵：尚未選運送方式時隱藏 -->
-          <template v-if="shipMethod">
-            <!-- 手機：col-span-3 整列顯示在運費折抵上方 -->
-            <div
-              class="col-span-3 flex items-center justify-end gap-1 text-sm @3xl:hidden"
-              style="color: var(--primary)"
-            >
-              <i class="pi pi-truck text-xs" />
-              符合『滿千免運』
-            </div>
-            <!-- PC：與運費折抵同一行；放在 col 1 並 justify-self-end 靠右。
-                 用 invisible @3xl:visible 確保手機也佔 grid cell（讓欄位對齊上方） -->
-            <div
-              class="invisible flex items-center gap-1 justify-self-end text-sm @3xl:visible"
-              style="color: var(--primary)"
-            >
-              <i class="pi pi-truck text-xs" />
-              符合『滿千免運』
-            </div>
-            <span class="text-slate-700">運費折抵</span>
-            <span class="text-right text-red-500"
-              >- $ {{ Math.abs(SHIPPING_DISCOUNT).toLocaleString() }}</span
-            >
-          </template>
-
-          <!-- 已套用優惠券提示 -->
-          <template v-if="appliedCoupon">
-            <div
-              class="col-span-3 flex items-center justify-end gap-1 text-sm @3xl:hidden"
-              style="color: var(--primary)"
-            >
-              <i class="pi pi-ticket text-xs" />
-              已套用『{{ appliedCoupon.title }}』
-            </div>
-            <div
-              class="invisible flex items-center gap-1 justify-self-end text-sm @3xl:visible"
-              style="color: var(--primary)"
-            >
-              <i class="pi pi-ticket text-xs" />
-              已套用『{{ appliedCoupon.title }}』
-            </div>
-            <span class="text-slate-700">優惠券折扣</span>
-            <span class="text-right text-red-500"
-              >- $ {{ Math.abs(couponDiscount).toLocaleString() }}</span
-            >
-          </template>
-
-          <!-- 紅利點數（跨組加總） -->
-          <template v-if="rewardPointsUsedTotal > 0">
-            <div></div>
-            <span class="text-slate-700">紅利點數折抵</span>
-            <span class="text-right text-red-500"
-              >- $ {{ rewardPointsUsedTotal.toLocaleString() }}</span
-            >
-          </template>
-
-          <!-- 總付款金額 -->
-          <div></div>
-          <span class="text-slate-700">總付款金額</span>
-          <span class="text-right font-medium" style="color: var(--primary)"
-            >$ {{ finalTotal.toLocaleString() }}</span
-          >
-        </div>
-      </section>
     </main>
 
-    <!-- Sticky footer -->
+    <!-- Sticky footer（總計可展開費用明細） -->
     <div
       class="sticky bottom-0 z-40 border-t border-b border-slate-200 bg-white"
     >
+      <!-- 費用明細面板 -->
+      <div v-if="isPayPanelOpen" class="border-b border-slate-200">
+        <div class="mx-auto max-w-7xl px-4 py-3.5">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-sm font-bold text-slate-950">費用明細</span>
+            <button
+              type="button"
+              class="cursor-pointer text-xs"
+              style="color: var(--primary)"
+              @click="handleTogglePayPanel"
+            >
+              收合 <i class="pi pi-chevron-down text-[10px]" />
+            </button>
+          </div>
+          <div class="flex flex-col gap-1 text-sm">
+            <div class="flex justify-between py-0.5">
+              <span class="text-slate-500">商品總金額</span>
+              <span class="text-slate-700"
+                >$ {{ productTotal.toLocaleString() }}</span
+              >
+            </div>
+            <div v-if="shipMethod" class="flex justify-between py-0.5">
+              <span class="text-slate-500">運費總金額</span>
+              <span class="text-slate-700"
+                >$ {{ shippingTotal.toLocaleString() }}</span
+              >
+            </div>
+            <div
+              v-if="bulkDiscountTotal > 0"
+              class="flex justify-between py-0.5"
+            >
+              <span class="text-slate-500">多件優惠折抵</span>
+              <span class="font-medium text-red-500"
+                >- $ {{ bulkDiscountTotal.toLocaleString() }}</span
+              >
+            </div>
+            <div
+              v-if="shippingDiscountTotal > 0"
+              class="flex justify-between py-0.5"
+            >
+              <span class="flex items-center gap-1 text-slate-500">
+                <i class="pi pi-truck text-xs" />
+                運費折抵（滿千免運）
+              </span>
+              <span class="font-medium text-red-500"
+                >- $ {{ shippingDiscountTotal.toLocaleString() }}</span
+              >
+            </div>
+            <div
+              v-if="couponDiscountTotal > 0"
+              class="flex justify-between py-0.5"
+            >
+              <span class="flex items-center gap-1 text-slate-500">
+                <i class="pi pi-ticket text-xs" />
+                優惠券折扣
+              </span>
+              <span class="font-medium text-red-500"
+                >- $ {{ couponDiscountTotal.toLocaleString() }}</span
+              >
+            </div>
+            <div
+              v-if="rewardPointsUsedTotal > 0"
+              class="flex justify-between py-0.5"
+            >
+              <span class="text-slate-500">紅利點數折抵</span>
+              <span class="font-medium text-red-500"
+                >- $ {{ rewardPointsUsedTotal.toLocaleString() }}</span
+              >
+            </div>
+            <div
+              class="mt-1 flex justify-between border-t border-slate-200 pt-2"
+            >
+              <span class="font-bold text-slate-950">總付款金額</span>
+              <span class="font-bold" style="color: var(--primary)"
+                >$ {{ finalTotal.toLocaleString() }}</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div
         class="mx-auto flex max-w-7xl items-center justify-end gap-4 px-4 py-3"
         style="padding-bottom: max(12px, env(safe-area-inset-bottom))"
       >
-        <div class="flex min-w-0 flex-col items-end leading-tight">
+        <button
+          type="button"
+          class="flex min-w-0 cursor-pointer flex-col items-end leading-tight"
+          @click="handleTogglePayPanel"
+        >
           <div class="flex min-w-0 items-baseline gap-2">
             <span class="text-sm text-slate-700 @3xl:text-lg">總付款金額</span>
             <span
@@ -1136,11 +1362,16 @@ const handlePlaceOrder = () => {
               style="color: var(--primary)"
               >${{ finalTotal.toLocaleString() }}</span
             >
+            <i
+              class="pi text-sm"
+              :class="isPayPanelOpen ? 'pi-chevron-down' : 'pi-chevron-up'"
+              style="color: var(--primary)"
+            />
           </div>
-          <span class="text-sm text-red-500"
+          <span v-if="totalSaved > 0" class="text-sm text-red-500"
             >共省下 -${{ totalSaved.toLocaleString() }}</span
           >
-        </div>
+        </button>
         <Button
           label="去付款"
           class="!min-h-12 shrink-0 !px-6 @3xl:!px-16"
@@ -1297,7 +1528,7 @@ const handlePlaceOrder = () => {
       </template>
     </Dialog>
 
-    <!-- ============== Coupon Drawer ============== -->
+    <!-- ============== Coupon Drawer（依訂單開啟） ============== -->
     <!-- Teleport 到 body：避開 App.vue 的 @container（會把 fixed 子節點變成
          以 frame 為 containing block），讓抽屜 / 遮罩用真正的 viewport 座標。 -->
     <Teleport to="body">
@@ -1312,7 +1543,7 @@ const handlePlaceOrder = () => {
         <div v-if="isCouponDrawerVisible" class="drawer-panel">
           <div class="mx-auto max-w-[680px] px-4 pt-5 pb-5">
             <!-- Header -->
-            <div class="mb-4 flex items-center justify-between">
+            <div class="mb-1 flex items-center justify-between">
               <h3 class="text-lg font-bold text-slate-950">可使用優惠券</h3>
               <Button
                 icon="pi pi-times"
@@ -1323,6 +1554,9 @@ const handlePlaceOrder = () => {
                 @click="isCouponDrawerVisible = false"
               />
             </div>
+            <p v-if="couponDrawerGroup" class="mb-4 text-sm text-slate-500">
+              套用於：{{ couponDrawerGroup.sellerName }}
+            </p>
 
             <!-- 手動輸入優惠碼 + 掃描 QR：手機版兩者同列，桌機加寬 -->
             <div class="mb-4 flex items-center gap-2">
@@ -1350,13 +1584,16 @@ const handlePlaceOrder = () => {
             </div>
 
             <!-- Coupon list -->
-            <div class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+            <div
+              v-if="couponDrawerGroup"
+              class="flex max-h-[60vh] flex-col gap-3 overflow-y-auto"
+            >
               <label
-                v-for="c in sortedCoupons"
+                v-for="c in drawerSortedCoupons"
                 :key="c.id"
                 class="flex rounded-[10px] border border-slate-200"
                 :class="
-                  !isCouponUsable(c)
+                  !isCouponUsableFor(couponDrawerGroup, c)
                     ? 'cursor-not-allowed'
                     : 'cursor-pointer hover:border-[var(--primary)]'
                 "
@@ -1364,22 +1601,42 @@ const handlePlaceOrder = () => {
                 <!-- Amount block -->
                 <div
                   class="flex w-[76px] shrink-0 items-center justify-center gap-1 rounded-l-[10px] px-2 py-3 @3xl:w-[140px] @3xl:gap-2 @3xl:px-3 @3xl:py-4"
-                  :class="isCouponUsable(c) ? '' : 'bg-slate-100'"
+                  :class="
+                    isCouponUsableFor(couponDrawerGroup, c)
+                      ? ''
+                      : 'bg-slate-100'
+                  "
                   :style="
-                    isCouponUsable(c)
+                    isCouponUsableFor(couponDrawerGroup, c)
                       ? 'background: var(--primary-surface)'
                       : ''
                   "
                 >
                   <i
                     class="pi pi-gift hidden text-xl @3xl:inline"
-                    :class="isCouponUsable(c) ? '' : 'text-slate-400'"
-                    :style="isCouponUsable(c) ? 'color: var(--primary)' : ''"
+                    :class="
+                      isCouponUsableFor(couponDrawerGroup, c)
+                        ? ''
+                        : 'text-slate-400'
+                    "
+                    :style="
+                      isCouponUsableFor(couponDrawerGroup, c)
+                        ? 'color: var(--primary)'
+                        : ''
+                    "
                   />
                   <span
                     class="text-lg font-bold @3xl:text-2xl"
-                    :class="isCouponUsable(c) ? '' : 'text-slate-400'"
-                    :style="isCouponUsable(c) ? 'color: var(--primary)' : ''"
+                    :class="
+                      isCouponUsableFor(couponDrawerGroup, c)
+                        ? ''
+                        : 'text-slate-400'
+                    "
+                    :style="
+                      isCouponUsableFor(couponDrawerGroup, c)
+                        ? 'color: var(--primary)'
+                        : ''
+                    "
                     >{{ c.amount }}</span
                   >
                 </div>
@@ -1388,9 +1645,9 @@ const handlePlaceOrder = () => {
                   class="flex min-w-0 flex-1 flex-col gap-1 px-3 py-3 @3xl:px-4 @3xl:py-4"
                 >
                   <span
-                    v-if="!isCouponUsable(c)"
+                    v-if="!isCouponUsableFor(couponDrawerGroup, c)"
                     class="text-xs font-medium text-red-500 @3xl:hidden"
-                    >{{ couponUnusableReason(c) }}</span
+                    >{{ couponUnusableReasonFor(couponDrawerGroup, c) }}</span
                   >
                   <p class="text-base font-medium text-slate-700">
                     {{ c.title }}
@@ -1405,12 +1662,16 @@ const handlePlaceOrder = () => {
                 <!-- Right side: radio / disabled note；手機版未達門檻則只在名稱上方顯示，這欄改用 hidden -->
                 <div
                   class="flex w-[60px] shrink-0 items-center justify-center py-2 text-center @3xl:w-24"
-                  :class="!isCouponUsable(c) ? 'hidden @3xl:flex' : ''"
+                  :class="
+                    !isCouponUsableFor(couponDrawerGroup, c)
+                      ? 'hidden @3xl:flex'
+                      : ''
+                  "
                 >
                   <span
-                    v-if="!isCouponUsable(c)"
+                    v-if="!isCouponUsableFor(couponDrawerGroup, c)"
                     class="text-sm text-red-500"
-                    >{{ couponUnusableReason(c) }}</span
+                    >{{ couponUnusableReasonFor(couponDrawerGroup, c) }}</span
                   >
                   <RadioButton
                     v-else
@@ -1424,10 +1685,13 @@ const handlePlaceOrder = () => {
             <!-- Footer -->
             <div class="mt-4 flex justify-end gap-2">
               <Button
-                label="取消"
+                label="不使用優惠券"
                 severity="secondary"
                 outlined
-                @click="isCouponDrawerVisible = false"
+                @click="
+                  couponDrawerSelected = null;
+                  handleConfirmCouponDrawer();
+                "
               />
               <Button label="確認" @click="handleConfirmCouponDrawer" />
             </div>
@@ -1436,7 +1700,7 @@ const handlePlaceOrder = () => {
       </Transition>
     </Teleport>
 
-    <!-- ============== Shipping Drawer ============== -->
+    <!-- ============== Shipping Drawer（4 種方式，超商依溫層逐訂單選門市） ============== -->
     <Teleport to="body">
       <Transition name="drawer-fade">
         <div
@@ -1462,11 +1726,11 @@ const handlePlaceOrder = () => {
                 />
               </div>
 
-              <div class="flex max-h-[60vh] flex-col gap-4 overflow-y-auto">
+              <div class="flex max-h-[62vh] flex-col gap-3 overflow-y-auto">
                 <p
                   v-if="
                     supportedShippingMethods.length <
-                    (['home', 'store'] as ShippingMethodId[]).length
+                    SHIPPING_METHOD_ORDER.length
                   "
                   class="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700"
                 >
@@ -1474,35 +1738,55 @@ const handlePlaceOrder = () => {
                   部分運送方式因您勾選的購物車不共同支援，已自動隱藏。
                 </p>
 
-                <!-- Home 方式卡 -->
+                <!-- 方式卡（accordion：點 header 切換，展開對應設定） -->
                 <div
-                  v-if="supportedShippingMethods.includes('home')"
-                  class="flex flex-col gap-3"
+                  v-for="m in supportedShippingMethods"
+                  :key="m"
+                  class="overflow-hidden rounded-[10px] border"
+                  :class="
+                    shipMethod === m
+                      ? 'border-[var(--primary)]'
+                      : 'border-slate-200'
+                  "
                 >
-                  <Button
-                    severity="secondary"
-                    class="!min-h-11 !w-full !justify-between"
-                    :pt="{
-                      root: {
-                        class: '!bg-slate-100 !border-none !text-slate-700',
-                      },
-                    }"
-                    @click="shipMethod = 'home'"
+                  <button
+                    type="button"
+                    class="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+                    :style="
+                      shipMethod === m
+                        ? 'background: var(--primary-surface)'
+                        : ''
+                    "
+                    @click="shipMethod = m"
                   >
-                    <span class="font-medium">宅配</span>
-                    <span class="flex items-center gap-2">
-                      $150
-                      <i
-                        v-if="shipMethod === 'home'"
-                        class="pi pi-check text-green-600"
-                      />
-                    </span>
-                  </Button>
+                    <RadioButton
+                      :model-value="shipMethod"
+                      :value="m"
+                      @update:model-value="shipMethod = m"
+                    />
+                    <i
+                      class="pi text-base text-slate-500"
+                      :class="SHIPPING_METHOD_ICONS[m]"
+                    />
+                    <span class="flex-1 text-base text-slate-700">{{
+                      SHIPPING_METHOD_LABELS[m]
+                    }}</span>
+                    <span
+                      class="text-sm"
+                      :class="
+                        shipMethod === m
+                          ? 'font-medium text-slate-700'
+                          : 'text-slate-500'
+                      "
+                      >{{ shippingMethodFeeHint(m) }}</span
+                    >
+                  </button>
 
-                  <div v-if="shipMethod === 'home'" class="flex flex-col gap-2">
-                    <span class="text-sm font-medium text-slate-500">
-                      宅配地址
-                    </span>
+                  <!-- 宅配 / 郵局宅配：共用收件地址清單 -->
+                  <div
+                    v-if="shipMethod === m && (m === 'home' || m === 'post')"
+                    class="flex flex-col gap-2 border-t border-slate-200 p-3"
+                  >
                     <button
                       v-for="addr in homeAddresses"
                       :key="addr.id"
@@ -1578,125 +1862,108 @@ const handlePlaceOrder = () => {
                       <span>新增宅配地址</span>
                     </button>
                   </div>
-                </div>
 
-                <!-- Store 方式卡 -->
-                <div
-                  v-if="supportedShippingMethods.includes('store')"
-                  class="flex flex-col gap-3"
-                >
-                  <Button
-                    severity="secondary"
-                    class="!min-h-11 !w-full !justify-between"
-                    :pt="{
-                      root: {
-                        class: '!bg-slate-100 !border-none !text-slate-700',
-                      },
-                    }"
-                    @click="shipMethod = 'store'"
-                  >
-                    <span class="font-medium">超商配送</span>
-                    <span class="flex items-center gap-2">
-                      $60
-                      <i
-                        v-if="shipMethod === 'store'"
-                        class="pi pi-check text-green-600"
-                      />
-                    </span>
-                  </Button>
-
+                  <!-- 自取：門市清單 -->
                   <div
-                    v-if="shipMethod === 'store'"
-                    class="flex flex-col gap-2"
+                    v-else-if="shipMethod === m && m === 'pickup'"
+                    class="flex flex-col gap-2 border-t border-slate-200 p-3"
                   >
-                    <span class="text-sm font-medium text-slate-500">
-                      取件門市
-                    </span>
                     <button
-                      v-for="addr in storeAddresses"
-                      :key="addr.id"
+                      v-for="p in PICKUP_LOCATIONS"
+                      :key="p.id"
                       type="button"
                       class="w-full rounded-lg border-2 p-3 text-left transition-colors"
                       :class="
-                        selectedStoreId === addr.id
+                        selectedPickupId === p.id
                           ? 'border-[var(--primary)]'
                           : 'border-slate-200 bg-white hover:border-slate-300'
                       "
                       :style="
-                        selectedStoreId === addr.id
+                        selectedPickupId === p.id
                           ? 'background: var(--primary-surface)'
                           : ''
                       "
-                      @click="selectedStoreId = addr.id"
+                      @click="selectedPickupId = p.id"
                     >
-                      <div class="flex gap-3">
-                        <div class="min-w-0 flex-1">
-                          <div
-                            class="flex flex-wrap items-center gap-2 text-sm text-slate-700"
-                          >
-                            <span class="font-medium">{{ addr.name }}</span>
-                            <span>{{ addr.phone }}</span>
-                            <span
-                              v-if="addr.isDefault"
-                              class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                              style="background: var(--primary)"
-                              >預設</span
-                            >
-                          </div>
-                          <div
-                            class="mt-1 flex items-center gap-2 text-sm text-slate-700"
-                          >
-                            <span
-                              class="inline-flex h-6 w-9 items-center justify-center rounded text-xs font-bold text-white"
-                              :style="
-                                addr.chain === '7-11'
-                                  ? 'background: #ee1c25'
-                                  : 'background: #00a040'
-                              "
-                              >{{
-                                addr.chain === '7-11' ? '7-11' : 'FAMI'
-                              }}</span
-                            >
-                            <span class="font-medium">{{
-                              addr.storeName
-                            }}</span>
-                          </div>
-                          <div
-                            class="mt-1 ml-11 flex items-center gap-1 text-sm text-slate-700"
-                          >
-                            <i class="pi pi-map-marker text-xs" />
-                            {{ addr.address }}
-                          </div>
-                        </div>
-                        <div class="flex shrink-0 flex-col items-end gap-1">
-                          <button
-                            v-if="!addr.isDefault"
-                            type="button"
-                            class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white/70 hover:text-amber-500"
-                            title="設為預設"
-                            @click.stop="handleSetDefaultStore(addr.id)"
-                          >
-                            <i class="pi pi-star" />
-                          </button>
-                          <button
-                            type="button"
-                            class="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-white/70 hover:text-red-500"
-                            title="刪除"
-                            @click.stop="handleDeleteStore(addr.id)"
-                          >
-                            <i class="pi pi-trash" />
-                          </button>
-                        </div>
+                      <div class="text-sm font-medium text-slate-700">
+                        {{ p.name }}
+                      </div>
+                      <div
+                        class="mt-1 flex items-center gap-1 text-sm text-slate-700"
+                      >
+                        <i class="pi pi-map-marker text-xs" />
+                        {{ p.address }} · {{ p.hours }}
                       </div>
                     </button>
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
-                      @click="shipDrawerView = 'add-store'"
+                  </div>
+
+                  <!-- 超商取貨：各訂單依溫層選品牌 → 帶出門市 -->
+                  <div
+                    v-else-if="shipMethod === m && m === 'store'"
+                    class="flex flex-col gap-3 border-t border-slate-200 p-3"
+                  >
+                    <p class="text-xs text-slate-500">
+                      點選超商品牌即帶出門市（依溫層）：
+                    </p>
+                    <div
+                      v-for="g in checkoutGroups"
+                      :key="g.id"
+                      class="rounded-lg border border-slate-200 p-3"
                     >
-                      <i class="pi pi-plus" />
-                      <span>新增超商門市</span>
-                    </button>
+                      <div class="mb-2 flex items-center gap-2">
+                        <span
+                          class="flex-1 text-sm font-medium text-slate-700"
+                          >{{ g.sellerName }}</span
+                        >
+                        <Tag
+                          :value="g.tempLayer"
+                          :severity="
+                            g.tempLayer === '常溫' ? 'secondary' : 'info'
+                          "
+                          class="!py-0.5 !text-xs"
+                        />
+                      </div>
+                      <div class="mb-2 flex flex-wrap gap-2">
+                        <button
+                          v-for="(b, bi) in cvsBrandsOf(g)"
+                          :key="b.name"
+                          type="button"
+                          class="cursor-pointer rounded-lg border px-3 py-2 text-xs transition-colors"
+                          :class="
+                            (cvsBrandByGroup[g.id] ?? -1) === bi
+                              ? 'border-[var(--primary)] font-medium'
+                              : 'border-slate-200 text-slate-700 hover:border-slate-300'
+                          "
+                          :style="
+                            (cvsBrandByGroup[g.id] ?? -1) === bi
+                              ? 'background: var(--primary-surface); color: var(--primary)'
+                              : ''
+                          "
+                          @click="handlePickCvsBrand(g, bi)"
+                        >
+                          {{ b.name }} ${{ b.fee }}
+                        </button>
+                      </div>
+                      <div
+                        v-if="cvsPickOf(g)"
+                        class="flex flex-wrap items-center gap-2 text-sm text-slate-700"
+                      >
+                        <i class="pi pi-map-marker text-xs" />
+                        <span
+                          >門市：<span class="font-medium">{{
+                            cvsPickOf(g)!.pickedStore
+                          }}</span></span
+                        >
+                        <button
+                          type="button"
+                          class="cursor-pointer text-xs underline"
+                          style="color: var(--primary)"
+                          @click="handleClearCvsPick(g)"
+                        >
+                          更換
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1781,92 +2048,6 @@ const handlePlaceOrder = () => {
                   @click="shipDrawerView = 'list'"
                 />
                 <Button label="確認新增" @click="handleSubmitAddHome" />
-              </div>
-            </template>
-
-            <!-- ===== View: add-store ===== -->
-            <template v-else-if="shipDrawerView === 'add-store'">
-              <div class="mb-4 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-slate-950">新增超商門市</h3>
-                <Button
-                  icon="pi pi-times"
-                  severity="secondary"
-                  text
-                  rounded
-                  class="!min-h-11 !min-w-11"
-                  @click="shipDrawerView = 'list'"
-                />
-              </div>
-
-              <div class="mx-auto flex max-w-[440px] flex-col gap-4">
-                <div class="flex flex-col gap-2">
-                  <label class="text-sm text-slate-700">選擇超商</label>
-                  <div class="flex gap-3">
-                    <button
-                      class="flex h-12 w-16 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-all"
-                      :style="
-                        newStoreChain === '7-11'
-                          ? 'border-color: var(--primary); background: #ee1c25'
-                          : 'border-color: transparent; background: #ee1c25'
-                      "
-                      @click="handlePickChain('7-11')"
-                    >
-                      7-ELEVEN
-                    </button>
-                    <button
-                      class="flex h-12 w-16 items-center justify-center rounded-md border-2 text-xs font-bold text-white transition-all"
-                      :style="
-                        newStoreChain === 'FamilyMart'
-                          ? 'border-color: var(--primary); background: #00a040'
-                          : 'border-color: transparent; background: #00a040'
-                      "
-                      @click="handlePickChain('FamilyMart')"
-                    >
-                      Family
-                    </button>
-                  </div>
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">選擇取件門市</label>
-                  <div v-if="!newStoreChain" class="font-bold text-slate-700">
-                    請先選擇超商
-                  </div>
-                  <div v-else>
-                    <p class="font-bold text-slate-700">
-                      {{ pickedStoreName }}
-                    </p>
-                    <p class="text-sm text-slate-600">{{ pickedStoreAddr }}</p>
-                  </div>
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">收件人姓名</label>
-                  <InputText v-model="newStoreName" class="w-full" />
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">收件人電話</label>
-                  <div class="flex gap-2">
-                    <Select
-                      v-model="newHomeCountryCode"
-                      :options="DRAWER_COUNTRY_CODES"
-                      class="w-[120px]"
-                    />
-                    <InputText
-                      v-model="newStorePhone"
-                      type="tel"
-                      class="flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div class="mt-4 flex justify-end gap-2">
-                <Button
-                  label="取消"
-                  severity="secondary"
-                  outlined
-                  @click="shipDrawerView = 'list'"
-                />
-                <Button label="確認新增" @click="handleSubmitAddStore" />
               </div>
             </template>
           </div>
