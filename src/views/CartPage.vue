@@ -373,10 +373,6 @@ const handleOpenAddOnDialog = (p: AddOnProduct) => {
 // 加購區流程：先按「更多加購商品 N 件」→ 彈窗列出全商城購物車 → 選一台顯示該 cart 的加購區
 /** 商城全部購物車清單（picker Dialog 列出所有 seed，不侷限於使用者已加購物的） */
 const allCarts = computed(() => groups.value);
-/** 全站加購商品總類數（給「更多加購商品 N 件」按鈕顯示，跨全部購物車去重） */
-const totalAddOnCount = computed(
-  () => new Set(allCarts.value.flatMap((g) => g.addOnProductIds ?? [])).size,
-);
 const isCartPickerVisible = ref(false);
 /** 已選擇的加購目標 cart id；null 表示還在初始「按鈕」狀態。 */
 const selectedAddOnCartId = ref<number | null>(null);
@@ -391,6 +387,16 @@ const addOnsOfSelectedCart = computed<AddOnProduct[]>(() => {
     .map((id) => ADD_ON_PRODUCTS.find((p) => p.id === id))
     .filter((p): p is AddOnProduct => p != null);
 });
+/** 全部購物車的加購商品（跨車去重）— 初始未篩選時顯示。 */
+const allAddOns = computed<AddOnProduct[]>(() =>
+  [...new Set(allCarts.value.flatMap((g) => g.addOnProductIds ?? []))]
+    .map((id) => ADD_ON_PRODUCTS.find((p) => p.id === id))
+    .filter((p): p is AddOnProduct => p != null),
+);
+/** 目前顯示的加購清單：選了車 → 該車；否則 → 全部。 */
+const displayedAddOns = computed<AddOnProduct[]>(() =>
+  selectedAddOnCart.value ? addOnsOfSelectedCart.value : allAddOns.value,
+);
 const handleOpenCartPicker = () => {
   isCartPickerVisible.value = true;
 };
@@ -770,7 +776,7 @@ const handleGoProduct = (productId?: number) => {
                   class="flex items-start gap-3"
                   :style="
                     subNeedsAttention(sub, item)
-                      ? 'outline: 1px solid #ef4444; border-radius: 8px; padding: 4px'
+                      ? 'outline: 1px solid var(--danger); border-radius: 8px; padding: 4px'
                       : ''
                   "
                 >
@@ -873,55 +879,57 @@ const handleGoProduct = (productId?: number) => {
         >
           <div class="flex min-w-0 flex-1 flex-col leading-tight">
             <span class="text-lg font-semibold text-slate-700">加購區</span>
-            <span
-              v-if="selectedAddOnCart"
-              class="text-sm break-words text-slate-600"
-            >
-              {{ selectedAddOnCart.sellerName }}
+            <span class="text-sm break-words text-slate-600">
+              {{
+                selectedAddOnCart
+                  ? selectedAddOnCart.sellerName
+                  : `全部購物車 · ${allAddOns.length} 件`
+              }}
             </span>
           </div>
-          <Button
-            v-if="selectedAddOnCart"
-            label="更換購物車"
-            icon="pi pi-refresh"
-            outlined
-            size="small"
-            class="shrink-0 !bg-white"
-            @click="handleOpenCartPicker"
-          />
+          <div class="flex shrink-0 items-center gap-2">
+            <Button
+              v-if="selectedAddOnCart"
+              label="顯示全部"
+              text
+              size="small"
+              @click="handleClearAddOnCart"
+            />
+            <Button
+              :label="selectedAddOnCart ? '更換購物車' : '選擇購物車'"
+              icon="pi pi-refresh"
+              outlined
+              size="small"
+              class="!bg-white"
+              @click="handleOpenCartPicker"
+            />
+          </div>
         </div>
 
-        <!-- State A：還沒選 cart → 大按鈕 -->
+        <!-- 空狀態：選定 cart 無加購商品（顯示全部時，只有全站皆無才空）-->
         <div
-          v-if="!selectedAddOnCart"
-          class="flex items-center justify-center p-[var(--card-pad)]"
-        >
-          <Button
-            :label="`更多加購商品 ${totalAddOnCount} 件`"
-            icon="pi pi-plus-circle"
-            class="!min-h-12 !px-6"
-            @click="handleOpenCartPicker"
-          />
-        </div>
-
-        <!-- State B-空：選中的 cart 沒有加購商品 -->
-        <div
-          v-else-if="addOnsOfSelectedCart.length === 0"
+          v-if="displayedAddOns.length === 0"
           class="flex flex-col items-center gap-2 px-4 py-8 text-center"
         >
           <i class="pi pi-inbox text-3xl text-slate-300" />
-          <p class="text-sm text-slate-500">此購物車目前沒有可加購的商品</p>
+          <p class="text-sm text-slate-500">
+            {{
+              selectedAddOnCart
+                ? '此購物車目前沒有可加購的商品'
+                : '目前沒有可加購的商品'
+            }}
+          </p>
         </div>
 
-        <!-- State B：已選 cart → 該 cart 加購清單 -->
+        <!-- 加購清單：初始為全部購物車（去重），選 cart 後篩成該 cart -->
         <div
           v-else
-          class="grid grid-cols-2 gap-2 p-[var(--card-pad)] @3xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]"
+          class="grid auto-rows-fr grid-cols-3 gap-1.5 p-[var(--card-pad)] @3xl:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]"
         >
           <div
-            v-for="p in addOnsOfSelectedCart"
+            v-for="p in displayedAddOns"
             :key="p.id"
-            class="flex min-w-0 flex-col gap-2 rounded-lg p-2"
+            class="flex h-full min-w-0 flex-col gap-1 rounded-lg p-1"
           >
             <div
               class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
@@ -929,7 +937,7 @@ const handleGoProduct = (productId?: number) => {
               <ProductImage :src="p.image" :alt="p.name" size="md" />
             </div>
             <p
-              class="line-clamp-2 text-sm leading-snug text-slate-950 @7xl:text-base"
+              class="line-clamp-2 min-h-[2lh] text-sm leading-snug text-slate-950 @7xl:text-base"
             >
               {{ p.name }}
             </p>
@@ -942,7 +950,7 @@ const handleGoProduct = (productId?: number) => {
 
             <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
             <button
-              class="add-cart-btn flex w-full items-center justify-center font-medium transition-all duration-200"
+              class="add-cart-btn mt-auto flex w-full items-center justify-center font-medium transition-all duration-200"
               :class="[
                 isPC
                   ? 'gap-2 rounded-lg px-4 py-3 text-base'
@@ -952,8 +960,8 @@ const handleGoProduct = (productId?: number) => {
               :style="
                 justAddedMap[p.id]
                   ? {
-                      background: '#10b981',
-                      border: '1px solid #059669',
+                      background: 'var(--success)',
+                      border: '1px solid var(--success-border)',
                       color: '#fff',
                     }
                   : {
@@ -1287,7 +1295,7 @@ const handleGoProduct = (productId?: number) => {
   left: var(--card-pad);
   right: var(--card-pad);
   height: 1px;
-  background: #e2e8f0;
+  background: var(--border-light);
 }
 .cart-divider::after {
   bottom: 0;
@@ -1303,7 +1311,7 @@ const handleGoProduct = (productId?: number) => {
   height: 44px;
   border-radius: 9999px;
   background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-light);
   color: var(--primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition:

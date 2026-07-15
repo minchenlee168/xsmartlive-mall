@@ -98,12 +98,6 @@ const SHIPPING_METHOD_LABELS: Record<ShippingMethodId, string> = {
   store: '超商取貨',
   post: '郵局宅配',
 };
-const SHIPPING_METHOD_ICONS: Record<ShippingMethodId, string> = {
-  home: 'pi-truck',
-  pickup: 'pi-shop',
-  store: 'pi-shopping-bag',
-  post: 'pi-envelope',
-};
 /** 運送方式在選單中的固定順序。 */
 const SHIPPING_METHOD_ORDER: ShippingMethodId[] = [
   'home',
@@ -298,6 +292,17 @@ const cvsBrandByGroup = ref<Record<number, number>>({});
 
 const cvsBrandsOf = (g: CheckoutGroup) =>
   g.tempLayer === '常溫' ? CVS_BRANDS.normal : CVS_BRANDS.low;
+/** 品牌名稱 → 鏈別（7-11 / 全家）。 */
+const cvsBrandChain = (name: string): '7-11' | 'family' =>
+  name.startsWith('7-11') ? '7-11' : 'family';
+/** 品牌名稱去掉鏈別前綴，剩服務描述（如「冷凍取貨」）；常溫店則為空。 */
+const cvsBrandDesc = (name: string): string =>
+  name.replace(/^(7-11|全家)\s*/, '');
+/** 超商 logo（放在 public/member-icons，透過 base path 取用）。 */
+const CVS_LOGOS: Record<'7-11' | 'family', string> = {
+  '7-11': `${import.meta.env.BASE_URL}member-icons/seven.svg`,
+  family: `${import.meta.env.BASE_URL}member-icons/family.svg`,
+};
 const cvsPickOf = (g: CheckoutGroup) => {
   const idx = cvsBrandByGroup.value[g.id] ?? -1;
   return idx >= 0 ? cvsBrandsOf(g)[idx] : null;
@@ -1054,23 +1059,25 @@ const handlePlaceOrder = () => {
             >
           </div>
 
-          <!-- 運費：操作欄放按鈕（同寬），說明欄放運送標籤與免運提示 -->
+          <!-- 運送方式/運費：先方式名稱（如冷凍宅配），再貼合字寬的變更鈕；最右為運費 -->
           <div :class="RECEIPT_ROW_CLASS">
-            <span class="text-sm text-slate-700">運費</span>
-            <div class="col-start-2 row-start-1">
+            <span class="text-sm text-slate-700">運送方式/運費</span>
+            <div
+              class="col-start-2 row-start-1 flex min-w-0 flex-wrap items-center gap-2 @3xl:col-span-2"
+            >
+              <span
+                v-if="shipMethod"
+                class="truncate text-sm text-slate-500"
+                >{{ groupShippingLabel(group) }}</span
+              >
               <Button
                 :label="shipMethod ? '變更' : '選擇配送方式'"
                 severity="secondary"
                 outlined
                 size="small"
-                :class="RECEIPT_BUTTON_CLASS"
+                class="shrink-0"
                 @click="handleOpenShipDrawer"
               />
-            </div>
-            <div v-if="shipMethod" :class="RECEIPT_HINT_CLASS">
-              <span class="truncate text-sm text-slate-500">{{
-                groupShippingLabel(group)
-              }}</span>
               <Tag
                 v-if="
                   groupShippingFee(group) !== null &&
@@ -1742,50 +1749,35 @@ const handlePlaceOrder = () => {
                 <div
                   v-for="m in supportedShippingMethods"
                   :key="m"
-                  class="overflow-hidden rounded-[10px] border"
-                  :class="
-                    shipMethod === m
-                      ? 'border-[var(--primary)]'
-                      : 'border-slate-200'
-                  "
+                  class="flex flex-col gap-3"
                 >
-                  <button
-                    type="button"
-                    class="flex min-h-12 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
-                    :style="
-                      shipMethod === m
-                        ? 'background: var(--primary-surface)'
-                        : ''
-                    "
+                  <Button
+                    severity="secondary"
+                    class="!min-h-11 !w-full !justify-between"
+                    :pt="{
+                      root: {
+                        class:
+                          'cursor-pointer !border-none !bg-slate-100 !text-slate-700 transition-colors hover:!bg-slate-200',
+                      },
+                    }"
                     @click="shipMethod = m"
                   >
-                    <RadioButton
-                      :model-value="shipMethod"
-                      :value="m"
-                      @update:model-value="shipMethod = m"
-                    />
-                    <i
-                      class="pi text-base text-slate-500"
-                      :class="SHIPPING_METHOD_ICONS[m]"
-                    />
-                    <span class="flex-1 text-base text-slate-700">{{
+                    <span class="font-medium">{{
                       SHIPPING_METHOD_LABELS[m]
                     }}</span>
-                    <span
-                      class="text-sm"
-                      :class="
-                        shipMethod === m
-                          ? 'font-medium text-slate-700'
-                          : 'text-slate-500'
-                      "
-                      >{{ shippingMethodFeeHint(m) }}</span
-                    >
-                  </button>
+                    <span class="flex items-center gap-2">
+                      {{ shippingMethodFeeHint(m) }}
+                      <i
+                        v-if="shipMethod === m"
+                        class="pi pi-check text-green-600"
+                      />
+                    </span>
+                  </Button>
 
                   <!-- 宅配 / 郵局宅配：共用收件地址清單 -->
                   <div
                     v-if="shipMethod === m && (m === 'home' || m === 'post')"
-                    class="flex flex-col gap-2 border-t border-slate-200 p-3"
+                    class="flex flex-col gap-2"
                   >
                     <button
                       v-for="addr in homeAddresses"
@@ -1866,7 +1858,7 @@ const handlePlaceOrder = () => {
                   <!-- 自取：門市清單 -->
                   <div
                     v-else-if="shipMethod === m && m === 'pickup'"
-                    class="flex flex-col gap-2 border-t border-slate-200 p-3"
+                    class="flex flex-col gap-2"
                   >
                     <button
                       v-for="p in PICKUP_LOCATIONS"
@@ -1900,7 +1892,7 @@ const handlePlaceOrder = () => {
                   <!-- 超商取貨：各訂單依溫層選品牌 → 帶出門市 -->
                   <div
                     v-else-if="shipMethod === m && m === 'store'"
-                    class="flex flex-col gap-3 border-t border-slate-200 p-3"
+                    class="flex flex-col gap-3"
                   >
                     <p class="text-xs text-slate-500">
                       點選超商品牌即帶出門市（依溫層）：
@@ -1928,11 +1920,11 @@ const handlePlaceOrder = () => {
                           v-for="(b, bi) in cvsBrandsOf(g)"
                           :key="b.name"
                           type="button"
-                          class="cursor-pointer rounded-lg border px-3 py-2 text-xs transition-colors"
+                          class="cursor-pointer rounded-lg border-2 px-3 py-2 text-sm transition-colors"
                           :class="
                             (cvsBrandByGroup[g.id] ?? -1) === bi
                               ? 'border-[var(--primary)] font-medium'
-                              : 'border-slate-200 text-slate-700 hover:border-slate-300'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                           "
                           :style="
                             (cvsBrandByGroup[g.id] ?? -1) === bi
@@ -1941,7 +1933,17 @@ const handlePlaceOrder = () => {
                           "
                           @click="handlePickCvsBrand(g, bi)"
                         >
-                          {{ b.name }} ${{ b.fee }}
+                          <span class="flex items-center gap-1.5">
+                            <img
+                              :src="CVS_LOGOS[cvsBrandChain(b.name)]"
+                              :alt="cvsBrandChain(b.name)"
+                              class="h-5 w-5 shrink-0 object-contain"
+                            />
+                            <span v-if="cvsBrandDesc(b.name)">{{
+                              cvsBrandDesc(b.name)
+                            }}</span>
+                            <span>${{ b.fee }}</span>
+                          </span>
                         </button>
                       </div>
                       <div
@@ -2075,7 +2077,7 @@ const handlePlaceOrder = () => {
   left: var(--card-pad);
   right: var(--card-pad);
   height: 1px;
-  background: #e2e8f0;
+  background: var(--border-light);
 }
 .cart-divider::after {
   bottom: 0;
