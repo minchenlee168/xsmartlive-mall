@@ -119,3 +119,61 @@ CartPage / CheckoutPage 用 `.cart-divider::after` / `.cart-divider-top::before`
 ## Arbitrary value
 
 CLAUDE.md 有寫但值得再強調：**優先語義化 class**（`text-3xl` / `text-slate-700`）；只有真的落在 Tailwind scale 之外才用 `[value]`。**主題色永遠走 CSS 變數**（`style="color: var(--primary)"`），不寫成 `text-[#7008e7]`——後者不會跟主題切換。
+
+## 顏色分類決策框架
+
+寫任何顏色前，先判斷它屬於哪一類，再決定寫法。這是避免「換膚壞掉」與「各頁灰階不一」的核心：
+
+| 類別 | 判斷 | 寫法 |
+| --- | --- | --- |
+| **品牌 / 主色 / accent** | 換主題時**應該**跟著變的色 | 走 token：`var(--primary)`、`var(--primary-surface)`、`var(--accent)`（見上方各節） |
+| **中性色（灰階文字 / 邊框 / 背景）** | 不隨主題變的灰 | Tailwind `slate-*`（`text-slate-700`、`border-slate-200`、`bg-slate-100`）。對照：`slate-100 ≈ --surface-100`、`slate-500 ≈ --text-muted` |
+| **狀態色（成功 / 錯誤 / 警示）** | 語義固定，不隨主題變 | 固定 Tailwind 語義色，見下「狀態色」表 |
+| **第三方品牌色（超商 / 社群）** | 本來就固定的別家品牌色 | 白名單常數，見下「第三方品牌色」 |
+
+> ⚠️ **不要用數字 ramp（`--primary-500` / `--primary-700` …）當 app UI 的深淺色。**
+> `theme.ts` 只覆蓋 `--primary` 基色與 `--primary-200`；`--primary-50~950` 在 `style.css` 是**寫死紫色**，僅供 PrimeVue Aura preset bridge（見「新增主題 checklist」第 5 點）。要深淺變化請用 `--primary-surface`，或 `color-mix(in srgb, var(--primary) N%, #fff / #000)`，這樣才跟著換膚。
+
+## 狀態色（成功 / 錯誤 / 警示）
+
+全站**統一用以下固定階層**，不要各頁自選深淺。**兩種寫法擇一，但同一個值**：
+
+- **template class**（一般情況優先）：用 Tailwind 語義色
+- **inline `:style` / 動態三元**（無法用 class 時）：用 `:root` 的語義 token（`var(--danger)` 等）
+
+| 狀態 | Tailwind class | 對應 token（inline 用） | 淺底 |
+| --- | --- | --- | --- |
+| 成功 / 加車 | `text-green-600` | `--success`（填色）/ `--success-border`（邊框） | `bg-green-50` |
+| 錯誤 / 售價紅 | `text-red-500` | `--danger` | `bg-red-50` |
+| 警示 / 提示 | `text-amber-700` | （暫無，用 class） | `bg-amber-50` |
+
+> `--danger` = red-500、`--success` = emerald-500、`--success-border` = emerald-600，定義於 `style.css :root`。
+> 售價紅、加車成功綠已改用這些 token（`ProductCard` / `CartPage` / `MyOrdersSection`）；warning 目前仍走 class。
+
+## 第三方品牌色（超商 / 社群）
+
+7-11、全家、LINE、IG 等別家品牌色**不走主題 token**（它們本來就固定），但**必須集中管理**，不可在元件內就地寫 hex（難維護、難盤點）。
+
+```ts
+// 建議集中在 src/utils/brand-colors.ts
+export const CVS_BRAND_COLORS = {
+  '7-11': '#ee1c25',
+  family: '#00a040',
+} as const;
+```
+
+反例（現況待修，`CheckoutPage.vue`）：
+
+```html
+<!-- ❌ 就地寫死 -->
+<span :style="addr.chain === '7-11' ? 'background: #ee1c25' : 'background: #00a040'" />
+```
+
+## 現況待修（review checklist）
+
+盤點時可逐項勾：
+
+- [ ] `CheckoutPage.vue` 超商品牌色 `#ee1c25` / `#00a040` 寫死 → 抽 `CVS_BRAND_COLORS` 常數
+- [ ] `--primary-50~950` ramp 未隨主題覆蓋 → 盤點 app UI 使用處，改用 `--primary-surface` / `color-mix`
+- [ ] 全站掃寫死 hex：`grep -rnE '#[0-9a-fA-F]{6}' src/components src/views`，逐一歸類（主題色→token / 第三方→白名單 / 中性→`slate-*`）
+- [ ] 狀態色深淺是否統一到上表（`text-green-600` / `text-red-500` / `text-amber-700`）

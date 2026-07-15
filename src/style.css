@@ -50,6 +50,11 @@ body {
   --border-light: #e2e8f0;
   --text-muted: #64748b;
 
+  /* 語義狀態色（跨主題固定）：售價 / 錯誤紅、加車成功綠 */
+  --danger: #ef4444; /* = tailwind red-500 */
+  --success: #10b981; /* = tailwind emerald-500 */
+  --success-border: #059669; /* = tailwind emerald-600 */
+
   /* Custom icon shades — derived from --brand so icons keep the reserved
      brand hue. For normal themes --brand === --primary. */
   --icon-primary: var(--brand);

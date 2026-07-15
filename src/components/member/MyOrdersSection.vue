@@ -537,7 +537,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           style:
             'background: #ffffff; border-radius: 8px 8px 0 0; padding: 8px 16px',
         },
-        title: { style: 'font-size: 14px; font-weight: 600; color: #334155' },
+        title: { style: 'font-size: 14px; font-weight: 600; color: var(--surface-700)' },
         content: {
           style:
             'padding: 14px 16px; font-size: 12.5px; line-height: 1.7; color: #475569',
@@ -548,7 +548,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       <template #header>
         <span class="text-sm font-semibold text-slate-700">
           購物權益與售後說明
-          <span class="ml-1 text-xs font-normal" style="color: #ef4444"
+          <span class="ml-1 text-xs font-normal" style="color: var(--danger)"
             >（待提供）</span
           >
         </span>
@@ -630,7 +630,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             :style="
               activeTab === t.key
                 ? 'color: var(--primary); border-color: var(--primary)'
-                : 'color: #64748b; border-color: transparent'
+                : 'color: var(--text-muted); border-color: transparent'
             "
             @click="activeTab = t.key"
           >
@@ -718,7 +718,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
           <div>
             <p class="text-xs text-slate-500">訂單總額</p>
-            <p class="font-bold" style="color: #ef4444">${{ order.total }}</p>
+            <p class="font-bold" style="color: var(--danger)">${{ order.total }}</p>
           </div>
           <div>
             <p class="text-xs text-slate-500">付款方式</p>
@@ -806,7 +806,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <td class="py-3 pr-3 pl-4 text-slate-700">{{ order.date }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.orderNo }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.qty }}</td>
-              <td class="px-3 py-3 font-bold" style="color: #ef4444">
+              <td class="px-3 py-3 font-bold" style="color: var(--danger)">
                 ${{ order.total }}
               </td>
               <td class="px-3 py-3 text-slate-700">{{ order.payment }}</td>
@@ -916,7 +916,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                     dt.key !== 'inquiry' &&
                     dt.key !== 'payment'
                       ? 'color: var(--primary); border-color: var(--primary)'
-                      : 'color: #64748b; border-color: transparent'
+                      : 'color: var(--text-muted); border-color: transparent'
                   "
                   @click="handleSelectDetailTab(order, dt.key)"
                 >
@@ -1011,7 +1011,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 v-for="pkg in item.packages"
                 :key="pkg.no"
                 class="rounded-[10px] px-4 py-2"
-                style="background: #f1f5f9"
+                style="background: var(--surface-100)"
               >
                 <!-- Package header：待付款階段尚未配箱，不顯示包裹編號 -->
                 <div class="mb-1.5 flex items-center justify-between">
@@ -1086,7 +1086,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                       pkg.currentStep === 'completed'
                     "
                     class="mt-2 inline-block cursor-pointer text-xs hover:underline"
-                    style="color: #ef4444"
+                    style="color: var(--danger)"
                     @click="handleOpenShippingProgress(pkg)"
                     >查看配送進度</a
                   >
@@ -1121,7 +1121,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                         :style="
                           step.status === 'pending'
                             ? 'color: #cbd5e1'
-                            : 'color: #64748b'
+                            : 'color: var(--text-muted)'
                         "
                       >
                         {{ step.time }}
@@ -1144,7 +1144,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                               step.status !== 'pending'
                             "
                             class="cursor-pointer text-xs hover:underline"
-                            style="color: #ef4444"
+                            style="color: var(--danger)"
                             @click="handleOpenShippingProgress(pkg)"
                             >(查看配送進度)</a
                           >

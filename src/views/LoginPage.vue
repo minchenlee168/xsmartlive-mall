@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
 import { useThemeStore } from '../pinia/theme';
+import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
 
 declare global {
   interface Window {
@@ -318,7 +319,10 @@ onBeforeUnmount(() => {
               :pt="{ root: { class: 'social-btn' } }"
               @click="handleSocialLogin('Facebook')"
             >
-              <i class="pi pi-facebook text-xl" style="color: #1877f2" />
+              <i
+                class="pi pi-facebook text-xl"
+                :style="{ color: SOCIAL_BRAND_COLORS.facebook }"
+              />
               <span>Facebook</span>
             </Button>
             <Button
@@ -430,6 +434,8 @@ onBeforeUnmount(() => {
   background: #f8fafc;
 }
 
+/* brand-color 豁免：Google logo 重繪，四色為官方標誌色（見 utils/brand-colors GOOGLE_LOGO_COLORS）。
+   CSS 無法 import TS 常數，故就地保留。 */
 .google-icon {
   display: inline-flex;
   align-items: center;
@@ -450,6 +456,7 @@ onBeforeUnmount(() => {
   line-height: 1;
 }
 
+/* brand-color 豁免：LINE 官方綠 #06c755（見 utils/brand-colors SOCIAL_BRAND_COLORS.line）。 */
 .line-icon {
   display: inline-flex;
   align-items: center;

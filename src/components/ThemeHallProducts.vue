@@ -127,7 +127,7 @@ onBeforeUnmount(stopAutoplay);
   height: 44px;
   border-radius: 9999px;
   background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-light);
   color: var(--primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition:

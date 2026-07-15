@@ -326,7 +326,7 @@ const handleAuthAction = () => {
           :style="
             activeItem === item
               ? { color: 'var(--primary)' }
-              : { color: '#64748b' }
+              : { color: 'var(--text-muted)' }
           "
           @click="handleNav(item)"
         >
@@ -366,7 +366,7 @@ const handleAuthAction = () => {
             :style="
               l.code === prefs.language.code
                 ? 'color: var(--primary); font-weight: 700'
-                : 'color: #334155'
+                : 'color: var(--surface-700)'
             "
           >
             {{ l.label }}
@@ -401,7 +401,7 @@ const handleAuthAction = () => {
             :style="
               c.code === prefs.currency.code
                 ? 'color: var(--primary); font-weight: 700'
-                : 'color: #334155'
+                : 'color: var(--surface-700)'
             "
           >
             {{ c.symbol }} · {{ c.code }} · {{ c.label }}

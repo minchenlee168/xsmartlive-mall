@@ -10,6 +10,7 @@ import { useUiStore } from '../pinia/ui';
 import { useOrdersStore } from '../pinia/orders';
 import { parseDashDate, formatDashDate } from '../utils/date';
 import { useCountdown } from '../composables/useCountdown';
+import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
 
 interface SocialAccount {
   key: string;
@@ -362,12 +363,12 @@ const OAUTH_BIND_CONFIG: Record<
 > = {
   line: {
     label: 'LINE',
-    brandColor: '#06c755',
+    brandColor: SOCIAL_BRAND_COLORS.line,
     description: '將跳轉至 LINE 授權頁面，授權後即可綁定您的 LINE 帳號至商城。',
   },
   tiktok: {
     label: 'TikTok',
-    brandColor: '#000000',
+    brandColor: SOCIAL_BRAND_COLORS.tiktok,
     description: '將跳轉至 TikTok 授權頁面，授權後即可綁定您的 TikTok 帳號。',
   },
 };

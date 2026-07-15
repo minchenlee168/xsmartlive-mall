@@ -2,6 +2,17 @@
 
 本 repo 為商城前台原型（Vite + Vue 3 + Tailwind 4 + PrimeVue 4），與主專案 [xsmartlive-frontend](https://github.com/ariesweng/xsmartlive-frontend)（Nuxt 4）共用設計與規範。本檔記錄原型開發時 Claude / 工程師應遵守的注意事項。
 
+## 規範檢查（開發前 / 後）
+
+改動前後依任務類型過對應把關，別憑印象直接改：
+
+- **改 `.vue` 顏色 / 樣式後**：跑 `node scripts/check-colors.mjs <改動檔>`，擋新增的寫死色（baseline 只報新增、不騷擾既存）。此檢查也已掛 PostToolUse hook 自動執行。
+- **視覺 / 排版 / RWD 調整前**：交給 `ui-designer` subagent。
+- **互動流程 / 狀態轉換 / 空狀態設計前**：交給 `ux-designer` subagent。
+- **動 store / 購物車 / 結帳 / 優惠券 / 紅利 / 運費 / 訂單邏輯前**：交給 `mall-domain-reviewer` subagent 審領域規則。
+- **commit 前或想全面檢查規範**：交給 `spec-reviewer` subagent（顏色 token、arbitrary value、RWD、pt、風格）。
+- 規範細節見 `docs/`（[design-tokens](./docs/design-tokens.md)、[livestream-patterns](./docs/livestream-patterns.md)、[primevue-conventions](./docs/primevue-conventions.md) 等）。
+
 ## 注意事項
 
 - PrimeVue 元件內部有自己的樣式封裝，繼承對其內部結構不一定有效，如需調整請使用 `pt`（passthrough）

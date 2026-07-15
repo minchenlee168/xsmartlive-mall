@@ -9,7 +9,8 @@
 | [livestream-patterns.md](./livestream-patterns.md) | 直播電商領域 8 條 pattern（購物車拆組、checkoutMode、優惠券層級、加車節奏、未用商城模式等）—做 UI / UX 決策前先過一遍 |
 | [architecture.md](./architecture.md) | 摸清路由 / 頁面關係、Aurora shell 與 `@container` frame 的定位邏輯、換頁 loading / 登入守衛 |
 | [state-stores.md](./state-stores.md) | 動 Pinia store（cart / orders / ui / theme / density / viewport / auth）— 資料格式、常用操作、跨頁面連動 |
-| [design-tokens.md](./design-tokens.md) | 顏色 / 間距 / 陰影 token；新增主題 preset；跟著 density 縮的間距；在 `@container` 內寫 RWD 的取捨 |
+| [design-tokens.md](./design-tokens.md) | 顏色 / 間距 / 陰影 token；顏色分類決策框架；狀態色 / 第三方品牌色規範；新增主題 preset；在 `@container` 內寫 RWD 的取捨 |
+| [hardcoded-color-cleanup.md](./hardcoded-color-cleanup.md) | 全站寫死 hex 的分類清理清單（working checklist）— 哪些要換 token / 哪些豁免，附優先順序 |
 | [primevue-conventions.md](./primevue-conventions.md) | PrimeVue 元件坑點 —`pt` 使用時機、Dialog / Drawer 在 frame 模式下的定位、Select / InputNumber 尺寸 |
 
 ## 使用習慣

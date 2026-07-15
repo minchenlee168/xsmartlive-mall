@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
 import { useCountdown } from '../composables/useCountdown';
+import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
 
 /**
  * 社群帳號首次登入流程：
@@ -41,7 +42,7 @@ const PROVIDER_PROFILES: Record<Provider, ProviderProfile> = {
     email: 'wang012@gmail.com',
     phone: '',
     phoneAlreadyVerified: false,
-    badgeColor: '#1877f2',
+    badgeColor: SOCIAL_BRAND_COLORS.facebook,
     badgeIcon: 'fa-brands fa-facebook-f',
     badgeLabel: 'Facebook',
   },
@@ -50,7 +51,7 @@ const PROVIDER_PROFILES: Record<Provider, ProviderProfile> = {
     email: 'wang012@gmail.com',
     phone: PRESET_PHONE,
     phoneAlreadyVerified: true,
-    badgeColor: '#ea4335',
+    badgeColor: SOCIAL_BRAND_COLORS.google,
     badgeIcon: 'fa-brands fa-google',
     badgeLabel: 'Google',
   },
@@ -59,7 +60,7 @@ const PROVIDER_PROFILES: Record<Provider, ProviderProfile> = {
     email: 'wang012@gmail.com',
     phone: '',
     phoneAlreadyVerified: false,
-    badgeColor: '#06c755',
+    badgeColor: SOCIAL_BRAND_COLORS.line,
     badgeIcon: 'fa-brands fa-line',
     badgeLabel: 'LINE',
   },
@@ -68,7 +69,7 @@ const PROVIDER_PROFILES: Record<Provider, ProviderProfile> = {
     email: 'wang012@gmail.com',
     phone: '',
     phoneAlreadyVerified: false,
-    badgeColor: '#000000',
+    badgeColor: SOCIAL_BRAND_COLORS.tiktok,
     badgeIcon: 'fa-brands fa-tiktok',
     badgeLabel: 'TikTok',
   },

@@ -124,6 +124,6 @@ const handleGoHome = () => {
 
 <style scoped>
 .cart-divider {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-light);
 }
 </style>

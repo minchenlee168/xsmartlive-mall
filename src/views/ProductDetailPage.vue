@@ -12,10 +12,9 @@ import { products } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
 import lineIcon from '../assets/line.svg';
 import instagramIcon from '../assets/instagram.svg';
+import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
 
 type SharePlatform = 'facebook' | 'line' | 'instagram' | 'link';
-
-const FACEBOOK_BLUE = '#1877F2';
 
 const route = useRoute();
 const router = useRouter();
@@ -428,7 +427,7 @@ const handleNextThumb = () => {
                   >
                     <i
                       class="pi pi-facebook text-base"
-                      :style="{ color: FACEBOOK_BLUE }"
+                      :style="{ color: SOCIAL_BRAND_COLORS.facebook }"
                     />
                     分享
                   </Button>

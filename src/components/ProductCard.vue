@@ -357,8 +357,8 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
           :style="
             isJustAdded
               ? {
-                  background: '#10b981',
-                  border: '1px solid #059669',
+                  background: 'var(--success)',
+                  border: '1px solid var(--success-border)',
                   color: '#fff',
                 }
               : {
@@ -441,8 +441,8 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
                       'color-mix(in srgb, var(--primary) 8%, transparent)',
                   }
                 : {
-                    borderColor: '#e2e8f0',
-                    color: '#334155',
+                    borderColor: 'var(--border-light)',
+                    color: 'var(--surface-700)',
                     background: '#fff',
                   }
             "
@@ -585,7 +585,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
             <p
               v-if="opt.maxQty != null && opt.maxQty < (product.pickCount ?? 0)"
               class="text-xs font-medium"
-              style="color: #ef4444"
+              style="color: var(--danger)"
             >
               限購 {{ optMaxQtyCard(opt) }} 個
             </p>

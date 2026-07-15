@@ -323,7 +323,7 @@ const buildTimeDisplay = (() => {
                   background: theme.swatchGradient ?? theme.swatch,
                   borderColor:
                     themeStore.current.id === theme.id
-                      ? '#020617'
+                      ? 'var(--surface-950)'
                       : 'transparent',
                   transform:
                     themeStore.current.id === theme.id ? 'scale(1.15)' : '',
