@@ -27,7 +27,20 @@ const fromTheme = computed(() => route.query.from === 'theme');
 const product = computed(
   () => products.find((p) => p.id === Number(route.params.id)) ?? products[0],
 );
-const selectedSize = ref(product.value.sizes?.[0] ?? '');
+/** 尺寸選項（含售完 disable）；售完尺寸顯示「（售完）」且不可選。 */
+const sizeOptions = computed(() =>
+  (product.value.sizes ?? []).map((s) => {
+    const soldOut = (product.value.soldOutSizes ?? []).includes(s);
+    return { label: soldOut ? `${s}（售完）` : s, value: s, disabled: soldOut };
+  }),
+);
+/** 初始選第一個「未售完」的尺寸。 */
+const firstAvailableSize = (): string => {
+  const sizes = product.value.sizes ?? [];
+  const sold = product.value.soldOutSizes ?? [];
+  return sizes.find((s) => !sold.includes(s)) ?? sizes[0] ?? '';
+};
+const selectedSize = ref(firstAvailableSize());
 const qty = ref(1);
 const activeThumb = ref(0);
 
@@ -384,7 +397,10 @@ const handleNextThumb = () => {
                   <span class="w-20 shrink-0 text-sm text-slate-700">尺碼</span>
                   <SelectButton
                     v-model="selectedSize"
-                    :options="product.sizes"
+                    :options="sizeOptions"
+                    option-label="label"
+                    option-value="value"
+                    option-disabled="disabled"
                     :allow-empty="false"
                   />
                 </div>

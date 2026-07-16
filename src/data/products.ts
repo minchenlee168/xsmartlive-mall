@@ -28,6 +28,8 @@ export interface Product {
   hasVariant?: boolean;
   stock?: number;
   sizes?: string[];
+  /** 已售完的尺寸（模擬缺貨）：選規格時顯示但不可選。 */
+  soldOutSizes?: string[];
   category?: string;
   image?: string;
   noCoupon?: boolean;
@@ -240,6 +242,7 @@ export const products: Product[] = [
     hasVariant: true,
     stock: 10,
     sizes: ['S', 'M', 'L', 'XL'],
+    soldOutSizes: ['M'],
     category: '大童童裝',
   },
   {
