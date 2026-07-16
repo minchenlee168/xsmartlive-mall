@@ -51,13 +51,21 @@ const isPickFull = computed(
     product.value.isPickBundle && pickedTotal.value === totalPickCount.value,
 );
 
-/** 縮圖數量：依容器寬度切；屬於計數邏輯而非樣式，保留 viewport store。 */
-const thumbCount = computed(() => {
-  const id = viewport.current.id;
-  if (id === 'pc') return 5;
-  if (id === 'mobile') return 3;
-  return 4;
-});
+/** 商品圖庫：主圖 + 情境 / 材質大圖（資料無多圖，補示範圖）；可切換 + 點按放大。 */
+const GALLERY_EXTRA_IMAGES = [
+  'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1200&fit=crop',
+  'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=1200&fit=crop',
+];
+const galleryImages = computed<string[]>(() =>
+  [product.value.image, ...GALLERY_EXTRA_IMAGES].filter(
+    (s): s is string => !!s,
+  ),
+);
+/** 大圖預覽（lightbox）：跟購物車一樣點圖放大，可 prev/next 切換第一 / 第二張。 */
+const isImagePreviewOpen = ref(false);
+const handleOpenImagePreview = () => {
+  isImagePreviewOpen.value = true;
+};
 
 const isCouponDrawerVisible = ref(false);
 const isLoginPromptOpen = ref(false);
@@ -196,11 +204,12 @@ const handleShareTo = (platform: SharePlatform) => {
 };
 
 const handlePrevThumb = () => {
-  activeThumb.value =
-    (activeThumb.value - 1 + thumbCount.value) % thumbCount.value;
+  const n = galleryImages.value.length;
+  activeThumb.value = (activeThumb.value - 1 + n) % n;
 };
 const handleNextThumb = () => {
-  activeThumb.value = (activeThumb.value + 1) % thumbCount.value;
+  const n = galleryImages.value.length;
+  activeThumb.value = (activeThumb.value + 1) % n;
 };
 </script>
 
@@ -263,16 +272,19 @@ const handleNextThumb = () => {
               <div
                 class="flex flex-col gap-3 @3xl:w-[320px] @3xl:shrink-0 @7xl:w-[513px]"
               >
-                <!-- Main image -->
-                <div
-                  class="aspect-square w-full overflow-hidden rounded-lg bg-slate-200 @3xl:aspect-[4/5] @7xl:aspect-square"
+                <!-- Main image：點按放大（lightbox） -->
+                <button
+                  type="button"
+                  class="aspect-square w-full cursor-zoom-in overflow-hidden rounded-lg bg-slate-200 @3xl:aspect-[4/5] @7xl:aspect-square"
+                  :aria-label="`放大圖片：${product.name}`"
+                  @click="handleOpenImagePreview"
                 >
                   <ProductImage
-                    :src="product.image"
+                    :src="galleryImages[activeThumb] ?? product.image"
                     :alt="product.name"
                     size="lg"
                   />
-                </div>
+                </button>
 
                 <!-- Thumbnails -->
                 <div class="flex items-center gap-1">
@@ -284,30 +296,24 @@ const handleNextThumb = () => {
                     class="!min-h-11 !min-w-11 shrink-0"
                     @click="handlePrevThumb"
                   />
-                  <div class="flex flex-1 justify-between gap-1.5">
-                    <div
-                      v-for="i in thumbCount"
+                  <div class="flex flex-1 gap-1.5">
+                    <button
+                      v-for="(img, i) in galleryImages"
                       :key="i"
-                      class="aspect-square flex-1 cursor-pointer overflow-hidden rounded-md bg-[#d9d9d9] transition-all"
+                      type="button"
+                      class="aspect-square w-16 shrink-0 cursor-pointer overflow-hidden rounded-md bg-slate-200 transition-all @3xl:w-auto @3xl:flex-1"
                       :class="
-                        activeThumb === i - 1
+                        activeThumb === i
                           ? 'ring-2'
                           : 'opacity-70 hover:opacity-100'
                       "
                       :style="
-                        activeThumb === i - 1
-                          ? 'outline: 2px solid var(--primary)'
-                          : ''
+                        activeThumb === i ? 'outline: 2px solid var(--primary)' : ''
                       "
-                      @click="activeThumb = i - 1"
+                      @click="activeThumb = i"
                     >
-                      <ProductImage
-                        v-if="i === 1"
-                        :src="product.image"
-                        :alt="product.name"
-                        size="sm"
-                      />
-                    </div>
+                      <ProductImage :src="img" :alt="product.name" size="sm" />
+                    </button>
                   </div>
                   <Button
                     icon="pi pi-chevron-right"
@@ -791,5 +797,59 @@ const handleNextThumb = () => {
       />
       <Button label="去登入" @click="handleGoLogin" />
     </template>
+  </Dialog>
+
+  <!-- 大圖預覽 lightbox：點主圖放大，可 prev/next 切換第一 / 第二張 -->
+  <Dialog
+    v-model:visible="isImagePreviewOpen"
+    modal
+    :draggable="false"
+    :dismissable-mask="true"
+    :show-header="false"
+    :style="{ width: 'min(92vw, 720px)' }"
+    :pt="{
+      content: {
+        style: 'padding: 0; background: transparent; box-shadow: none',
+      },
+    }"
+  >
+    <div class="relative flex items-center justify-center">
+      <img
+        :src="galleryImages[activeThumb]"
+        :alt="product.name"
+        class="max-h-[80vh] w-auto rounded-lg object-contain"
+      />
+      <button
+        type="button"
+        class="absolute top-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+        aria-label="關閉"
+        @click="isImagePreviewOpen = false"
+      >
+        <i class="pi pi-times" />
+      </button>
+      <template v-if="galleryImages.length > 1">
+        <button
+          type="button"
+          class="absolute top-1/2 left-2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+          aria-label="上一張"
+          @click="handlePrevThumb"
+        >
+          <i class="pi pi-chevron-left" />
+        </button>
+        <button
+          type="button"
+          class="absolute top-1/2 right-2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+          aria-label="下一張"
+          @click="handleNextThumb"
+        >
+          <i class="pi pi-chevron-right" />
+        </button>
+        <span
+          class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white"
+        >
+          {{ activeThumb + 1 }} / {{ galleryImages.length }}
+        </span>
+      </template>
+    </div>
   </Dialog>
 </template>
