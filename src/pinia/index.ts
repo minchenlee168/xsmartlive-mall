@@ -4,6 +4,7 @@
  * 1) 在這裡 re-export
  * 2) 若有登出需清空的狀態，在 clearAllStores() 中呼叫該 store 的 reset
  */
+export { useAddressStore } from './address';
 export { useAuthStore } from './auth';
 export { useCartStore } from './cart';
 export { useDensityStore } from './density';

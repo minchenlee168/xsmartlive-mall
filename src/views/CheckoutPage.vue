@@ -13,6 +13,7 @@ import {
 } from '../pinia/cart';
 import { useOrdersStore } from '../pinia/orders';
 import { useAuthStore } from '../pinia/auth';
+import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
 import { useCountdown } from '../composables/useCountdown';
 
 type TempLayer = '常溫' | '冷藏' | '冷凍';
@@ -48,7 +49,7 @@ interface HomeAddress {
   unavailable?: boolean;
 }
 
-type ShipDrawerView = 'list' | 'add-home';
+type ShipDrawerView = 'list' | 'add-home' | 'add-store';
 
 const INVOICE_TYPES = [
   { label: '個人發票（紙本）', value: 'personal-paper' },
@@ -109,20 +110,10 @@ const SHIPPING_METHOD_ORDER: ShippingMethodId[] = [
 const HOME_FEES: Record<TempLayer, number> = { 冷凍: 150, 冷藏: 150, 常溫: 80 };
 /** 郵局宅配運費：依訂單溫層計價。 */
 const POST_FEES: Record<TempLayer, number> = { 冷凍: 100, 冷藏: 100, 常溫: 70 };
-/** 超商取貨品牌選項：冷凍 / 冷藏走低溫清單，常溫走一般清單。 */
-const CVS_BRANDS: Record<
-  'low' | 'normal',
-  { name: string; fee: number; pickedStore: string }[]
-> = {
-  low: [
-    { name: '7-11 冷凍取貨', fee: 120, pickedStore: '7-11 信義冷凍門市' },
-    { name: '全家 冷凍取貨', fee: 110, pickedStore: '全家 信義冷凍門市' },
-    { name: '7-11 黑貓低溫', fee: 150, pickedStore: '7-11 信義冷凍門市' },
-  ],
-  normal: [
-    { name: '7-11', fee: 60, pickedStore: '7-11 板橋門市' },
-    { name: '全家', fee: 60, pickedStore: '全家 板橋門市' },
-  ],
+/** 超商取貨運費：依鏈別 × 溫層。門市身分由會員預設門市決定，這裡只管費率。 */
+const CVS_FEES: Record<CvsChain, Record<TempLayer, number>> = {
+  '7-11': { 常溫: 60, 冷藏: 120, 冷凍: 120 },
+  FamilyMart: { 常溫: 60, 冷藏: 110, 冷凍: 110 },
 };
 const PICKUP_LOCATIONS = [
   {
@@ -287,34 +278,43 @@ onMounted(() => {
 // ---- 配送方式（全訂單共用一種方式；超商門市各訂單各自選）--------------------
 const shipMethod = ref<ShippingMethodId | null>(null);
 const selectedPickupId = ref(PICKUP_LOCATIONS[0].id);
-/** 超商取貨：各訂單選的品牌 index（依溫層清單）；未選 = 無紀錄。 */
-const cvsBrandByGroup = ref<Record<number, number>>({});
-
-const cvsBrandsOf = (g: CheckoutGroup) =>
-  g.tempLayer === '常溫' ? CVS_BRANDS.normal : CVS_BRANDS.low;
-/** 品牌名稱 → 鏈別（7-11 / 全家）。 */
-const cvsBrandChain = (name: string): '7-11' | 'family' =>
-  name.startsWith('7-11') ? '7-11' : 'family';
-/** 品牌名稱去掉鏈別前綴，剩服務描述（如「冷凍取貨」）；常溫店則為空。 */
-const cvsBrandDesc = (name: string): string =>
-  name.replace(/^(7-11|全家)\s*/, '');
+const addressStore = useAddressStore();
+/** 會員的超商門市清單（封裝 store，供 template 用）。 */
+const cvsStoreList = computed(() => addressStore.storeAddrs);
+/** 超商取貨：各訂單選的門市 id（會員 storeAddr.id）；每組獨立。 */
+const cvsStoreByGroup = ref<Record<number, string>>({});
 /** 超商 logo（放在 public/member-icons，透過 base path 取用）。 */
-const CVS_LOGOS: Record<'7-11' | 'family', string> = {
+const CVS_LOGOS: Record<CvsChain, string> = {
   '7-11': `${import.meta.env.BASE_URL}member-icons/seven.svg`,
-  family: `${import.meta.env.BASE_URL}member-icons/family.svg`,
+  FamilyMart: `${import.meta.env.BASE_URL}member-icons/family.svg`,
 };
-const cvsPickOf = (g: CheckoutGroup) => {
-  const idx = cvsBrandByGroup.value[g.id] ?? -1;
-  return idx >= 0 ? cvsBrandsOf(g)[idx] : null;
+/** 該組已選門市 + 依溫層算出的運費；未選 / 門市無鏈別 → null。 */
+const cvsPickOf = (g: CheckoutGroup): { store: Address; fee: number } | null => {
+  const storeId = cvsStoreByGroup.value[g.id];
+  if (storeId == null) return null;
+  const store = cvsStoreList.value.find((s) => s.id === storeId);
+  if (!store?.chain) return null;
+  return { store, fee: CVS_FEES[store.chain][g.tempLayer] };
 };
-const handlePickCvsBrand = (g: CheckoutGroup, index: number) => {
-  cvsBrandByGroup.value = { ...cvsBrandByGroup.value, [g.id]: index };
+const handlePickCvsStore = (g: CheckoutGroup, storeId: string) => {
+  cvsStoreByGroup.value = { ...cvsStoreByGroup.value, [g.id]: storeId };
 };
-const handleClearCvsPick = (g: CheckoutGroup) => {
-  const next = { ...cvsBrandByGroup.value };
-  delete next[g.id];
-  cvsBrandByGroup.value = next;
-};
+// 每組超商門市預帶會員預設門市（冷凍 / 常溫都帶同一個，運費各自依溫層查表）；
+// 已選的保留、消失的組移除。
+watch(
+  checkoutGroups,
+  (groups) => {
+    const dsId = addressStore.defaultStoreAddr?.id;
+    const next: Record<number, string> = {};
+    for (const g of groups) {
+      const existing = cvsStoreByGroup.value[g.id];
+      if (existing != null) next[g.id] = existing;
+      else if (dsId) next[g.id] = dsId;
+    }
+    cvsStoreByGroup.value = next;
+  },
+  { immediate: true },
+);
 
 const selectedPickup = computed(
   () =>
@@ -345,6 +345,11 @@ const groupShippingDiscount = (g: CheckoutGroup): number => {
   const fee = groupShippingFee(g);
   return fee !== null && fee > 0 && isGroupFreeShipping(g) ? fee : 0;
 };
+/** 該組是否有實際運費（有運費才顯示運費折抵列，達/未達門檻都顯示）。 */
+const groupHasShippingFee = (g: CheckoutGroup): boolean => {
+  const fee = groupShippingFee(g);
+  return fee !== null && fee > 0;
+};
 /** 明細列的運送標籤，例如「冷凍宅配」「自取 · 台北門市」。 */
 const groupShippingLabel = (g: CheckoutGroup): string => {
   switch (shipMethod.value) {
@@ -357,7 +362,7 @@ const groupShippingLabel = (g: CheckoutGroup): string => {
     case 'store': {
       const pick = cvsPickOf(g);
       return pick
-        ? `${g.tempLayer}超商取貨 · ${pick.pickedStore}`
+        ? `${g.tempLayer}超商取貨 · ${pick.store.storeName}`
         : `${g.tempLayer}超商取貨（尚未選門市）`;
     }
     default:
@@ -375,7 +380,7 @@ const shippingMethodFeeHint = (m: ShippingMethodId): string => {
   const fees = checkoutGroups.value.map((g) => {
     if (m === 'home') return HOME_FEES[g.tempLayer];
     if (m === 'post') return POST_FEES[g.tempLayer];
-    return Math.min(...cvsBrandsOf(g).map((b) => b.fee));
+    return Math.min(...Object.values(CVS_FEES).map((f) => f[g.tempLayer]));
   });
   return fees.length ? `$${Math.min(...fees)} 起` : '';
 };
@@ -449,6 +454,37 @@ const handleSubmitAddHome = () => {
     isDefault: false,
   });
   resetAddHomeForm();
+  shipDrawerView.value = 'list';
+};
+
+// ---- 新增超商門市（推進共用 address store，會員中心同步）---------------------
+const CVS_CHAIN_OPTIONS: { label: string; value: CvsChain }[] = [
+  { label: '7-11', value: '7-11' },
+  { label: '全家', value: 'FamilyMart' },
+];
+const newStoreChain = ref<CvsChain>('7-11');
+const newStoreShopName = ref('');
+const newStoreAddress = ref('');
+const newStoreName = ref('王小明');
+const newStoreCountryCode = ref('+886');
+const newStorePhone = ref('');
+const resetAddStoreForm = () => {
+  newStoreShopName.value = '';
+  newStoreAddress.value = '';
+  newStorePhone.value = '';
+};
+const handleSubmitAddStore = () => {
+  if (!newStoreShopName.value.trim()) return;
+  addressStore.storeAddrs.push({
+    id: 's_' + Date.now(),
+    name: newStoreName.value,
+    phone: `${newStoreCountryCode.value} ${newStorePhone.value || '000****00'}`,
+    address: newStoreAddress.value,
+    isDefault: false,
+    chain: newStoreChain.value,
+    storeName: newStoreShopName.value,
+  });
+  resetAddStoreForm();
   shipDrawerView.value = 'list';
 };
 
@@ -852,7 +888,7 @@ const handlePlaceOrder = () => {
       : shipMethod.value === 'pickup'
         ? `自取 ${selectedPickup.value.name}（${selectedPickup.value.address}）`
         : checkoutGroups.value
-            .map((g) => `${g.sellerName}：${cvsPickOf(g)?.pickedStore ?? ''}`)
+            .map((g) => `${g.sellerName}：${cvsPickOf(g)?.store.storeName ?? ''}`)
             .join('；');
 
   ordersStore.setLastPaymentSummary({
@@ -942,7 +978,7 @@ const handlePlaceOrder = () => {
             >
               <span class="text-slate-500">{{ g.sellerName }}</span>
               <span v-if="cvsPickOf(g)" class="text-slate-700">
-                {{ cvsPickOf(g)!.pickedStore }}
+                {{ cvsPickOf(g)!.store.storeName }}
               </span>
               <span v-else class="text-red-500">尚未選門市</span>
             </div>
@@ -1124,16 +1160,6 @@ const handlePlaceOrder = () => {
                 class="shrink-0"
                 @click="handleOpenShipDrawer(group.id)"
               />
-              <Tag
-                v-if="
-                  groupShippingFee(group) !== null &&
-                  groupShippingFee(group)! > 0 &&
-                  !isGroupFreeShipping(group)
-                "
-                value="未達免運門檻"
-                severity="secondary"
-                class="shrink-0 !bg-slate-100 !py-0.5 !text-xs !text-slate-400"
-              />
             </div>
             <span
               v-if="groupShippingFee(group) === null"
@@ -1150,13 +1176,11 @@ const handlePlaceOrder = () => {
             >
           </div>
 
-          <!-- 運費折抵：達免運門檻標籤放操作欄，與按鈕同寬對齊 -->
-          <div
-            v-if="groupShippingDiscount(group) > 0"
-            :class="RECEIPT_ROW_CLASS"
-          >
+          <!-- 運費折抵：有運費時達 / 未達門檻都顯示；達標折抵全額運費、未達顯示 $0 -->
+          <div v-if="groupHasShippingFee(group)" :class="RECEIPT_ROW_CLASS">
             <span class="text-sm text-slate-700">運費折抵</span>
             <Tag
+              v-if="isGroupFreeShipping(group)"
               value="達免運門檻"
               class="col-start-2 row-start-1 !w-[132px] !justify-center !py-0.5 !text-xs"
               :pt="{
@@ -1166,8 +1190,19 @@ const handlePlaceOrder = () => {
                 },
               }"
             />
-            <span :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
+            <Tag
+              v-else
+              value="未達免運門檻"
+              severity="secondary"
+              class="col-start-2 row-start-1 !w-[132px] !justify-center !bg-slate-100 !py-0.5 !text-xs !text-slate-400"
+            />
+            <span
+              v-if="isGroupFreeShipping(group)"
+              :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
               >- $ {{ groupShippingDiscount(group).toLocaleString() }}</span
+            >
+            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'"
+              >$ 0</span
             >
           </div>
 
@@ -1941,7 +1976,7 @@ const handlePlaceOrder = () => {
                     class="flex flex-col gap-3"
                   >
                     <p class="text-xs text-slate-500">
-                      點選超商品牌即帶出門市（依溫層）：
+                      選擇取貨門市（門市取自會員設定，運費依溫層）：
                     </p>
                     <div
                       v-for="g in shipDrawerStoreGroups"
@@ -1971,32 +2006,33 @@ const handlePlaceOrder = () => {
                       </div>
                       <div class="mb-2 flex flex-wrap gap-2">
                         <button
-                          v-for="(b, bi) in cvsBrandsOf(g)"
-                          :key="b.name"
+                          v-for="s in cvsStoreList"
+                          :key="s.id"
                           type="button"
                           class="cursor-pointer rounded-lg border-2 px-3 py-2 text-sm transition-colors"
                           :class="
-                            (cvsBrandByGroup[g.id] ?? -1) === bi
+                            cvsStoreByGroup[g.id] === s.id
                               ? 'border-[var(--primary)] font-medium'
                               : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                           "
                           :style="
-                            (cvsBrandByGroup[g.id] ?? -1) === bi
+                            cvsStoreByGroup[g.id] === s.id
                               ? 'background: var(--primary-surface); color: var(--primary)'
                               : ''
                           "
-                          @click="handlePickCvsBrand(g, bi)"
+                          @click="handlePickCvsStore(g, s.id)"
                         >
                           <span class="flex items-center gap-1.5">
                             <img
-                              :src="CVS_LOGOS[cvsBrandChain(b.name)]"
-                              :alt="cvsBrandChain(b.name)"
+                              v-if="s.chain"
+                              :src="CVS_LOGOS[s.chain]"
+                              :alt="s.chain"
                               class="h-5 w-5 shrink-0 object-contain"
                             />
-                            <span v-if="cvsBrandDesc(b.name)">{{
-                              cvsBrandDesc(b.name)
-                            }}</span>
-                            <span>${{ b.fee }}</span>
+                            <span>{{ s.storeName }}</span>
+                            <span v-if="s.chain"
+                              >${{ CVS_FEES[s.chain][g.tempLayer] }}</span
+                            >
                           </span>
                         </button>
                       </div>
@@ -2007,19 +2043,20 @@ const handlePlaceOrder = () => {
                         <i class="pi pi-map-marker text-xs" />
                         <span
                           >門市：<span class="font-medium">{{
-                            cvsPickOf(g)!.pickedStore
+                            cvsPickOf(g)!.store.storeName
                           }}</span></span
                         >
-                        <button
-                          type="button"
-                          class="cursor-pointer text-xs underline"
-                          style="color: var(--primary)"
-                          @click="handleClearCvsPick(g)"
-                        >
-                          更換
-                        </button>
                       </div>
                     </div>
+                    <!-- 新增超商門市：加入會員門市清單（會員中心同步） -->
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                      @click="shipDrawerView = 'add-store'"
+                    >
+                      <i class="pi pi-plus" />
+                      <span>新增超商門市</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2104,6 +2141,75 @@ const handlePlaceOrder = () => {
                   @click="shipDrawerView = 'list'"
                 />
                 <Button label="確認新增" @click="handleSubmitAddHome" />
+              </div>
+            </template>
+
+            <!-- ===== View: add-store ===== -->
+            <template v-else-if="shipDrawerView === 'add-store'">
+              <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-950">新增超商門市</h3>
+                <Button
+                  icon="pi pi-times"
+                  severity="secondary"
+                  text
+                  rounded
+                  class="!min-h-11 !min-w-11"
+                  @click="shipDrawerView = 'list'"
+                />
+              </div>
+
+              <div class="mx-auto flex max-w-[440px] flex-col gap-3">
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">超商品牌</label>
+                  <Select
+                    v-model="newStoreChain"
+                    :options="CVS_CHAIN_OPTIONS"
+                    option-label="label"
+                    option-value="value"
+                    class="w-full"
+                  />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">門市名稱</label>
+                  <InputText
+                    v-model="newStoreShopName"
+                    class="w-full"
+                    placeholder="例如：信義門市"
+                  />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">門市地址</label>
+                  <InputText v-model="newStoreAddress" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">收件人姓名</label>
+                  <InputText v-model="newStoreName" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700">收件人電話</label>
+                  <div class="flex gap-2">
+                    <Select
+                      v-model="newStoreCountryCode"
+                      :options="DRAWER_COUNTRY_CODES"
+                      class="w-[120px]"
+                    />
+                    <InputText
+                      v-model="newStorePhone"
+                      type="tel"
+                      class="flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 flex justify-end gap-2">
+                <Button
+                  label="取消"
+                  severity="secondary"
+                  outlined
+                  @click="shipDrawerView = 'list'"
+                />
+                <Button label="確認新增" @click="handleSubmitAddStore" />
               </div>
             </template>
           </div>

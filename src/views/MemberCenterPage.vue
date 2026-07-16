@@ -11,6 +11,8 @@ import { useOrdersStore } from '../pinia/orders';
 import { parseDashDate, formatDashDate } from '../utils/date';
 import { useCountdown } from '../composables/useCountdown';
 import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
+import { storeToRefs } from 'pinia';
+import { useAddressStore, type Address } from '../pinia/address';
 
 interface SocialAccount {
   key: string;
@@ -19,15 +21,6 @@ interface SocialAccount {
   bound: boolean;
   idLabel: string;
   accountId: string;
-}
-interface Address {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  isDefault: boolean;
-  chain?: '7-11' | 'FamilyMart';
-  storeName?: string;
 }
 interface PointRecord {
   type: 'earn' | 'deduct';
@@ -435,53 +428,9 @@ const handleCopySocialBindCode = async (): Promise<void> => {
   }
 };
 
-// Shipping addresses
+// Shipping addresses（宅配 / 超商門市改由共用 address store 提供，結帳頁共讀）
 const addressTab = ref<'home' | 'store'>('home');
-const homeAddrs = ref<Address[]>([
-  {
-    id: 'h1',
-    name: '王小明',
-    phone: '+886 912****56',
-    address: '台北市信義區忠孝東路五段 100 號 10 樓',
-    isDefault: true,
-  },
-  {
-    id: 'h2',
-    name: '王小明',
-    phone: '+886 912****56',
-    address: '台中市西屯區台灣大道三段 99 號',
-    isDefault: false,
-  },
-]);
-const storeAddrs = ref<Address[]>([
-  {
-    id: 's1',
-    name: '王小明',
-    phone: '+886 912****56',
-    chain: '7-11',
-    storeName: '鑫工門市',
-    address: '台北市信義區忠孝東路五段 100 號 10 樓',
-    isDefault: true,
-  },
-  {
-    id: 's2',
-    name: '王小明',
-    phone: '+886 912****56',
-    chain: '7-11',
-    storeName: '連興門市',
-    address: '高雄市三民區大連街 314 號',
-    isDefault: false,
-  },
-  {
-    id: 's3',
-    name: '王小明',
-    phone: '+886 912****56',
-    chain: 'FamilyMart',
-    storeName: '平鎮上海店',
-    address: '桃園市平鎮區上海路２０５號１樓',
-    isDefault: false,
-  },
-]);
+const { homeAddrs, storeAddrs } = storeToRefs(useAddressStore());
 const currentAddrs = computed(() =>
   addressTab.value === 'home' ? homeAddrs.value : storeAddrs.value,
 );
