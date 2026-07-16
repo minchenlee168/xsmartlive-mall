@@ -223,7 +223,7 @@ export const useCartStore = defineStore('cart', () => {
           price: 620,
           original: 980,
           checked: false,
-          note: '直播主暫停收單中，僅供瀏覽 / 加購。',
+          note: '防風防水機能布料，內裡加絨保暖；建議手洗或使用洗衣袋，勿烘乾以免影響防水膜。',
         },
       ],
     },
