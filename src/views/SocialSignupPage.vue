@@ -12,11 +12,11 @@ import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
  * - step = 'verify'  → 安全驗證：填手機 + 簡訊驗證碼，綁定到帳號
  * - step = 'success' → 綁定成功提示，按鈕進入商城
  * query 參數：
- * - provider=facebook|google|line|tiktok（必填）
+ * - provider=facebook|google|line|tiktok|whatsapp（必填）
  * - phone=true 時 demo 預填手機的版本；預設無預填
  */
 
-type Provider = 'facebook' | 'google' | 'line' | 'tiktok';
+type Provider = 'facebook' | 'google' | 'line' | 'tiktok' | 'whatsapp';
 type Step = 'review' | 'verify' | 'success';
 
 interface ProviderProfile {
@@ -72,6 +72,15 @@ const PROVIDER_PROFILES: Record<Provider, ProviderProfile> = {
     badgeColor: SOCIAL_BRAND_COLORS.tiktok,
     badgeIcon: 'fa-brands fa-tiktok',
     badgeLabel: 'TikTok',
+  },
+  whatsapp: {
+    name: '王小明',
+    email: 'wang012@gmail.com',
+    phone: '',
+    phoneAlreadyVerified: false,
+    badgeColor: SOCIAL_BRAND_COLORS.whatsapp,
+    badgeIcon: 'fa-brands fa-whatsapp',
+    badgeLabel: 'WhatsApp',
   },
 };
 

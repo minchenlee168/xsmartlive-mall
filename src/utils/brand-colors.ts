@@ -12,6 +12,7 @@ export const SOCIAL_BRAND_COLORS = {
   line: '#06c755',
   google: '#ea4335',
   tiktok: '#000000',
+  whatsapp: '#25d366',
 } as const;
 
 /** Google 標誌四色 — 僅用於重繪 Google logo（conic-gradient 等美術情境）。 */

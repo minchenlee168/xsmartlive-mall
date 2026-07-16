@@ -329,6 +329,18 @@ onBeforeUnmount(() => {
               outlined
               severity="secondary"
               :pt="{ root: { class: 'social-btn' } }"
+              @click="handleSocialLogin('WhatsApp')"
+            >
+              <i
+                class="pi pi-whatsapp text-xl"
+                :style="{ color: SOCIAL_BRAND_COLORS.whatsapp }"
+              />
+              <span>WhatsApp</span>
+            </Button>
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
               @click="handleSocialLogin('Google')"
             >
               <span class="google-icon" aria-hidden="true">G</span>
