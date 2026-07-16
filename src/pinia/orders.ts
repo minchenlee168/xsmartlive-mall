@@ -450,6 +450,7 @@ export const useOrdersStore = defineStore('orders', () => {
     total: number;
     payment: string;
     delivery: string;
+    buyerNote?: string;
   }): string {
     seq += 1;
     const now = new Date();
@@ -494,6 +495,7 @@ export const useOrdersStore = defineStore('orders', () => {
       detailTab: 'progress',
       expanded: true,
       items,
+      buyerNote: input.buyerNote,
     });
     transactions.value.unshift({
       date: dateShort,

@@ -14,6 +14,7 @@ import App from './App.vue';
 // 全域常用元件（避免各檔重複 import）
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
 import InputNumber from 'primevue/inputnumber';
 import Password from 'primevue/password';
 import Select from 'primevue/select';
@@ -103,6 +104,7 @@ app.directive('tooltip', Tooltip);
 // 全域註冊元件
 app.component('Button', Button);
 app.component('InputText', InputText);
+app.component('Textarea', Textarea);
 app.component('InputNumber', InputNumber);
 app.component('Password', Password);
 app.component('Select', Select);

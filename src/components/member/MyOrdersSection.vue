@@ -834,6 +834,17 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </tbody>
         </table>
 
+        <!-- 買家備註（結帳時留言給賣家）；有填才顯示 -->
+        <div
+          v-if="order.buyerNote"
+          class="flex flex-col gap-1 border-t border-slate-200 px-4 py-3 text-sm"
+        >
+          <span class="text-xs text-slate-500">訂單備註</span>
+          <p class="whitespace-pre-wrap break-words text-slate-700">
+            {{ order.buyerNote }}
+          </p>
+        </div>
+
         <!-- 子 tab：手機改用 Select 下拉、其他用橫式 tabs -->
         <div class="border-b border-slate-200">
           <template v-if="isMobile">

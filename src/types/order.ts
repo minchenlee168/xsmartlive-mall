@@ -68,6 +68,8 @@ export interface OrderRecord {
   detailTab: DetailTab;
   expanded: boolean;
   items: OrderItem[];
+  /** 買家對這筆訂單的備註（留言給賣家）；下單時從結帳頁帶入。 */
+  buyerNote?: string;
 }
 
 export interface Transaction {

@@ -80,7 +80,7 @@ const DRAWER_DISTRICTS = ['前鎮區', '三民區', '信義區'];
 // @3xl 四欄插入說明欄；操作欄固定 132px 讓按鈕 / stepper 左右對齊。
 // 視覺一律沿用專案標準元件樣式，不另外覆蓋尺寸與字級。
 const RECEIPT_ROW_CLASS =
-  'grid min-h-9 grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-1 @3xl:grid-cols-[96px_132px_minmax(0,1fr)_auto]';
+  'grid min-h-9 grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-1 @3xl:grid-cols-[104px_132px_minmax(0,1fr)_auto]';
 const RECEIPT_BUTTON_CLASS = 'w-[132px]';
 const RECEIPT_HINT_CLASS =
   'col-span-2 col-start-2 row-start-2 flex min-w-0 items-center gap-2 @3xl:col-span-1 @3xl:col-start-3 @3xl:row-start-1';
@@ -455,10 +455,19 @@ const handleSubmitAddHome = () => {
 // ---- 運送方式抽屜 -----------------------------------------------------------
 const isShipDrawerVisible = ref(false);
 const shipDrawerView = ref<ShipDrawerView>('list');
-const handleOpenShipDrawer = () => {
+/** 抽屜開啟來源訂單 id：從個別訂單開 → 只顯示該訂單的超商；null（共用入口）→ 全部訂單。 */
+const shipDrawerGroupId = ref<number | null>(null);
+const handleOpenShipDrawer = (groupId: number | null = null) => {
+  shipDrawerGroupId.value = groupId;
   shipDrawerView.value = 'list';
   isShipDrawerVisible.value = true;
 };
+/** 超商取貨區要顯示的訂單：帶 groupId → 只該訂單；否則全部。 */
+const shipDrawerStoreGroups = computed(() =>
+  shipDrawerGroupId.value != null
+    ? checkoutGroups.value.filter((g) => g.id === shipDrawerGroupId.value)
+    : checkoutGroups.value,
+);
 
 // 只有一種運送方式 → 直接鎖定該方式（沒選擇餘地）；
 // 多種 → 讓使用者主動選、運費等選完才顯示；
@@ -688,6 +697,20 @@ watch(
 );
 const rewardPointsOfGroup = (g: CheckoutGroup): number =>
   Math.max(0, Math.floor(Number(rewardPointsByGroup.value[g.id]) || 0));
+
+/** 每筆訂單的買家備註（留言給賣家）；每組獨立，下單時逐組帶進 orders。 */
+const noteByGroup = ref<Record<number, string>>({});
+// checkoutGroups 變動時同步鍵：消失組移除、舊值保留（避免 stale key）
+watch(
+  checkoutGroups,
+  (groups) => {
+    const next: Record<number, string> = {};
+    for (const g of groups) next[g.id] = noteByGroup.value[g.id] ?? '';
+    noteByGroup.value = next;
+  },
+  { immediate: true },
+);
+
 const rewardPointsUsedTotal = computed(() =>
   checkoutGroups.value.reduce((s, g) => s + rewardPointsOfGroup(g), 0),
 );
@@ -816,6 +839,7 @@ const handlePlaceOrder = () => {
       total: groupDisplayTotal(g),
       payment: method,
       delivery: shippingMethodLabel.value,
+      buyerNote: noteByGroup.value[g.id]?.trim() || undefined,
     }),
   );
 
@@ -891,7 +915,7 @@ const handlePlaceOrder = () => {
               icon-pos="right"
               link
               size="small"
-              @click="handleOpenShipDrawer"
+              @click="handleOpenShipDrawer()"
             />
           </div>
           <template v-if="shipMethod === 'home' || shipMethod === 'post'">
@@ -1039,6 +1063,25 @@ const handlePlaceOrder = () => {
           </div>
         </div>
 
+        <!-- 訂單備註：留言給賣家（每筆訂單獨立，下單時帶進該筆訂單）-->
+        <div class="cart-divider-top px-4 py-3">
+          <div class="relative">
+            <Textarea
+              v-model="noteByGroup[group.id]"
+              rows="1"
+              :maxlength="200"
+              auto-resize
+              placeholder="留言給賣家…（選填）"
+              class="w-full !pr-14 !text-sm"
+            />
+            <span
+              class="pointer-events-none absolute right-2.5 bottom-2 rounded bg-white/85 px-1 text-xs text-slate-400"
+            >
+              {{ (noteByGroup[group.id] ?? '').length }}/200
+            </span>
+          </div>
+        </div>
+
         <!-- 全寬收據式明細：標籤左、金額右，操作行內 -->
         <!-- 收據式明細：網格對齊（標籤｜操作 132px｜說明｜金額靠右）；
              手機版說明列換行到操作按鈕下方 -->
@@ -1061,7 +1104,10 @@ const handlePlaceOrder = () => {
 
           <!-- 運送方式/運費：先方式名稱（如冷凍宅配），再貼合字寬的變更鈕；最右為運費 -->
           <div :class="RECEIPT_ROW_CLASS">
-            <span class="text-sm text-slate-700">運送方式/運費</span>
+            <span
+              class="col-start-1 row-start-1 text-sm whitespace-nowrap text-slate-700"
+              >運送方式/運費</span
+            >
             <div
               class="col-start-2 row-start-1 flex min-w-0 flex-wrap items-center gap-2 @3xl:col-span-2"
             >
@@ -1076,7 +1122,7 @@ const handlePlaceOrder = () => {
                 outlined
                 size="small"
                 class="shrink-0"
-                @click="handleOpenShipDrawer"
+                @click="handleOpenShipDrawer(group.id)"
               />
               <Tag
                 v-if="
@@ -1898,11 +1944,19 @@ const handlePlaceOrder = () => {
                       點選超商品牌即帶出門市（依溫層）：
                     </p>
                     <div
-                      v-for="g in checkoutGroups"
+                      v-for="g in shipDrawerStoreGroups"
                       :key="g.id"
-                      class="rounded-lg border border-slate-200 p-3"
+                      :class="
+                        shipDrawerGroupId == null
+                          ? 'rounded-lg border border-slate-200 p-3'
+                          : ''
+                      "
                     >
-                      <div class="mb-2 flex items-center gap-2">
+                      <!-- 個別訂單開啟時整個 header（賣家名 + 溫層 tag）都省略 -->
+                      <div
+                        v-if="shipDrawerGroupId == null"
+                        class="mb-2 flex items-center gap-2"
+                      >
                         <span
                           class="flex-1 text-sm font-medium text-slate-700"
                           >{{ g.sellerName }}</span
