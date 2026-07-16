@@ -59,6 +59,21 @@ const INVOICE_TYPES = [
   { label: '自然人憑證', value: 'natural' },
   { label: '會員載具', value: 'member' },
 ];
+/** 捐贈單位清單（可下拉選，也可自行輸入其他）。 */
+const DONATE_ORGS = [
+  '財團法人喜憨兒社會福利基金會',
+  '財團法人流浪動物之家基金會',
+  '財團法人伊甸社會福利基金會',
+  '臺灣基督教門諾會醫療財團法人門諾醫院',
+  '財團法人創世社會福利基金會',
+  '社團法人台灣之心愛護動物協會',
+  '基督徒救世會社會福利事業基金會',
+  '財團法人雅文兒童聽語文教基金會',
+  '財團法人天使心家族社會福利基金會',
+  '財團法人勵馨社會福利事業基金會',
+  '財團法人陽光社會福利基金會',
+  '財團法人愛盲基金會',
+];
 const PAYMENT_METHODS: { label: string; value: PaymentMethodId }[] = [
   { label: '線上信用卡（藍新）', value: 'credit' },
   { label: '線上信用卡（數位鑑）', value: 'credit-digital' },
@@ -734,19 +749,6 @@ watch(
 const rewardPointsOfGroup = (g: CheckoutGroup): number =>
   Math.max(0, Math.floor(Number(rewardPointsByGroup.value[g.id]) || 0));
 
-/** 每筆訂單的買家備註（留言給賣家）；每組獨立，下單時逐組帶進 orders。 */
-const noteByGroup = ref<Record<number, string>>({});
-// checkoutGroups 變動時同步鍵：消失組移除、舊值保留（避免 stale key）
-watch(
-  checkoutGroups,
-  (groups) => {
-    const next: Record<number, string> = {};
-    for (const g of groups) next[g.id] = noteByGroup.value[g.id] ?? '';
-    noteByGroup.value = next;
-  },
-  { immediate: true },
-);
-
 const rewardPointsUsedTotal = computed(() =>
   checkoutGroups.value.reduce((s, g) => s + rewardPointsOfGroup(g), 0),
 );
@@ -795,6 +797,16 @@ watch(
 
 const invoiceType = ref('personal-paper');
 const invoiceEmail = ref('abc@gmail.com');
+/** 手機條碼載具（選「手機條碼」發票時使用）。 */
+const invoiceMobileBarcode = ref('');
+/** 捐贈：捐贈單位（可選可輸入）+ 機構編號（愛心捐贈碼）。 */
+const invoiceDonateOrg = ref('');
+const invoiceDonateCode = ref('');
+/** 公司統編：公司名稱 + 統一編號。 */
+const invoiceCompanyName = ref('');
+const invoiceCompanyTaxId = ref('');
+/** 自然人憑證載具條碼（2 大寫英文 + 14 數字）。 */
+const invoiceNaturalCode = ref('');
 
 // ---- 全域金額（底部可展開費用明細）------------------------------------------
 const productTotal = computed(() =>
@@ -875,7 +887,6 @@ const handlePlaceOrder = () => {
       total: groupDisplayTotal(g),
       payment: method,
       delivery: shippingMethodLabel.value,
-      buyerNote: noteByGroup.value[g.id]?.trim() || undefined,
     }),
   );
 
@@ -1099,25 +1110,6 @@ const handlePlaceOrder = () => {
           </div>
         </div>
 
-        <!-- 訂單備註：留言給賣家（每筆訂單獨立，下單時帶進該筆訂單）-->
-        <div class="cart-divider-top px-4 py-3">
-          <div class="relative">
-            <Textarea
-              v-model="noteByGroup[group.id]"
-              rows="1"
-              :maxlength="200"
-              auto-resize
-              placeholder="留言給賣家…（選填）"
-              class="w-full !pr-14 !text-sm"
-            />
-            <span
-              class="pointer-events-none absolute right-2.5 bottom-2 rounded bg-white/85 px-1 text-xs text-slate-400"
-            >
-              {{ (noteByGroup[group.id] ?? '').length }}/200
-            </span>
-          </div>
-        </div>
-
         <!-- 全寬收據式明細：標籤左、金額右，操作行內 -->
         <!-- 收據式明細：網格對齊（標籤｜操作 132px｜說明｜金額靠右）；
              手機版說明列換行到操作按鈕下方 -->
@@ -1303,7 +1295,68 @@ const handlePlaceOrder = () => {
               class="w-full"
             />
           </div>
-          <div class="flex flex-col gap-1">
+          <!-- 依發票類型顯示對應欄位：手機條碼 / 捐贈 / 公司統編 / Email -->
+          <template v-if="invoiceType === 'company'">
+            <div class="flex flex-col gap-1">
+              <label class="text-sm text-slate-700">公司名稱</label>
+              <InputText
+                v-model="invoiceCompanyName"
+                class="w-full"
+                placeholder="請輸入公司名稱"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-sm text-slate-700">統一編號</label>
+              <InputText
+                v-model="invoiceCompanyTaxId"
+                class="w-full"
+                placeholder="請輸入統一編號"
+              />
+            </div>
+          </template>
+          <div
+            v-else-if="invoiceType === 'mobile'"
+            class="flex flex-col gap-1"
+          >
+            <label class="text-sm text-slate-700">手機條碼</label>
+            <InputText
+              v-model="invoiceMobileBarcode"
+              class="w-full"
+              placeholder="/.12345"
+            />
+          </div>
+          <div
+            v-else-if="invoiceType === 'natural'"
+            class="flex flex-col gap-1"
+          >
+            <label class="text-sm text-slate-700">自然人憑證條碼</label>
+            <InputText
+              v-model="invoiceNaturalCode"
+              class="w-full"
+              placeholder="請輸入自然人憑證條碼（AB12345678901234）"
+            />
+          </div>
+          <template v-else-if="invoiceType === 'donate'">
+            <div class="flex flex-col gap-1">
+              <label class="text-sm text-slate-700">捐贈單位</label>
+              <Select
+                v-model="invoiceDonateOrg"
+                :options="DONATE_ORGS"
+                editable
+                placeholder="請選擇或輸入捐贈單位"
+                class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-sm text-slate-700">機構編號</label>
+              <InputText
+                v-model="invoiceDonateCode"
+                class="w-full"
+                placeholder="請輸入愛心捐贈碼"
+              />
+            </div>
+          </template>
+          <div v-else class="flex flex-col gap-1">
             <label class="text-sm text-slate-700">Email</label>
             <InputText v-model="invoiceEmail" type="email" class="w-full" />
           </div>
