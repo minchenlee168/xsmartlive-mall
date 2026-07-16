@@ -912,7 +912,7 @@ const handleGoProduct = (productId?: number) => {
             />
             <Button
               :label="selectedAddOnCart ? '更換購物車' : '選擇購物車'"
-              icon="pi pi-refresh"
+              icon="pi pi-filter"
               outlined
               size="small"
               class="!bg-white"
@@ -956,12 +956,20 @@ const handleGoProduct = (productId?: number) => {
             >
               {{ p.name }}
             </p>
-            <span
-              class="text-base font-bold @7xl:text-lg"
-              style="color: var(--primary)"
-            >
-              ${{ p.price }}
-            </span>
+            <div class="flex flex-wrap items-baseline gap-x-1.5">
+              <span
+                class="text-base font-bold @7xl:text-lg"
+                style="color: var(--primary)"
+              >
+                ${{ p.price }}
+              </span>
+              <span
+                v-if="p.original"
+                class="text-xs whitespace-nowrap text-slate-400 line-through"
+              >
+                ${{ p.original }}
+              </span>
+            </div>
 
             <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
             <button
