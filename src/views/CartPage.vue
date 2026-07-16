@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from 'vue';
+import { computed, ref, watch, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
@@ -409,6 +409,27 @@ const addOnCards = computed<{ product: AddOnProduct; cartId: number }[]>(() => {
     const owner = ownerCartOf(product.id);
     return owner ? [{ product, cartId: owner.id }] : [];
   });
+});
+/**
+ * 加購區固定高度（約顯示 6 個）+ 動態載入：
+ * 超過 9 個商品時先渲染前 9 個，捲到底再載入下一批。
+ */
+const ADD_ON_INITIAL_COUNT = 9;
+const ADD_ON_LOAD_STEP = 6;
+const addOnVisibleCount = ref(ADD_ON_INITIAL_COUNT);
+const visibleAddOnCards = computed(() =>
+  addOnCards.value.slice(0, addOnVisibleCount.value),
+);
+const handleAddOnScroll = (e: Event) => {
+  const el = e.target as HTMLElement;
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  if (nearBottom && addOnVisibleCount.value < addOnCards.value.length) {
+    addOnVisibleCount.value += ADD_ON_LOAD_STEP;
+  }
+};
+// 切換 / 篩選購物車 → 重置動態載入的可視數量
+watch(selectedAddOnCartId, () => {
+  addOnVisibleCount.value = ADD_ON_INITIAL_COUNT;
 });
 const handleOpenCartPicker = () => {
   isCartPickerVisible.value = true;
@@ -931,88 +952,93 @@ const handleGoProduct = (productId?: number) => {
           </p>
         </div>
 
-        <!-- 加購清單：全部檢視去重（不顯示車名）；每張卡加購進其所屬購物車 -->
+        <!-- 加購清單：固定高（約顯示 6 個）+ 捲動動態載入；每張卡加購進其所屬購物車 -->
         <div
           v-else
-          class="grid auto-rows-fr grid-cols-3 gap-1.5 p-[var(--card-pad)] @3xl:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]"
+          class="max-h-[26rem] overflow-y-auto p-[var(--card-pad)]"
+          @scroll="handleAddOnScroll"
         >
           <div
-            v-for="{ product: p, cartId } in addOnCards"
-            :key="addOnKey(cartId, p.id)"
-            class="flex h-full min-w-0 flex-col gap-1 rounded-lg p-1"
+            class="grid auto-rows-fr grid-cols-3 gap-1.5 @3xl:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]"
           >
             <div
-              class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
+              v-for="{ product: p, cartId } in visibleAddOnCards"
+              :key="addOnKey(cartId, p.id)"
+              class="flex h-full min-w-0 flex-col gap-1 rounded-lg p-1"
             >
-              <ProductImage :src="p.image" :alt="p.name" size="md" />
-            </div>
-            <p
-              class="line-clamp-2 min-h-[2lh] text-sm leading-snug text-slate-950 @7xl:text-base"
-            >
-              {{ p.name }}
-            </p>
-            <span
-              class="text-base font-bold @7xl:text-lg"
-              style="color: var(--primary)"
-            >
-              ${{ p.price }}
-            </span>
-
-            <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
-            <button
-              class="add-cart-btn mt-auto flex w-full items-center justify-center font-medium transition-all duration-200"
-              :class="[
-                isPC
-                  ? 'gap-2 rounded-lg px-4 py-3 text-base'
-                  : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
-                justAddedMap[addOnKey(cartId, p.id)] ? 'added-pop' : '',
-              ]"
-              :style="
-                justAddedMap[addOnKey(cartId, p.id)]
-                  ? {
-                      background: 'var(--success)',
-                      border: '1px solid var(--success-border)',
-                      color: '#fff',
-                    }
-                  : {
-                      background: 'var(--primary-bg)',
-                      border: '1px solid var(--primary)',
-                      color: '#fff',
-                    }
-              "
-              :disabled="justAddedMap[addOnKey(cartId, p.id)]"
-              @mouseover="
-                (e) => {
-                  if (justAddedMap[addOnKey(cartId, p.id)]) return;
-                  (e.currentTarget as HTMLElement).style.background =
-                    'var(--primary-hover-bg)';
-                }
-              "
-              @mouseleave="
-                (e) => {
-                  if (justAddedMap[addOnKey(cartId, p.id)]) return;
-                  (e.currentTarget as HTMLElement).style.background =
-                    'var(--primary-bg)';
-                }
-              "
-              @click="handleOpenAddOnDialog(p, cartId)"
-            >
-              <i
-                :class="[
-                  justAddedMap[addOnKey(cartId, p.id)]
-                    ? 'pi pi-check-circle'
-                    : 'pi pi-cart-plus',
-                  isPC ? 'text-sm' : 'text-xl',
-                ]"
-              />
-              <span v-if="isPC">
-                {{
-                  justAddedMap[addOnKey(cartId, p.id)]
-                    ? '已加入購物車'
-                    : '加入購物車'
-                }}
+              <div
+                class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
+              >
+                <ProductImage :src="p.image" :alt="p.name" size="md" />
+              </div>
+              <p
+                class="line-clamp-2 min-h-[2lh] text-sm leading-snug text-slate-950 @7xl:text-base"
+              >
+                {{ p.name }}
+              </p>
+              <span
+                class="text-base font-bold @7xl:text-lg"
+                style="color: var(--primary)"
+              >
+                ${{ p.price }}
               </span>
-            </button>
+
+              <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
+              <button
+                class="add-cart-btn mt-auto flex w-full items-center justify-center font-medium transition-all duration-200"
+                :class="[
+                  isPC
+                    ? 'gap-2 rounded-lg px-4 py-3 text-base'
+                    : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
+                  justAddedMap[addOnKey(cartId, p.id)] ? 'added-pop' : '',
+                ]"
+                :style="
+                  justAddedMap[addOnKey(cartId, p.id)]
+                    ? {
+                        background: 'var(--success)',
+                        border: '1px solid var(--success-border)',
+                        color: '#fff',
+                      }
+                    : {
+                        background: 'var(--primary-bg)',
+                        border: '1px solid var(--primary)',
+                        color: '#fff',
+                      }
+                "
+                :disabled="justAddedMap[addOnKey(cartId, p.id)]"
+                @mouseover="
+                  (e) => {
+                    if (justAddedMap[addOnKey(cartId, p.id)]) return;
+                    (e.currentTarget as HTMLElement).style.background =
+                      'var(--primary-hover-bg)';
+                  }
+                "
+                @mouseleave="
+                  (e) => {
+                    if (justAddedMap[addOnKey(cartId, p.id)]) return;
+                    (e.currentTarget as HTMLElement).style.background =
+                      'var(--primary-bg)';
+                  }
+                "
+                @click="handleOpenAddOnDialog(p, cartId)"
+              >
+                <i
+                  :class="[
+                    justAddedMap[addOnKey(cartId, p.id)]
+                      ? 'pi pi-check-circle'
+                      : 'pi pi-cart-plus',
+                    isPC ? 'text-sm' : 'text-xl',
+                  ]"
+                />
+                <span v-if="isPC">
+                  {{
+                    justAddedMap[addOnKey(cartId, p.id)]
+                      ? '已加入購物車'
+                      : '加入購物車'
+                  }}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
