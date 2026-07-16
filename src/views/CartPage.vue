@@ -363,9 +363,12 @@ const combinedSpecOptions = (p: AddOnProduct): string[] => {
 const addOnDialog = ref<AddOnProduct | null>(null);
 const addOnDialogSpec = ref<string>('');
 const addOnDialogQty = ref<number>(1);
+/** 加購 Dialog 對應的購物車 id — 決定確認後加到哪台車。 */
+const addOnDialogCartId = ref<number | null>(null);
 
-const handleOpenAddOnDialog = (p: AddOnProduct) => {
+const handleOpenAddOnDialog = (p: AddOnProduct, cartId: number) => {
   addOnDialog.value = p;
+  addOnDialogCartId.value = cartId;
   addOnDialogSpec.value = combinedSpecOptions(p)[0] ?? p.spec ?? '預設';
   addOnDialogQty.value = 1;
 };
@@ -380,23 +383,33 @@ const selectedAddOnCart = computed(() =>
   groups.value.find((g) => g.id === selectedAddOnCartId.value),
 );
 /** 該 cart 的加購商品（依 addOnProductIds 篩 ADD_ON_PRODUCTS）。 */
-const addOnsOfSelectedCart = computed<AddOnProduct[]>(() => {
-  const c = selectedAddOnCart.value;
-  if (!c?.addOnProductIds) return [];
-  return c.addOnProductIds
+/** 某台車的加購商品（依 addOnProductIds 篩 ADD_ON_PRODUCTS）。 */
+const addOnsOfCart = (c: CartGroup): AddOnProduct[] =>
+  (c.addOnProductIds ?? [])
     .map((id) => ADD_ON_PRODUCTS.find((p) => p.id === id))
     .filter((p): p is AddOnProduct => p != null);
-});
-/** 全部購物車的加購商品（跨車去重）— 初始未篩選時顯示。 */
+/** 全部購物車的加購商品（跨車去重）— 給 header 顯示件數用。 */
 const allAddOns = computed<AddOnProduct[]>(() =>
   [...new Set(allCarts.value.flatMap((g) => g.addOnProductIds ?? []))]
     .map((id) => ADD_ON_PRODUCTS.find((p) => p.id === id))
     .filter((p): p is AddOnProduct => p != null),
 );
-/** 目前顯示的加購清單：選了車 → 該車；否則 → 全部。 */
-const displayedAddOns = computed<AddOnProduct[]>(() =>
-  selectedAddOnCart.value ? addOnsOfSelectedCart.value : allAddOns.value,
-);
+/** 某加購商品所屬的購物車（第一台列出它的車）— 全部檢視加購的目標車。 */
+const ownerCartOf = (pid: number): CartGroup | undefined =>
+  allCarts.value.find((g) => g.addOnProductIds?.includes(pid));
+/**
+ * 加購區顯示卡片：全部檢視 → 去重、各自對應其所屬車（不顯示車名）；
+ * 選定車 → 該車商品、全部對應該車。每張卡都帶「加購時要進哪台車」。
+ */
+const addOnCards = computed<{ product: AddOnProduct; cartId: number }[]>(() => {
+  const sel = selectedAddOnCart.value;
+  if (sel)
+    return addOnsOfCart(sel).map((product) => ({ product, cartId: sel.id }));
+  return allAddOns.value.flatMap((product) => {
+    const owner = ownerCartOf(product.id);
+    return owner ? [{ product, cartId: owner.id }] : [];
+  });
+});
 const handleOpenCartPicker = () => {
   isCartPickerVisible.value = true;
 };
@@ -409,17 +422,19 @@ const handleClearAddOnCart = () => {
 };
 
 // 按下確認後短暫的綠色 ✓ 回饋（跟 ProductCard 同款，作用在卡片按鈕上）
-const justAddedMap = ref<Record<number, boolean>>({});
-const addedTimers = new Map<number, ReturnType<typeof setTimeout>>();
-const flashAddedFor = (pid: number) => {
-  justAddedMap.value[pid] = true;
-  const prev = addedTimers.get(pid);
+/** 加購卡片唯一 key：同商品可能出現在多台車，需用「車 id + 商品 id」區分。 */
+const addOnKey = (cartId: number, pid: number): string => `${cartId}-${pid}`;
+const justAddedMap = ref<Record<string, boolean>>({});
+const addedTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const flashAddedFor = (key: string) => {
+  justAddedMap.value[key] = true;
+  const prev = addedTimers.get(key);
   if (prev) clearTimeout(prev);
   addedTimers.set(
-    pid,
+    key,
     setTimeout(() => {
-      justAddedMap.value[pid] = false;
-      addedTimers.delete(pid);
+      justAddedMap.value[key] = false;
+      addedTimers.delete(key);
     }, 1500),
   );
 };
@@ -453,13 +468,13 @@ const handleConfirmAddOn = (e: MouseEvent) => {
     },
     spec,
     qty,
-    // 加購區：如果有選定 cart 就進那台且置頂；否則走預設分派
-    selectedAddOnCartId.value != null
-      ? { targetCartId: selectedAddOnCartId.value, prepend: true }
+    // 加購區：進「該商品所屬那台車」（Dialog 開啟時記錄）且置頂；沒有才走預設分派
+    addOnDialogCartId.value != null
+      ? { targetCartId: addOnDialogCartId.value, prepend: true }
       : undefined,
   );
   burstAddToCartFromEvent(e);
-  flashAddedFor(p.id);
+  flashAddedFor(addOnKey(addOnDialogCartId.value ?? -1, p.id));
   addOnDialog.value = null;
   // 加購場景使用者已在購物車頁，不需要「點此結帳 / 繼續購物」二次跳轉；改用 toast 就好
   ui.toast(`已加入「${p.name}」`);
@@ -906,9 +921,9 @@ const handleGoProduct = (productId?: number) => {
           </div>
         </div>
 
-        <!-- 空狀態：選定 cart 無加購商品（顯示全部時，只有全站皆無才空）-->
+        <!-- 空狀態：沒有可加購商品 -->
         <div
-          v-if="displayedAddOns.length === 0"
+          v-if="addOnCards.length === 0"
           class="flex flex-col items-center gap-2 px-4 py-8 text-center"
         >
           <i class="pi pi-inbox text-3xl text-slate-300" />
@@ -921,14 +936,14 @@ const handleGoProduct = (productId?: number) => {
           </p>
         </div>
 
-        <!-- 加購清單：初始為全部購物車（去重），選 cart 後篩成該 cart -->
+        <!-- 加購清單：全部檢視去重（不顯示車名）；每張卡加購進其所屬購物車 -->
         <div
           v-else
           class="grid auto-rows-fr grid-cols-3 gap-1.5 p-[var(--card-pad)] @3xl:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]"
         >
           <div
-            v-for="p in displayedAddOns"
-            :key="p.id"
+            v-for="{ product: p, cartId } in addOnCards"
+            :key="addOnKey(cartId, p.id)"
             class="flex h-full min-w-0 flex-col gap-1 rounded-lg p-1"
           >
             <div
@@ -955,10 +970,10 @@ const handleGoProduct = (productId?: number) => {
                 isPC
                   ? 'gap-2 rounded-lg px-4 py-3 text-base'
                   : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
-                justAddedMap[p.id] ? 'added-pop' : '',
+                justAddedMap[addOnKey(cartId, p.id)] ? 'added-pop' : '',
               ]"
               :style="
-                justAddedMap[p.id]
+                justAddedMap[addOnKey(cartId, p.id)]
                   ? {
                       background: 'var(--success)',
                       border: '1px solid var(--success-border)',
@@ -970,31 +985,37 @@ const handleGoProduct = (productId?: number) => {
                       color: '#fff',
                     }
               "
-              :disabled="justAddedMap[p.id]"
+              :disabled="justAddedMap[addOnKey(cartId, p.id)]"
               @mouseover="
                 (e) => {
-                  if (justAddedMap[p.id]) return;
+                  if (justAddedMap[addOnKey(cartId, p.id)]) return;
                   (e.currentTarget as HTMLElement).style.background =
                     'var(--primary-hover-bg)';
                 }
               "
               @mouseleave="
                 (e) => {
-                  if (justAddedMap[p.id]) return;
+                  if (justAddedMap[addOnKey(cartId, p.id)]) return;
                   (e.currentTarget as HTMLElement).style.background =
                     'var(--primary-bg)';
                 }
               "
-              @click="handleOpenAddOnDialog(p)"
+              @click="handleOpenAddOnDialog(p, cartId)"
             >
               <i
                 :class="[
-                  justAddedMap[p.id] ? 'pi pi-check-circle' : 'pi pi-cart-plus',
+                  justAddedMap[addOnKey(cartId, p.id)]
+                    ? 'pi pi-check-circle'
+                    : 'pi pi-cart-plus',
                   isPC ? 'text-sm' : 'text-xl',
                 ]"
               />
               <span v-if="isPC">
-                {{ justAddedMap[p.id] ? '已加入購物車' : '加入購物車' }}
+                {{
+                  justAddedMap[addOnKey(cartId, p.id)]
+                    ? '已加入購物車'
+                    : '加入購物車'
+                }}
               </span>
             </button>
           </div>
