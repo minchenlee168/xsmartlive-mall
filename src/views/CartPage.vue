@@ -951,20 +951,12 @@ const handleGoProduct = (productId?: number) => {
             >
               {{ p.name }}
             </p>
-            <div class="flex flex-wrap items-baseline gap-x-1.5">
-              <span
-                class="text-base font-bold @7xl:text-lg"
-                style="color: var(--primary)"
-              >
-                ${{ p.price }}
-              </span>
-              <span
-                v-if="p.original"
-                class="text-xs whitespace-nowrap text-slate-400 line-through"
-              >
-                ${{ p.original }}
-              </span>
-            </div>
+            <span
+              class="text-base font-bold @7xl:text-lg"
+              style="color: var(--primary)"
+            >
+              ${{ p.price }}
+            </span>
 
             <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
             <button
