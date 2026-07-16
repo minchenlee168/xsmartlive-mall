@@ -789,11 +789,6 @@ const handleGoProduct = (productId?: number) => {
                   v-for="(sub, si) in item.bundleItems"
                   :key="si"
                   class="flex items-start gap-3"
-                  :style="
-                    subNeedsAttention(sub, item)
-                      ? 'outline: 1px solid var(--danger); border-radius: 8px; padding: 4px'
-                      : ''
-                  "
                 >
                   <button
                     type="button"
