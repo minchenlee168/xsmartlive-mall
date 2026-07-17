@@ -718,15 +718,15 @@ const handleGoProduct = (productId?: number) => {
                       class="!py-0.5 !text-[10px]"
                     />
                     <span
-                      class="text-xs whitespace-nowrap text-slate-500 line-through"
-                    >
-                      ${{ lineOriginalTotal(item).toLocaleString() }}
-                    </span>
-                    <span
                       class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
                       style="color: var(--primary)"
                     >
                       NTD ${{ lineDisplayTotal(item).toLocaleString() }}
+                    </span>
+                    <span
+                      class="text-xs whitespace-nowrap text-slate-500 line-through"
+                    >
+                      ${{ lineOriginalTotal(item).toLocaleString() }}
                     </span>
                   </template>
                   <template v-else>
@@ -959,7 +959,7 @@ const handleGoProduct = (productId?: number) => {
           @scroll="handleAddOnScroll"
         >
           <div
-            class="grid auto-rows-fr grid-cols-3 gap-1.5 @3xl:grid-cols-[repeat(auto-fill,minmax(120px,1fr))]"
+            class="grid auto-rows-fr grid-cols-3 gap-1.5 @3xl:grid-cols-[repeat(auto-fill,minmax(120px,1fr))] @5xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]"
           >
             <div
               v-for="{ product: p, cartId } in visibleAddOnCards"
@@ -985,10 +985,10 @@ const handleGoProduct = (productId?: number) => {
 
               <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
               <button
-                class="add-cart-btn mt-auto flex w-full items-center justify-center font-medium transition-all duration-200"
+                class="add-cart-btn mt-auto flex w-full items-center justify-center font-medium whitespace-nowrap transition-all duration-200"
                 :class="[
                   isPC
-                    ? 'gap-2 rounded-lg px-4 py-3 text-base'
+                    ? 'gap-2 rounded-lg px-1 py-3 text-base'
                     : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
                   justAddedMap[addOnKey(cartId, p.id)] ? 'added-pop' : '',
                 ]"
