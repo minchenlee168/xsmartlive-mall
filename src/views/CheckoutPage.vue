@@ -290,8 +290,28 @@ onMounted(() => {
   if (allItems.value.length === 0) router.replace('/cart');
 });
 
-// ---- 配送方式（全訂單共用一種方式；超商門市各訂單各自選）--------------------
-const shipMethod = ref<ShippingMethodId | null>(null);
+// ---- 配送方式（各訂單各自選；頂部「套用全部」入口可一次帶全部）--------------
+/** 各訂單各自的運送方式；未選 = null。key 為 group.id。 */
+const shipMethodByGroup = ref<Record<number, ShippingMethodId | null>>({});
+/** 讀某訂單目前選的運送方式。 */
+const groupShipMethod = (g: CheckoutGroup): ShippingMethodId | null =>
+  shipMethodByGroup.value[g.id] ?? null;
+/** 單一訂單支援的運送方式（固定順序）。 */
+const groupSupportedMethods = (g: CheckoutGroup): ShippingMethodId[] =>
+  SHIPPING_METHOD_ORDER.filter((m) => g.shippingMethods.includes(m));
+/** 所有訂單是否都選同一種方式；是 → 該方式，否（含未全選）→ null。 */
+const sharedShipMethod = computed<ShippingMethodId | null>(() => {
+  const groups = checkoutGroups.value;
+  if (groups.length === 0) return null;
+  const first = groupShipMethod(groups[0]);
+  return first && groups.every((g) => groupShipMethod(g) === first)
+    ? first
+    : null;
+});
+/** 是否至少有一筆訂單已選運送方式（底部運費列顯示與否）。 */
+const hasAnyShipMethod = computed(() =>
+  checkoutGroups.value.some((g) => groupShipMethod(g) !== null),
+);
 const selectedPickupId = ref(PICKUP_LOCATIONS[0].id);
 const addressStore = useAddressStore();
 /** 會員的超商門市清單（封裝 store，供 template 用）。 */
@@ -339,7 +359,7 @@ const selectedPickup = computed(
 
 /** 該組運費；null = 尚未能計算（未選方式，或超商未選門市）。 */
 const groupShippingFee = (g: CheckoutGroup): number | null => {
-  switch (shipMethod.value) {
+  switch (groupShipMethod(g)) {
     case 'home':
       return HOME_FEES[g.tempLayer];
     case 'post':
@@ -367,7 +387,7 @@ const groupHasShippingFee = (g: CheckoutGroup): boolean => {
 };
 /** 明細列的運送標籤，例如「冷凍宅配」「自取 · 台北門市」。 */
 const groupShippingLabel = (g: CheckoutGroup): string => {
-  switch (shipMethod.value) {
+  switch (groupShipMethod(g)) {
     case 'home':
       return `${g.tempLayer}宅配`;
     case 'post':
@@ -385,14 +405,46 @@ const groupShippingLabel = (g: CheckoutGroup): string => {
   }
 };
 
-const shippingMethodLabel = computed(() =>
-  shipMethod.value ? SHIPPING_METHOD_LABELS[shipMethod.value] : '尚未選擇',
-);
+/** 運送方式選單 header 顯示的「$X 起」；依抽屜範圍（單一訂單 / 全部）估算。 */
+/** 頂部摘要用：不帶溫層的方式標籤；超商直接顯示「7-11 XX門市」。 */
+const groupShipSummaryLabel = (g: CheckoutGroup): string => {
+  const m = groupShipMethod(g);
+  switch (m) {
+    case 'home':
+    case 'post':
+      return SHIPPING_METHOD_LABELS[m];
+    case 'pickup':
+      return `自取 · ${selectedPickup.value.name}`;
+    case 'store': {
+      const pick = cvsPickOf(g);
+      return pick
+        ? `${pick.store.chain ?? ''} ${pick.store.storeName}`.trim()
+        : '超商取貨（尚未選門市）';
+    }
+    default:
+      return '';
+  }
+};
+/** 頂部摘要用：某訂單已選方式的地址 / 門市明細（label 之外的補充行）。 */
+const groupShipDetail = (g: CheckoutGroup): string => {
+  const m = groupShipMethod(g);
+  if (m === 'home' || m === 'post') {
+    return selectedHome.value
+      ? `${selectedHome.value.name} ${selectedHome.value.phone} ${selectedHome.value.address}`
+      : '尚未選擇配送地址';
+  }
+  if (m === 'pickup') {
+    return `${selectedPickup.value.address} · ${selectedPickup.value.hours}`;
+  }
+  return '';
+};
 
-/** 運送方式選單 header 顯示的「$X 起」。 */
-const shippingMethodFeeHint = (m: ShippingMethodId): string => {
+const shippingMethodFeeHint = (
+  m: ShippingMethodId,
+  groups: CheckoutGroup[],
+): string => {
   if (m === 'pickup') return '$0';
-  const fees = checkoutGroups.value.map((g) => {
+  const fees = groups.map((g) => {
     if (m === 'home') return HOME_FEES[g.tempLayer];
     if (m === 'post') return POST_FEES[g.tempLayer];
     return Math.min(...Object.values(CVS_FEES).map((f) => f[g.tempLayer]));
@@ -513,26 +565,52 @@ const handleOpenShipDrawer = (groupId: number | null = null) => {
   shipDrawerView.value = 'list';
   isShipDrawerVisible.value = true;
 };
-/** 超商取貨區要顯示的訂單：帶 groupId → 只該訂單；否則全部。 */
-const shipDrawerStoreGroups = computed(() =>
+/** 抽屜作用範圍的訂單：帶 groupId → 只該訂單；否則全部（套用全部）。 */
+const drawerGroups = computed(() =>
   shipDrawerGroupId.value != null
     ? checkoutGroups.value.filter((g) => g.id === shipDrawerGroupId.value)
     : checkoutGroups.value,
 );
+/** 抽屜可選的運送方式：個別訂單 → 該訂單支援的；套用全部 → 各車交集。 */
+const drawerMethods = computed<ShippingMethodId[]>(() => {
+  if (shipDrawerGroupId.value == null) return supportedShippingMethods.value;
+  const g = checkoutGroups.value.find((x) => x.id === shipDrawerGroupId.value);
+  return g ? groupSupportedMethods(g) : [];
+});
+/** 抽屜目前反白的方式：個別訂單 → 該訂單的方式；套用全部 → 共同方式。 */
+const drawerSelectedMethod = computed<ShippingMethodId | null>(() =>
+  shipDrawerGroupId.value != null
+    ? (shipMethodByGroup.value[shipDrawerGroupId.value] ?? null)
+    : sharedShipMethod.value,
+);
+/** 在抽屜選方式：個別 → 只設該訂單；套用全部 → 一次帶所有訂單。 */
+const handleSelectShipMethod = (m: ShippingMethodId): void => {
+  if (shipDrawerGroupId.value != null) {
+    shipMethodByGroup.value = {
+      ...shipMethodByGroup.value,
+      [shipDrawerGroupId.value]: m,
+    };
+    return;
+  }
+  const next = { ...shipMethodByGroup.value };
+  for (const g of checkoutGroups.value) next[g.id] = m;
+  shipMethodByGroup.value = next;
+};
 
-// 只有一種運送方式 → 直接鎖定該方式（沒選擇餘地）；
-// 多種 → 讓使用者主動選、運費等選完才顯示；
-// 目前選的方式已不支援 → 清空
+// 逐訂單初始化 / 清理運送方式：
+// - 該組只支援一種方式 → 自動鎖定（沒選擇餘地）
+// - 已選方式仍被支援 → 保留；否則（含移除的組）→ 清空
 watch(
-  supportedShippingMethods,
-  (methods) => {
-    if (methods.length === 1) {
-      shipMethod.value = methods[0];
-      return;
+  checkoutGroups,
+  (groups) => {
+    const next: Record<number, ShippingMethodId | null> = {};
+    for (const g of groups) {
+      const supported = groupSupportedMethods(g);
+      const current = shipMethodByGroup.value[g.id] ?? null;
+      if (supported.length === 1) next[g.id] = supported[0];
+      else next[g.id] = current && supported.includes(current) ? current : null;
     }
-    if (shipMethod.value && !methods.includes(shipMethod.value)) {
-      shipMethod.value = null;
-    }
+    shipMethodByGroup.value = next;
   },
   { immediate: true },
 );
@@ -843,22 +921,25 @@ const handleTogglePayPanel = () => {
 
 // ---- 下單 --------------------------------------------------------------------
 const handlePlaceOrder = () => {
-  // 未選配送方式 / 超商未選門市 → 擋下並帶回抽屜
-  if (!shipMethod.value) {
-    ui.toast('請先選擇配送方式');
+  // 有訂單未選配送方式 / 超商未選門市 / 宅配未選地址 → 擋下並帶回抽屜
+  if (checkoutGroups.value.some((g) => !groupShipMethod(g))) {
+    ui.toast('請先為各訂單選擇配送方式');
     handleOpenShipDrawer();
     return;
   }
   if (
-    shipMethod.value === 'store' &&
-    checkoutGroups.value.some((g) => !cvsPickOf(g))
+    checkoutGroups.value.some(
+      (g) => groupShipMethod(g) === 'store' && !cvsPickOf(g),
+    )
   ) {
-    ui.toast('請為各訂單選擇取貨門市');
+    ui.toast('請為超商取貨的訂單選擇取貨門市');
     handleOpenShipDrawer();
     return;
   }
   if (
-    (shipMethod.value === 'home' || shipMethod.value === 'post') &&
+    checkoutGroups.value.some(
+      (g) => groupShipMethod(g) === 'home' || groupShipMethod(g) === 'post',
+    ) &&
     !selectedHome.value
   ) {
     ui.toast('請選擇配送地址');
@@ -886,20 +967,20 @@ const handlePlaceOrder = () => {
       })),
       total: groupDisplayTotal(g),
       payment: method,
-      delivery: shippingMethodLabel.value,
+      delivery: SHIPPING_METHOD_LABELS[groupShipMethod(g)!],
     }),
   );
 
-  // 依目前選擇的配送方式抓取聯絡人 / 電話 / 完整地址（給付款成功頁顯示）
+  // 收件聯絡人 / 電話沿用共用地址簿；配送地址依各訂單方式組出摘要
   const buyerName = selectedHome.value?.name ?? '';
   const buyerPhone = selectedHome.value?.phone ?? '';
   const deliveryAddress =
-    shipMethod.value === 'home' || shipMethod.value === 'post'
+    sharedShipMethod.value === 'home' || sharedShipMethod.value === 'post'
       ? (selectedHome.value?.address ?? '')
-      : shipMethod.value === 'pickup'
+      : sharedShipMethod.value === 'pickup'
         ? `自取 ${selectedPickup.value.name}（${selectedPickup.value.address}）`
         : checkoutGroups.value
-            .map((g) => `${g.sellerName}：${cvsPickOf(g)?.store.storeName ?? ''}`)
+            .map((g) => `${g.sellerName}：${groupShippingLabel(g)}`)
             .join('；');
 
   ordersStore.setLastPaymentSummary({
@@ -943,57 +1024,65 @@ const handlePlaceOrder = () => {
       class="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--page-pad-x)] pb-[120px] @7xl:px-0"
       style="gap: var(--stack-gap)"
     >
-      <!-- 配送資訊（共用，置頂） -->
+      <!-- 配送資訊（套用全部入口；各訂單仍可於下方明細個別調整） -->
       <section class="shadow-card overflow-hidden rounded-xl bg-white">
-        <div class="cart-divider px-4 py-3">
+        <div class="cart-divider flex items-center gap-1 px-4 py-3">
           <span class="font-medium text-slate-700">配送資訊</span>
+          <i
+            v-tooltip.bottom="{
+              value:
+                '此處設定會套用到所有訂單；也可於下方各訂單明細個別調整。',
+              event: 'focus',
+            }"
+            class="pi pi-question-circle cursor-pointer text-sm text-slate-400 transition-colors hover:text-slate-600"
+            tabindex="0"
+            role="button"
+            aria-label="配送方式說明"
+          />
         </div>
-        <div class="card-pad flex flex-col gap-3">
-          <div class="text-sm text-slate-500">配送方式</div>
-          <div class="flex items-center gap-3">
+        <div class="card-pad flex flex-col gap-2">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="text-sm text-slate-500">配送方式</span>
             <span
               class="text-sm"
-              :class="shipMethod ? 'text-slate-700' : 'text-slate-500'"
-              >{{ shippingMethodLabel }}</span
+              :class="sharedShipMethod ? 'text-slate-700' : 'text-slate-500'"
+              >{{
+                sharedShipMethod
+                  ? SHIPPING_METHOD_LABELS[sharedShipMethod]
+                  : '各訂單各自選擇'
+              }}</span
             >
             <Button
-              label="選擇運送方式"
+              label="套用全部"
               icon="pi pi-chevron-right"
               icon-pos="right"
               link
               size="small"
+              class="ml-auto"
               @click="handleOpenShipDrawer()"
             />
           </div>
-          <template v-if="shipMethod === 'home' || shipMethod === 'post'">
-            <div class="mt-1 text-sm text-slate-500">配送地址</div>
-            <div v-if="selectedHome" class="text-sm text-slate-700">
-              {{ selectedHome.name }} {{ selectedHome.phone }}
-              {{ selectedHome.address }}
-            </div>
-            <div v-else class="text-sm text-slate-500">尚未選擇配送地址</div>
-          </template>
-          <template v-else-if="shipMethod === 'pickup'">
-            <div class="mt-1 text-sm text-slate-500">自取門市</div>
-            <div class="text-sm text-slate-700">
-              {{ selectedPickup.name }}　{{ selectedPickup.address }} ·
-              {{ selectedPickup.hours }}
-            </div>
-          </template>
-          <template v-else-if="shipMethod === 'store'">
-            <div class="mt-1 text-sm text-slate-500">取貨門市（各訂單）</div>
+          <!-- 各訂單已選配送方式 / 地址 / 門市摘要 -->
+          <div
+            class="mt-1 flex flex-col gap-2 border-t border-slate-100 pt-3"
+          >
             <div
               v-for="g in checkoutGroups"
               :key="g.id"
-              class="flex flex-wrap items-center gap-2 text-sm"
+              class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm"
             >
               <span class="text-slate-500">{{ g.sellerName }}</span>
-              <span v-if="cvsPickOf(g)" class="text-slate-700">
-                {{ cvsPickOf(g)!.store.storeName }}
-              </span>
-              <span v-else class="text-red-500">尚未選門市</span>
+              <span v-if="groupShipMethod(g)" class="text-slate-700">{{
+                groupShipSummaryLabel(g)
+              }}</span>
+              <span v-else class="text-slate-400">尚未選擇配送方式</span>
+              <span
+                v-if="groupShipDetail(g)"
+                class="w-full text-slate-500"
+                >{{ groupShipDetail(g) }}</span
+              >
             </div>
-          </template>
+          </div>
         </div>
       </section>
 
@@ -1140,12 +1229,12 @@ const handlePlaceOrder = () => {
               class="col-start-2 row-start-1 flex min-w-0 flex-wrap items-center gap-2 @3xl:col-span-2"
             >
               <span
-                v-if="shipMethod"
+                v-if="groupShipMethod(group)"
                 class="truncate text-sm text-slate-500"
                 >{{ groupShippingLabel(group) }}</span
               >
               <Button
-                :label="shipMethod ? '變更' : '選擇配送方式'"
+                :label="groupShipMethod(group) ? '變更' : '選擇配送方式'"
                 severity="secondary"
                 outlined
                 size="small"
@@ -1427,7 +1516,7 @@ const handlePlaceOrder = () => {
                 >$ {{ productTotal.toLocaleString() }}</span
               >
             </div>
-            <div v-if="shipMethod" class="flex justify-between py-0.5">
+            <div v-if="hasAnyShipMethod" class="flex justify-between py-0.5">
               <span class="text-slate-500">運費總金額</span>
               <span class="text-slate-700"
                 >$ {{ shippingTotal.toLocaleString() }}</span
@@ -1856,7 +1945,13 @@ const handlePlaceOrder = () => {
             <!-- ===== View: list ===== -->
             <template v-if="shipDrawerView === 'list'">
               <div class="mb-4 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-slate-950">選擇運送方式</h3>
+                <h3 class="text-lg font-bold text-slate-950">
+                  {{
+                    shipDrawerGroupId == null
+                      ? '選擇運送方式（套用全部）'
+                      : '選擇運送方式'
+                  }}
+                </h3>
                 <Button
                   icon="pi pi-times"
                   severity="secondary"
@@ -1870,18 +1965,18 @@ const handlePlaceOrder = () => {
               <div class="flex max-h-[62vh] flex-col gap-3 overflow-y-auto">
                 <p
                   v-if="
-                    supportedShippingMethods.length <
-                    SHIPPING_METHOD_ORDER.length
+                    shipDrawerGroupId == null &&
+                    supportedShippingMethods.length < SHIPPING_METHOD_ORDER.length
                   "
                   class="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700"
                 >
                   <i class="pi pi-info-circle mr-1" />
-                  部分運送方式因您勾選的購物車不共同支援，已自動隱藏。
+                  部分運送方式因您勾選的購物車不共同支援，套用全部時已自動隱藏。
                 </p>
 
                 <!-- 方式卡（accordion：點 header 切換，展開對應設定） -->
                 <div
-                  v-for="m in supportedShippingMethods"
+                  v-for="m in drawerMethods"
                   :key="m"
                   class="flex flex-col gap-3"
                 >
@@ -1894,15 +1989,15 @@ const handlePlaceOrder = () => {
                           'cursor-pointer !border-none !bg-slate-100 !text-slate-700 transition-colors hover:!bg-slate-200',
                       },
                     }"
-                    @click="shipMethod = m"
+                    @click="handleSelectShipMethod(m)"
                   >
                     <span class="font-medium">{{
                       SHIPPING_METHOD_LABELS[m]
                     }}</span>
                     <span class="flex items-center gap-2">
-                      {{ shippingMethodFeeHint(m) }}
+                      {{ shippingMethodFeeHint(m, drawerGroups) }}
                       <i
-                        v-if="shipMethod === m"
+                        v-if="drawerSelectedMethod === m"
                         class="pi pi-check text-green-600"
                       />
                     </span>
@@ -1910,7 +2005,9 @@ const handlePlaceOrder = () => {
 
                   <!-- 宅配 / 郵局宅配：共用收件地址清單 -->
                   <div
-                    v-if="shipMethod === m && (m === 'home' || m === 'post')"
+                    v-if="
+                      drawerSelectedMethod === m && (m === 'home' || m === 'post')
+                    "
                     class="flex flex-col gap-2"
                   >
                     <button
@@ -1991,7 +2088,7 @@ const handlePlaceOrder = () => {
 
                   <!-- 自取：門市清單 -->
                   <div
-                    v-else-if="shipMethod === m && m === 'pickup'"
+                    v-else-if="drawerSelectedMethod === m && m === 'pickup'"
                     class="flex flex-col gap-2"
                   >
                     <button
@@ -2025,14 +2122,14 @@ const handlePlaceOrder = () => {
 
                   <!-- 超商取貨：各訂單依溫層選品牌 → 帶出門市 -->
                   <div
-                    v-else-if="shipMethod === m && m === 'store'"
+                    v-else-if="drawerSelectedMethod === m && m === 'store'"
                     class="flex flex-col gap-3"
                   >
                     <p class="text-xs text-slate-500">
                       選擇取貨門市（門市取自會員設定，運費依溫層）：
                     </p>
                     <div
-                      v-for="g in shipDrawerStoreGroups"
+                      v-for="g in drawerGroups"
                       :key="g.id"
                       :class="
                         shipDrawerGroupId == null
