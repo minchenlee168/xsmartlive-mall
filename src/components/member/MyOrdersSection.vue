@@ -442,6 +442,12 @@ const handleCancelOrder = (order: OrderRecord): void => {
   ui.toast('訂單已取消（示意）');
 };
 
+/** 已送達訂單：買家確認完成 → 包裹推進 completed、狀態轉已完成。 */
+const handleCompleteOrder = (order: OrderRecord): void => {
+  ordersStore.completeOrder(order.id);
+  ui.toast('訂單已完成');
+};
+
 // ── 訂單提問 drawer（右側抽出，內容為 AI 客服待開發提示） ──
 const isInquiryDrawerVisible = ref(false);
 /**
@@ -833,6 +839,20 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             </tr>
           </tbody>
         </table>
+
+        <!-- 已送達 → 買家可「確認完成」，訂單轉為已完成 -->
+        <div
+          v-if="orderDisplayStatus(order) === '已送達'"
+          class="flex items-center justify-end gap-3 border-t border-slate-200 px-4 py-3"
+        >
+          <span class="text-sm text-slate-500">已收到商品了嗎？</span>
+          <Button
+            label="確認完成"
+            size="small"
+            class="shrink-0"
+            @click="handleCompleteOrder(order)"
+          />
+        </div>
 
         <!-- 買家備註（結帳時留言給賣家）；有填才顯示 -->
         <div

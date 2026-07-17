@@ -511,10 +511,30 @@ export const useOrdersStore = defineStore('orders', () => {
     lastPaymentSummary.value = s;
   };
 
+  /** 買家確認「已完成」：已送達的包裹推進到 completed，訂單狀態轉為 completed。 */
+  function completeOrder(orderId: string): void {
+    const order = orders.value.find((o) => o.id === orderId);
+    if (!order) return;
+    const now = new Date();
+    const t = `${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} ${pad2(
+      now.getHours(),
+    )}:${pad2(now.getMinutes())}`;
+    order.items.forEach((it) => {
+      it.packages.forEach((p) => {
+        if (p.currentStep === 'delivered') {
+          p.currentStep = 'completed';
+          p.stepTimes = { ...p.stepTimes, completed: t };
+        }
+      });
+    });
+    order.status = 'completed';
+  }
+
   return {
     orders,
     transactions,
     placeOrder,
+    completeOrder,
     lastPaymentSummary,
     setLastPaymentSummary,
   };
