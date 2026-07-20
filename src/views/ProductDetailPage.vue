@@ -370,7 +370,7 @@ const handleNextThumb = () => {
                   >
                   <span
                     v-if="product.noCoupon || product.isBundle"
-                    class="px-3 text-sm text-slate-700"
+                    class="text-sm text-slate-700"
                   >
                     ＊已為優惠商品，不適用任何優惠券
                   </span>
@@ -381,8 +381,19 @@ const handleNextThumb = () => {
                     icon-pos="right"
                     link
                     size="small"
+                    class="!px-0"
                     @click="handleOpenCoupons"
                   />
+                </div>
+
+                <!-- 商品備註（賣家提醒 / 商品說明）-->
+                <div v-if="product.note" class="flex items-start gap-6">
+                  <span class="w-20 shrink-0 text-sm text-slate-700"
+                    >商品備註</span
+                  >
+                  <p class="flex-1 text-sm leading-relaxed text-slate-700">
+                    {{ product.note }}
+                  </p>
                 </div>
 
                 <!-- Size -->

@@ -30,6 +30,8 @@ export interface Product {
   sizes?: string[];
   /** 已售完的尺寸（模擬缺貨）：選規格時顯示但不可選。 */
   soldOutSizes?: string[];
+  /** 商品備註（賣家提醒 / 商品說明），顯示於商品內頁。 */
+  note?: string;
   category?: string;
   image?: string;
   noCoupon?: boolean;
@@ -50,6 +52,7 @@ export const products: Product[] = [
     original: 1580,
     stock: 10,
     category: '生鮮',
+    note: '本商品全程冷凍配送，收貨後請立即冷凍保存，建議 3 日內食用完畢。',
     image:
       'https://images.unsplash.com/photo-1485921325833-c519f76c4927?w=600&fit=crop',
     isBundle: true,
@@ -243,6 +246,7 @@ export const products: Product[] = [
     stock: 10,
     sizes: ['S', 'M', 'L', 'XL'],
     soldOutSizes: ['M'],
+    note: '直播限定色，不參與退換貨；建議冷水手洗、勿漂白、勿烘乾。',
     category: '大童童裝',
   },
   {
