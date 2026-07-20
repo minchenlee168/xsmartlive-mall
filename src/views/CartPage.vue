@@ -693,7 +693,7 @@ const handleGoProduct = (productId?: number) => {
                 <!-- 買多優惠提示 -->
                 <div
                   v-if="item.bulkDiscount"
-                  class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                  class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
                   :class="
                     hasBulkDiscount(item)
                       ? 'bg-green-50 text-green-700'
