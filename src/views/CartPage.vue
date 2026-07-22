@@ -638,7 +638,7 @@ const handleGoProduct = (productId?: number) => {
         >
           <!-- Item row -->
           <div
-            class="flex items-start gap-3 px-[var(--card-pad)] py-[var(--card-pad)] @7xl:gap-4"
+            class="flex flex-wrap items-start gap-3 px-[var(--card-pad)] py-[var(--card-pad)] @3xl:flex-nowrap @7xl:gap-4"
           >
             <!-- Checkbox + 圖片：default 是整台一起、paused 不能結帳，都不顯示 item 勾選 -->
             <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
@@ -677,7 +677,8 @@ const handleGoProduct = (productId?: number) => {
                 >
                   規格 {{ item.spec }}
                 </div>
-                <div class="flex items-center gap-3 text-sm">
+                <!-- 平板以上：數量與商品名同欄、與價格並排（維持現狀） -->
+                <div class="hidden items-center gap-3 text-sm @3xl:flex">
                   <span class="text-slate-600">數量</span>
                   <InputNumber
                     v-model="item.qty"
@@ -755,6 +756,21 @@ const handleGoProduct = (productId?: number) => {
                   @click="removeItem(group, item.id)"
                 />
               </div>
+            </div>
+
+            <!-- 手機版：數量獨立成一行、佔整列寬度，避免被右側價格欄夾窄 -->
+            <div class="flex basis-full items-center gap-3 text-sm @3xl:hidden">
+              <span class="text-slate-600">數量</span>
+              <InputNumber
+                v-model="item.qty"
+                :min="1"
+                :disabled="isPausedMode(group)"
+                show-buttons
+                button-layout="horizontal"
+                increment-button-icon="pi pi-plus"
+                decrement-button-icon="pi pi-minus"
+                class="qty-stepper"
+              />
             </div>
           </div>
 
