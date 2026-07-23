@@ -182,11 +182,11 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
   <!-- 全域 Toast：手刻元件、畫面正中、一次一則、由 ui.currentToast 驅動 -->
   <AppToast />
 
-  <!-- 加入購物車成功彈窗：白底、靠上、不遮罩、3 秒後自動消失 -->
+  <!-- 加入購物車成功彈窗：白底、置中、不遮罩、3 秒後自動消失 -->
   <Dialog
     :visible="ui.addedProductName !== null"
     :modal="false"
-    position="top"
+    position="center"
     header="加入購物車"
     :draggable="false"
     :style="{ width: '380px' }"

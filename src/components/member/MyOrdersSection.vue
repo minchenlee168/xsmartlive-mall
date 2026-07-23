@@ -1017,7 +1017,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <p class="line-clamp-1 text-sm leading-snug text-slate-700">
                   {{ item.name }}
                 </p>
-                <p class="mt-1 text-xs text-slate-500">規格：{{ item.spec }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ item.spec }}</p>
               </div>
               <div class="flex shrink-0 flex-col items-end gap-2">
                 <p class="text-sm font-bold text-slate-950">
@@ -1605,7 +1605,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             <p class="text-slate-500">直播管家 xSmartLive 股份有限公司</p>
           </div>
           <div>
-            <p class="text-slate-500">買方 / 載具</p>
+            <p class="text-slate-500">發票類型</p>
             <p class="font-medium">
               {{ invoicePreviewOrder.invoice || '個人載具' }}
             </p>

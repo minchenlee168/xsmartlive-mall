@@ -20,6 +20,21 @@ export interface PickOption {
   maxQty?: number;
 }
 
+/** 多軸規格的一個軸，如「尺寸」「顏色」。 */
+export interface SpecAxis {
+  name: string;
+  options: string[];
+}
+
+/** 一個 SKU 組合 + 剩餘庫存；spec 記錄各軸選值。 */
+export interface Sku {
+  id: string;
+  /** 各規格軸選值，如 { 尺寸: '73cm', 顏色: '霧藍' } */
+  spec: Record<string, string>;
+  /** 剩餘庫存；0 → 售完不可選 */
+  stock: number;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -28,6 +43,10 @@ export interface Product {
   hasVariant?: boolean;
   stock?: number;
   sizes?: string[];
+  /** 多軸規格（尺寸 / 顏色…）；有此欄位 → 支援後選規格的 SKU 選擇。 */
+  specAxes?: SpecAxis[];
+  /** SKU 組合與庫存；後選規格時依此檢查各組合是否可選。 */
+  skus?: Sku[];
   /** 已售完的尺寸（模擬缺貨）：選規格時顯示但不可選。 */
   soldOutSizes?: string[];
   /** 商品備註（賣家提醒 / 商品說明），顯示於商品內頁。 */
@@ -257,6 +276,57 @@ export const products: Product[] = [
     hasVariant: true,
     stock: 10,
     sizes: ['66cm', '73cm', '80cm', '90cm'],
+    // 多軸 SKU（尺寸 × 10 種顏色）+ 庫存；供直播得標後挑選規格使用，含幾個售完組合示範
+    specAxes: [
+      { name: '尺寸', options: ['66cm', '73cm', '80cm'] },
+      {
+        name: '顏色',
+        options: [
+          '奶油白',
+          '霧藍',
+          '櫻花粉',
+          '薄荷綠',
+          '鵝黃',
+          '奶茶',
+          '珊瑚橘',
+          '丁香紫',
+          '石墨灰',
+          '磚紅',
+        ],
+      },
+    ],
+    skus: [
+      { id: 's3-66-01', spec: { 尺寸: '66cm', 顏色: '奶油白' }, stock: 150 },
+      { id: 's3-66-02', spec: { 尺寸: '66cm', 顏色: '霧藍' }, stock: 150 },
+      { id: 's3-66-03', spec: { 尺寸: '66cm', 顏色: '櫻花粉' }, stock: 150 },
+      { id: 's3-66-04', spec: { 尺寸: '66cm', 顏色: '薄荷綠' }, stock: 0 },
+      { id: 's3-66-05', spec: { 尺寸: '66cm', 顏色: '鵝黃' }, stock: 150 },
+      { id: 's3-66-06', spec: { 尺寸: '66cm', 顏色: '奶茶' }, stock: 150 },
+      { id: 's3-66-07', spec: { 尺寸: '66cm', 顏色: '珊瑚橘' }, stock: 150 },
+      { id: 's3-66-08', spec: { 尺寸: '66cm', 顏色: '丁香紫' }, stock: 150 },
+      { id: 's3-66-09', spec: { 尺寸: '66cm', 顏色: '石墨灰' }, stock: 150 },
+      { id: 's3-66-10', spec: { 尺寸: '66cm', 顏色: '磚紅' }, stock: 150 },
+      { id: 's3-73-01', spec: { 尺寸: '73cm', 顏色: '奶油白' }, stock: 0 },
+      { id: 's3-73-02', spec: { 尺寸: '73cm', 顏色: '霧藍' }, stock: 150 },
+      { id: 's3-73-03', spec: { 尺寸: '73cm', 顏色: '櫻花粉' }, stock: 150 },
+      { id: 's3-73-04', spec: { 尺寸: '73cm', 顏色: '薄荷綠' }, stock: 150 },
+      { id: 's3-73-05', spec: { 尺寸: '73cm', 顏色: '鵝黃' }, stock: 150 },
+      { id: 's3-73-06', spec: { 尺寸: '73cm', 顏色: '奶茶' }, stock: 150 },
+      { id: 's3-73-07', spec: { 尺寸: '73cm', 顏色: '珊瑚橘' }, stock: 0 },
+      { id: 's3-73-08', spec: { 尺寸: '73cm', 顏色: '丁香紫' }, stock: 150 },
+      { id: 's3-73-09', spec: { 尺寸: '73cm', 顏色: '石墨灰' }, stock: 150 },
+      { id: 's3-73-10', spec: { 尺寸: '73cm', 顏色: '磚紅' }, stock: 150 },
+      { id: 's3-80-01', spec: { 尺寸: '80cm', 顏色: '奶油白' }, stock: 150 },
+      { id: 's3-80-02', spec: { 尺寸: '80cm', 顏色: '霧藍' }, stock: 0 },
+      { id: 's3-80-03', spec: { 尺寸: '80cm', 顏色: '櫻花粉' }, stock: 150 },
+      { id: 's3-80-04', spec: { 尺寸: '80cm', 顏色: '薄荷綠' }, stock: 150 },
+      { id: 's3-80-05', spec: { 尺寸: '80cm', 顏色: '鵝黃' }, stock: 150 },
+      { id: 's3-80-06', spec: { 尺寸: '80cm', 顏色: '奶茶' }, stock: 150 },
+      { id: 's3-80-07', spec: { 尺寸: '80cm', 顏色: '珊瑚橘' }, stock: 150 },
+      { id: 's3-80-08', spec: { 尺寸: '80cm', 顏色: '丁香紫' }, stock: 0 },
+      { id: 's3-80-09', spec: { 尺寸: '80cm', 顏色: '石墨灰' }, stock: 150 },
+      { id: 's3-80-10', spec: { 尺寸: '80cm', 顏色: '磚紅' }, stock: 150 },
+    ],
     category: '寶寶包屁',
     image:
       'https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=600&fit=crop',
@@ -319,6 +389,22 @@ export const products: Product[] = [
     hasVariant: true,
     stock: 10,
     sizes: ['100cm', '110cm', '120cm'],
+    // 多軸 SKU（尺寸 × 顏色）+ 庫存；供直播得標後挑選規格使用
+    specAxes: [
+      { name: '尺寸', options: ['100cm', '110cm', '120cm'] },
+      { name: '顏色', options: ['淺藍', '深藍', '水洗灰'] },
+    ],
+    skus: [
+      { id: 's8-100-01', spec: { 尺寸: '100cm', 顏色: '淺藍' }, stock: 150 },
+      { id: 's8-100-02', spec: { 尺寸: '100cm', 顏色: '深藍' }, stock: 150 },
+      { id: 's8-100-03', spec: { 尺寸: '100cm', 顏色: '水洗灰' }, stock: 0 },
+      { id: 's8-110-01', spec: { 尺寸: '110cm', 顏色: '淺藍' }, stock: 150 },
+      { id: 's8-110-02', spec: { 尺寸: '110cm', 顏色: '深藍' }, stock: 150 },
+      { id: 's8-110-03', spec: { 尺寸: '110cm', 顏色: '水洗灰' }, stock: 150 },
+      { id: 's8-120-01', spec: { 尺寸: '120cm', 顏色: '淺藍' }, stock: 0 },
+      { id: 's8-120-02', spec: { 尺寸: '120cm', 顏色: '深藍' }, stock: 150 },
+      { id: 's8-120-03', spec: { 尺寸: '120cm', 顏色: '水洗灰' }, stock: 150 },
+    ],
     category: '小童童裝',
     image:
       'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=600&fit=crop',

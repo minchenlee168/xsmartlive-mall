@@ -30,6 +30,47 @@ export type {
 export const useCartStore = defineStore('cart', () => {
   const groups = ref<CartGroup[]>([
     {
+      // 直播下標車：default 模式（整台一起結、禁止棄標）；下標當下未選規格，需在車內後選 SKU
+      id: 6,
+      sellerName: '07/10 晚間直播搶購場',
+      tags: [{ label: '常溫', type: 'secondary' }],
+      shippingMethods: ['home', 'store'],
+      paymentMethods: ['credit', 'atm', 'cod'],
+      checkoutMode: 'default',
+      items: [
+        {
+          // 批次下標：同商品聚合成一列（得標 100 件），規格用彈窗批次挑選
+          id: 'i_bid1',
+          productId: 3,
+          name: '寶寶連身包屁衣 有機棉長袖春秋款 0-18個月',
+          image: products.find((p) => p.id === 3)?.image,
+          spec: '',
+          qty: 100,
+          price: 199,
+          original: 320,
+          checked: true,
+          specPending: true,
+          isBidBatch: true,
+          specAllocation: {},
+        },
+        {
+          // 第二個得標商品（同為待挑選規格）
+          id: 'i_bid2',
+          productId: 8,
+          name: '女童牛仔短褲 夏季薄款休閒百搭',
+          image: products.find((p) => p.id === 8)?.image,
+          spec: '',
+          qty: 30,
+          price: 220,
+          original: 360,
+          checked: true,
+          specPending: true,
+          isBidBatch: true,
+          specAllocation: {},
+        },
+      ],
+    },
+    {
       id: 1,
       sellerName: '07/09 廚娘小桂の直播廚房',
       tags: [{ label: '冷凍', type: 'info' }],
@@ -214,6 +255,21 @@ export const useCartStore = defineStore('cart', () => {
           original: 680,
           checked: false,
         },
+        {
+          // 任選 4 件動態組合：規格用彈窗挑選（選項＋規格→加入→已選 X/4），bundleItems 空＝待挑選
+          id: 'i_pick4',
+          productId: 16,
+          name: '任選 4 件 寶寶配件超值組合（部分限購）',
+          image: products.find((p) => p.id === 16)?.image,
+          spec: '預設',
+          qty: 1,
+          price: 599,
+          original: 980,
+          checked: false,
+          isBundle: true,
+          bundleExpanded: true,
+          bundleItems: [],
+        },
       ],
     },
     {
@@ -300,7 +356,11 @@ export const useCartStore = defineStore('cart', () => {
   const syncBulkDiscountsToItems = () => {
     groups.value.forEach((g) => {
       g.items.forEach((i) => {
-        i.bulkDiscount = findBulkDiscountFor(i.productId);
+        // 禁止棄標（default）的購物車一律不套用買多優惠（整台固定、不可調量，買多優惠無意義）
+        i.bulkDiscount =
+          g.checkoutMode === 'default'
+            ? undefined
+            : findBulkDiscountFor(i.productId);
       });
     });
   };
@@ -345,6 +405,8 @@ export const useCartStore = defineStore('cart', () => {
       targetCartId?: number;
       /** 新增（非合併）時放在該台最上面而不是最後面；加購區用 */
       prepend?: boolean;
+      /** 直播下標：未選規格加入，強制各自成列（不合併），車內再後選 SKU */
+      specPending?: boolean;
     },
   ) {
     // targetCartId 指定 → 直接找那台；否則走分派規則 / fallback / 新建
@@ -369,10 +431,10 @@ export const useCartStore = defineStore('cart', () => {
       };
       groups.value.unshift(target);
     }
-    // 同商品（同 productId）且同規格 → 合併累加數量，不另開一列
-    const existing = target.items.find(
-      (i) => i.productId === p.id && i.spec === spec,
-    );
+    // 直播下標（待選規格）：同商品聚合進批次列、累加下標數；否則同商品同規格 → 合併累加
+    const existing = options?.specPending
+      ? target.items.find((i) => i.productId === p.id && i.isBidBatch)
+      : target.items.find((i) => i.productId === p.id && i.spec === spec);
     if (existing) {
       existing.qty += qty;
       existing.checked = true;
@@ -386,7 +448,7 @@ export const useCartStore = defineStore('cart', () => {
       productId: p.id,
       name: p.name,
       image: p.image,
-      spec,
+      spec: options?.specPending ? '' : spec,
       qty,
       price: p.price,
       original: p.original,
@@ -394,7 +456,14 @@ export const useCartStore = defineStore('cart', () => {
       isBundle: cat?.isBundle,
       bundleExpanded: cat?.isBundle ? true : undefined,
       bundleItems: resolvedBundleItems,
-      bulkDiscount: findBulkDiscountFor(p.id),
+      // 禁止棄標（default）的購物車一律不套用買多優惠
+      bulkDiscount:
+        target.checkoutMode === 'default'
+          ? undefined
+          : findBulkDiscountFor(p.id),
+      specPending: options?.specPending,
+      isBidBatch: options?.specPending || undefined,
+      specAllocation: options?.specPending ? {} : undefined,
     };
     if (options?.prepend) {
       target.items.unshift(newItem);

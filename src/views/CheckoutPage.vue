@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
+import StoreMapPicker from '../components/StoreMapPicker.vue';
 import { useUiStore } from '../pinia/ui';
 import {
   useCartStore,
@@ -463,7 +464,38 @@ const groupShipDetail = (g: CheckoutGroup): string => {
   if (m === 'pickup') {
     return `${selectedPickup.value.address} · ${selectedPickup.value.hours}`;
   }
+  if (m === 'store') {
+    const pick = cvsPickOf(g);
+    return pick
+      ? `${pick.store.name} ${pick.store.phone} ${pick.store.address}`
+      : '';
+  }
   return '';
+};
+
+/** 某訂單依已選運送方式的收件人（姓名 + 電話）；未選 / 無資料 → null。 */
+const groupRecipient = (
+  g: CheckoutGroup,
+): { name: string; phone: string } | null => {
+  const m = groupShipMethod(g);
+  if (m === 'home' || m === 'post') {
+    return selectedHome.value
+      ? { name: selectedHome.value.name, phone: selectedHome.value.phone }
+      : null;
+  }
+  if (m === 'pickup') {
+    if (!pickupContactName.value.trim() && !pickupContactPhone.value.trim())
+      return null;
+    return {
+      name: pickupContactName.value,
+      phone: `${pickupContactPhoneCode.value} ${pickupContactPhone.value}`.trim(),
+    };
+  }
+  if (m === 'store') {
+    const pick = cvsPickOf(g);
+    return pick ? { name: pick.store.name, phone: pick.store.phone } : null;
+  }
+  return null;
 };
 
 const shippingMethodFeeHint = (
@@ -552,10 +584,6 @@ const handleSubmitAddHome = () => {
 };
 
 // ---- 新增超商門市（推進共用 address store，會員中心同步）---------------------
-const CVS_CHAIN_OPTIONS: { label: string; value: CvsChain }[] = [
-  { label: '7-11', value: '7-11' },
-  { label: '全家', value: 'FamilyMart' },
-];
 const newStoreChain = ref<CvsChain>('7-11');
 const newStoreShopName = ref('');
 const newStoreAddress = ref('');
@@ -567,8 +595,28 @@ const resetAddStoreForm = () => {
   newStoreAddress.value = '';
   newStorePhone.value = '';
 };
+// 超商電子地圖選門市
+const isStoreMapVisible = ref(false);
+const handleOpenStoreMap = (chain: CvsChain) => {
+  newStoreChain.value = chain;
+  isStoreMapVisible.value = true;
+};
+const handleSelectStore = (store: {
+  chain: CvsChain;
+  storeName: string;
+  address: string;
+}) => {
+  newStoreChain.value = store.chain;
+  newStoreShopName.value = store.storeName;
+  newStoreAddress.value = store.address;
+};
 const handleSubmitAddStore = () => {
-  if (!newStoreShopName.value.trim()) return;
+  if (
+    !newStoreShopName.value.trim() ||
+    !newStoreName.value.trim() ||
+    !newStorePhone.value.trim()
+  )
+    return;
   addressStore.storeAddrs.push({
     id: 's_' + Date.now(),
     name: newStoreName.value,
@@ -1160,12 +1208,11 @@ const handlePlaceOrder = () => {
               <p class="truncate text-base font-semibold text-slate-700">
                 {{ item.name }}
               </p>
-              <!-- 規格列：一律先規格、後數量（含組合商品；spec 為預設值時不顯示） -->
+              <!-- 規格列：直接顯示規格內容（不加「規格」label；spec 為預設值時不顯示） -->
               <div
                 v-if="item.spec && item.spec !== '預設'"
                 class="flex gap-4 text-sm text-slate-700"
               >
-                <span class="shrink-0">規格</span>
                 <span class="truncate">{{ item.spec }}</span>
               </div>
               <!-- 組合商品內容（不可收合，直接列出） -->
@@ -1300,6 +1347,24 @@ const handlePlaceOrder = () => {
             <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'"
               >$ {{ groupShippingFee(group)!.toLocaleString() }}</span
             >
+          </div>
+
+          <!-- 收件人資訊：選完運送方式後顯示姓名 + 手機號碼 -->
+          <div v-if="groupRecipient(group)" :class="RECEIPT_ROW_CLASS">
+            <span
+              class="col-start-1 row-start-1 text-sm whitespace-nowrap text-slate-700"
+              >收件人</span
+            >
+            <div
+              class="col-start-2 row-start-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 @3xl:col-span-2"
+            >
+              <span class="text-sm text-slate-700">{{
+                groupRecipient(group)!.name
+              }}</span>
+              <span class="text-sm text-slate-500">{{
+                groupRecipient(group)!.phone
+              }}</span>
+            </div>
           </div>
 
           <!-- 運費折抵：有運費時達 / 未達門檻都顯示；達標折抵全額運費、未達顯示 $0 -->
@@ -2417,34 +2482,70 @@ const handlePlaceOrder = () => {
               </div>
 
               <div class="mx-auto flex max-w-[440px] flex-col gap-3">
-                <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">超商品牌</label>
-                  <Select
-                    v-model="newStoreChain"
-                    :options="CVS_CHAIN_OPTIONS"
-                    option-label="label"
-                    option-value="value"
-                    class="w-full"
-                  />
+                <!-- 選擇超商（點 logo 開該超商電子地圖，門市免手填） -->
+                <div class="flex flex-col gap-2">
+                  <label class="text-sm text-slate-700">選擇超商</label>
+                  <div class="flex gap-3">
+                    <button
+                      class="flex h-12 w-16 items-center justify-center rounded-md border-2 bg-white transition-all"
+                      :class="
+                        newStoreChain === '7-11' ? '' : 'border-slate-200'
+                      "
+                      :style="
+                        newStoreChain === '7-11'
+                          ? 'border-color: var(--primary)'
+                          : ''
+                      "
+                      @click="handleOpenStoreMap('7-11')"
+                    >
+                      <img
+                        :src="CVS_LOGOS['7-11']"
+                        alt="7-11"
+                        class="h-7 w-7 object-contain"
+                      />
+                    </button>
+                    <button
+                      class="flex h-12 w-16 items-center justify-center rounded-md border-2 bg-white transition-all"
+                      :class="
+                        newStoreChain === 'FamilyMart' ? '' : 'border-slate-200'
+                      "
+                      :style="
+                        newStoreChain === 'FamilyMart'
+                          ? 'border-color: var(--primary)'
+                          : ''
+                      "
+                      @click="handleOpenStoreMap('FamilyMart')"
+                    >
+                      <img
+                        :src="CVS_LOGOS['FamilyMart']"
+                        alt="FamilyMart"
+                        class="h-7 w-7 object-contain"
+                      />
+                    </button>
+                  </div>
+                  <div
+                    v-if="newStoreShopName && newStoreAddress"
+                    class="flex min-w-0 flex-col rounded-md border border-slate-200 bg-slate-50 p-3"
+                  >
+                    <span class="font-bold text-slate-950">{{
+                      newStoreShopName
+                    }}</span>
+                    <span class="truncate text-xs text-slate-500">{{
+                      newStoreAddress
+                    }}</span>
+                  </div>
+                  <p v-else class="text-sm text-slate-400">尚未選擇門市</p>
                 </div>
                 <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">門市名稱</label>
-                  <InputText
-                    v-model="newStoreShopName"
-                    class="w-full"
-                    placeholder="例如：信義門市"
-                  />
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">門市地址</label>
-                  <InputText v-model="newStoreAddress" class="w-full" />
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">收件人姓名</label>
+                  <label class="text-sm text-slate-700"
+                    >收件人姓名<span class="text-red-500"> *</span></label
+                  >
                   <InputText v-model="newStoreName" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">收件人電話</label>
+                  <label class="text-sm text-slate-700"
+                    >收件人電話<span class="text-red-500"> *</span></label
+                  >
                   <div class="flex gap-2">
                     <Select
                       v-model="newStoreCountryCode"
@@ -2469,6 +2570,13 @@ const handlePlaceOrder = () => {
                 />
                 <Button label="確認新增" @click="handleSubmitAddStore" />
               </div>
+
+              <!-- 超商電子地圖選門市 -->
+              <StoreMapPicker
+                v-model:visible="isStoreMapVisible"
+                :chain="newStoreChain"
+                @select="handleSelectStore"
+              />
             </template>
           </div>
         </div>

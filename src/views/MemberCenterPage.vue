@@ -5,6 +5,7 @@ import MemberIcon from '../components/MemberIcon.vue';
 import MyOrdersSection from '../components/member/MyOrdersSection.vue';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
+import StoreMapPicker from '../components/StoreMapPicker.vue';
 import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
 import { useOrdersStore } from '../pinia/orders';
@@ -12,7 +13,11 @@ import { parseDashDate, formatDashDate } from '../utils/date';
 import { useCountdown } from '../composables/useCountdown';
 import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
 import { storeToRefs } from 'pinia';
-import { useAddressStore, type Address } from '../pinia/address';
+import {
+  useAddressStore,
+  type Address,
+  type CvsChain,
+} from '../pinia/address';
 
 interface SocialAccount {
   key: string;
@@ -622,6 +627,22 @@ const form = reactive({
 });
 const districts = computed(() => DISTRICT_MAP[form.city] ?? []);
 
+// 超商電子地圖選門市
+const isStoreMapVisible = ref(false);
+const handleOpenStoreMap = (chain: CvsChain) => {
+  form.chain = chain;
+  isStoreMapVisible.value = true;
+};
+const handleSelectStore = (store: {
+  chain: CvsChain;
+  storeName: string;
+  address: string;
+}) => {
+  form.chain = store.chain;
+  form.storeName = store.storeName;
+  form.detail = store.address;
+};
+
 const resetForm = () => {
   form.name = '';
   form.countryCode = '+886';
@@ -652,7 +673,12 @@ const handleOpenEditAddr = (addr: Address) => {
 const isFormValid = computed(() => {
   if (!form.name.trim() || !form.phone.trim()) return false;
   if (addressTab.value === 'home') return !!form.detail.trim();
-  return !!form.storeName.trim() && !!form.detail.trim();
+  return (
+    !!form.storeName.trim() &&
+    !!form.detail.trim() &&
+    !!form.name.trim() &&
+    !!form.phone.trim()
+  );
 });
 const handleSaveAddr = () => {
   if (!isFormValid.value) return;
@@ -1724,7 +1750,7 @@ const handleSaveAddr = () => {
       :style="{ width: '28rem' }"
     >
       <div class="flex flex-col gap-4">
-        <!-- Store: chain picker -->
+        <!-- Store: 選擇超商（點 logo 開該超商電子地圖，門市免手填） -->
         <div v-if="addressTab === 'store'" class="flex flex-col gap-2">
           <label class="text-sm text-slate-700">選擇超商</label>
           <div class="flex gap-3">
@@ -1734,7 +1760,7 @@ const handleSaveAddr = () => {
               :style="
                 form.chain === '7-11' ? 'border-color: var(--primary)' : ''
               "
-              @click="form.chain = '7-11'"
+              @click="handleOpenStoreMap('7-11')"
             >
               <img :src="sevenIcon" alt="7-11" class="h-7 w-7 object-contain" />
             </button>
@@ -1746,7 +1772,7 @@ const handleSaveAddr = () => {
                   ? 'border-color: var(--primary)'
                   : ''
               "
-              @click="form.chain = 'FamilyMart'"
+              @click="handleOpenStoreMap('FamilyMart')"
             >
               <img
                 :src="familyIcon"
@@ -1755,17 +1781,17 @@ const handleSaveAddr = () => {
               />
             </button>
           </div>
-        </div>
-
-        <div v-if="addressTab === 'store'" class="flex flex-col gap-1.5">
-          <label class="text-sm text-slate-700"
-            >門市名稱<span class="text-red-500"> *</span></label
+          <!-- 已選門市：只讀卡（不顯示超商 logo，只留門市名 + 地址）-->
+          <div
+            v-if="form.storeName && form.detail"
+            class="flex min-w-0 flex-col rounded-md border border-slate-200 bg-slate-50 p-3"
           >
-          <InputText
-            v-model="form.storeName"
-            placeholder="例：鑫工門市"
-            class="w-full"
-          />
+            <span class="font-bold text-slate-950">{{ form.storeName }}</span>
+            <span class="truncate text-xs text-slate-500">{{
+              form.detail
+            }}</span>
+          </div>
+          <p v-else class="text-sm text-slate-400">尚未選擇門市</p>
         </div>
 
         <div class="flex flex-col gap-1.5">
@@ -1811,20 +1837,24 @@ const handleSaveAddr = () => {
           </div>
         </div>
 
-        <div class="flex flex-col gap-1.5">
+        <div v-if="addressTab === 'home'" class="flex flex-col gap-1.5">
           <label class="text-sm text-slate-700">
-            {{ addressTab === 'home' ? '詳細收件地址' : '門市地址'
-            }}<span class="text-red-500"> *</span>
+            詳細收件地址<span class="text-red-500"> *</span>
           </label>
           <InputText
             v-model="form.detail"
-            :placeholder="
-              addressTab === 'home' ? '街道、門牌、樓層' : '門市完整地址'
-            "
+            placeholder="街道、門牌、樓層"
             class="w-full"
           />
         </div>
       </div>
+
+      <!-- 超商電子地圖選門市 -->
+      <StoreMapPicker
+        v-model:visible="isStoreMapVisible"
+        :chain="form.chain"
+        @select="handleSelectStore"
+      />
 
       <template #footer>
         <Button

@@ -11,7 +11,7 @@ import {
 } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { useViewportStore } from '../pinia/viewport';
-import { products } from '../data/products';
+import { products, type PickOption } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
 
 /** 單一規格維度（顏色 / 尺寸 / 口味 之類）。 */
@@ -159,6 +159,10 @@ const lineDisplayTotal = (item: CartItem): number =>
 /** 尚未套用買多優惠的價格（僅買多優惠達標時顯示、劃線用）：單價 × 數量。 */
 const preBulkDiscountTotal = (item: CartItem): number =>
   item.price * item.qty;
+
+/** 金額顯示：為 1000 的整數倍 → 以 k 表示（如 19000 → 19k）；否則千分位。 */
+const formatMoney = (n: number): string =>
+  n !== 0 && n % 1000 === 0 ? `${n / 1000}k` : n.toLocaleString();
 
 const isGroupAllChecked = (group: CartGroup) =>
   group.items.length > 0 && group.items.every((i) => i.checked);
@@ -347,6 +351,373 @@ const setSubSpec = (sub: CartBundleItem, value: string) => {
 
 const setSubQty = (sub: CartBundleItem, value: number) => {
   sub.qty = value;
+};
+
+// ── 直播下標「後選規格」：多軸 SKU 選擇，下拉常駐可改（見 live-bid-deferred-spec-plan）──
+/** 取商品的規格軸；無 → 空陣列。 */
+const specAxesOf = (item: CartItem) =>
+  products.find((p) => p.id === item.productId)?.specAxes ?? [];
+const skusOf = (item: CartItem) =>
+  products.find((p) => p.id === item.productId)?.skus ?? [];
+/** 使用者當前的後選規格草稿：item.id → { 軸名: 選值 }。 */
+const pendingSpecDraft = ref<Record<string, Record<string, string>>>({});
+/** 有效選值：以已選定 SKU 的規格為底、疊上使用者當前草稿（供常駐下拉顯示現值 + 售完判斷）。 */
+const effectiveDraft = (item: CartItem): Record<string, string> => {
+  const base: Record<string, string> = {};
+  if (item.selectedSkuId) {
+    const sku = skusOf(item).find((s) => s.id === item.selectedSkuId);
+    if (sku) Object.assign(base, sku.spec);
+  }
+  return { ...base, ...(pendingSpecDraft.value[item.id] ?? {}) };
+};
+/** 讀某軸目前選值（供 template model-value 用）。 */
+const draftValueOf = (item: CartItem, axisName: string): string | null =>
+  effectiveDraft(item)[axisName] ?? null;
+/** 某軸的某選值是否還有可選 SKU（依已選其他軸 + 庫存判斷）。 */
+const isAxisOptionAvailable = (
+  item: CartItem,
+  axisName: string,
+  optionValue: string,
+): boolean => {
+  const draft = effectiveDraft(item);
+  return skusOf(item).some((s) => {
+    if (s.spec[axisName] !== optionValue) return false;
+    for (const [k, v] of Object.entries(draft)) {
+      if (k !== axisName && v && s.spec[k] !== v) return false;
+    }
+    return s.stock > 0;
+  });
+};
+/** 給 Select 的選項（售完 → disable 並標「（售完）」）。 */
+const axisOptionsFor = (item: CartItem, axis: { name: string; options: string[] }) =>
+  axis.options.map((opt) => {
+    const available = isAxisOptionAvailable(item, axis.name, opt);
+    return { label: available ? opt : `${opt}（售完）`, value: opt, disabled: !available };
+  });
+/** 選某軸 → 更新草稿並即時重驗：各軸選滿且該 SKU 有貨 → 寫回規格；否則退回待選、清掉已定規格（擋結帳）。 */
+const setPendingAxis = (item: CartItem, axisName: string, value: string) => {
+  const merged = { ...effectiveDraft(item), [axisName]: value };
+  pendingSpecDraft.value = { ...pendingSpecDraft.value, [item.id]: merged };
+  const axes = specAxesOf(item);
+  const complete = axes.length > 0 && axes.every((a) => merged[a.name]);
+  const matched = complete
+    ? skusOf(item).find((s) => axes.every((a) => s.spec[a.name] === merged[a.name]))
+    : undefined;
+  if (matched && matched.stock > 0) {
+    item.spec = axes.map((a) => merged[a.name]).join(' / ');
+    item.selectedSkuId = matched.id;
+    item.specPending = false;
+  } else {
+    item.spec = '';
+    item.selectedSkuId = undefined;
+    item.specPending = true;
+  }
+};
+
+// ── 批次下標：規格分配（購物車列一顆按鈕 → 彈窗分配 → 確定寫回）──
+/** 某商品目前已確定分配的總數 / 明細（購物車列摘要用，讀 item.specAllocation）。 */
+const committedTotal = (item: CartItem): number =>
+  Object.values(item.specAllocation ?? {}).reduce((a, b) => a + b, 0);
+const bidAllocRows = (item: CartItem) =>
+  Object.entries(item.specAllocation ?? {}).map(([skuId, qty]) => {
+    const sku = skusOf(item).find((s) => s.id === skuId);
+    return {
+      skuId,
+      label: sku
+        ? specAxesOf(item)
+            .map((a) => sku.spec[a.name])
+            .join(' / ')
+        : skuId,
+      qty,
+    };
+  });
+/** 購物車列規格摘要：預設只顯示前幾列，太多時點「查看更多」展開。 */
+const BID_SUMMARY_LIMIT = 3;
+const bidRowsExpanded = ref<Record<string, boolean>>({});
+const visibleBidRows = (item: CartItem) => {
+  const rows = bidAllocRows(item);
+  return bidRowsExpanded.value[item.id] ? rows : rows.slice(0, BID_SUMMARY_LIMIT);
+};
+const toggleBidRows = (item: CartItem) => {
+  bidRowsExpanded.value = {
+    ...bidRowsExpanded.value,
+    [item.id]: !bidRowsExpanded.value[item.id],
+  };
+};
+
+// 分配彈窗狀態：bidDialogAlloc 為編輯中的草稿分配，按「確定」才寫回 item.specAllocation。
+const bidDialogItem = ref<CartItem | null>(null);
+const bidDialogAlloc = ref<Record<string, number>>({});
+const bidRowDraft = ref<{ spec: Record<string, string>; qty: number | null }>({
+  spec: {},
+  qty: null,
+});
+const openBidDialog = (item: CartItem) => {
+  bidDialogItem.value = item;
+  bidDialogAlloc.value = { ...(item.specAllocation ?? {}) };
+  bidRowDraft.value = { spec: {}, qty: null };
+};
+const closeBidDialog = () => {
+  bidDialogItem.value = null;
+};
+const confirmBidDialog = () => {
+  const item = bidDialogItem.value;
+  if (!item) return;
+  // 挑選超過得標數量 → 提示並擋下,請使用者調整
+  if (dlgTotal() > item.qty) {
+    ui.toast(
+      `挑選數量已超過得標數量（${dlgTotal()} / ${item.qty}），請調整`,
+      'warn',
+    );
+    return;
+  }
+  item.specAllocation = { ...bidDialogAlloc.value };
+  item.specPending = dlgTotal() !== item.qty;
+  closeBidDialog();
+};
+
+// 彈窗內：分配總數 / 剩餘 / 已加入清單（操作 bidDialogAlloc）
+const dlgTotal = (): number =>
+  Object.values(bidDialogAlloc.value).reduce((a, b) => a + b, 0);
+const dlgRemaining = (): number => (bidDialogItem.value?.qty ?? 0) - dlgTotal();
+/** 挑選數量是否已超過得標數量。 */
+const dlgOver = (): boolean => dlgTotal() > (bidDialogItem.value?.qty ?? 0);
+const dlgRows = () => {
+  const item = bidDialogItem.value;
+  if (!item) return [];
+  return Object.entries(bidDialogAlloc.value).map(([skuId, qty]) => {
+    const sku = skusOf(item).find((s) => s.id === skuId);
+    return {
+      skuId,
+      label: sku
+        ? specAxesOf(item)
+            .map((a) => sku.spec[a.name])
+            .join(' / ')
+        : skuId,
+      qty,
+    };
+  });
+};
+const setDlgAxis = (axisName: string, value: string) => {
+  bidRowDraft.value = {
+    ...bidRowDraft.value,
+    spec: { ...bidRowDraft.value.spec, [axisName]: value },
+  };
+};
+const setDlgQty = (value: number | null) => {
+  bidRowDraft.value = { ...bidRowDraft.value, qty: value };
+};
+/** 新增列某軸選值是否可選（依已選其他軸 + 該 SKU 尚有可分配量）。 */
+const dlgAxisAvailable = (axisName: string, optionValue: string): boolean => {
+  const item = bidDialogItem.value;
+  if (!item) return false;
+  const draft = bidRowDraft.value.spec;
+  return skusOf(item).some((s) => {
+    if (s.spec[axisName] !== optionValue) return false;
+    for (const [k, v] of Object.entries(draft)) {
+      if (k !== axisName && v && s.spec[k] !== v) return false;
+    }
+    return s.stock - (bidDialogAlloc.value[s.id] ?? 0) > 0;
+  });
+};
+const dlgAxisOptions = (axis: { name: string; options: string[] }) =>
+  axis.options.map((opt) => {
+    const ok = dlgAxisAvailable(axis.name, opt);
+    return { label: ok ? opt : `${opt}（售完）`, value: opt, disabled: !ok };
+  });
+const dlgSku = () => {
+  const item = bidDialogItem.value;
+  if (!item) return undefined;
+  const axes = specAxesOf(item);
+  const d = bidRowDraft.value.spec;
+  if (!axes.length || !axes.every((a) => d[a.name])) return undefined;
+  return skusOf(item).find((s) => axes.every((a) => s.spec[a.name] === d[a.name]));
+};
+const dlgDraftMax = (): number => {
+  const sku = dlgSku();
+  if (!sku) return 0;
+  // 只受該 SKU 庫存限制（允許總數超過得標數量，超過時指示轉紅）
+  return Math.max(0, sku.stock - (bidDialogAlloc.value[sku.id] ?? 0));
+};
+const dlgCanAdd = (): boolean => {
+  const qty = bidRowDraft.value.qty ?? 0;
+  return !!dlgSku() && qty > 0 && qty <= dlgDraftMax();
+};
+const dlgAdd = () => {
+  if (!dlgCanAdd()) return;
+  const sku = dlgSku()!;
+  const qty = bidRowDraft.value.qty ?? 0;
+  bidDialogAlloc.value = {
+    ...bidDialogAlloc.value,
+    [sku.id]: (bidDialogAlloc.value[sku.id] ?? 0) + qty,
+  };
+  bidRowDraft.value = { spec: {}, qty: null };
+};
+const dlgSetQty = (skuId: string, value: number | null) => {
+  const item = bidDialogItem.value;
+  if (!item) return;
+  const sku = skusOf(item).find((s) => s.id === skuId);
+  if (!sku) return;
+  // 只受該 SKU 庫存限制（允許總數超過得標數量）
+  const capped = Math.max(1, Math.min(value ?? 1, sku.stock));
+  bidDialogAlloc.value = { ...bidDialogAlloc.value, [skuId]: capped };
+};
+const dlgRemove = (skuId: string) => {
+  const alloc = { ...bidDialogAlloc.value };
+  delete alloc[skuId];
+  bidDialogAlloc.value = alloc;
+};
+
+// ── 任選組合「挑選內容」彈窗（比照批次下標挑選規格）：
+//    選項 + 規格 + 數量 → 加入 → 已選清單 → 確定寫回 item.bundleItems ──
+const pickDialogItem = ref<CartItem | null>(null);
+// pickDialogList 為編輯中的草稿已選，按「確定」才寫回 item.bundleItems。
+const pickDialogList = ref<CartBundleItem[]>([]);
+const pickRowDraft = ref<{
+  name: string | null;
+  spec: string | null;
+  qty: number | null;
+}>({ name: null, spec: null, qty: 1 });
+
+/** 取任選組合的商品目錄資料。 */
+const pickCatOf = (item: CartItem) =>
+  products.find((p) => p.id === item.productId);
+
+const openPickDialog = (item: CartItem) => {
+  pickDialogItem.value = item;
+  pickDialogList.value = (item.bundleItems ?? []).map((b) => ({ ...b }));
+  pickRowDraft.value = { name: null, spec: null, qty: 1 };
+};
+const closePickDialog = () => {
+  pickDialogItem.value = null;
+};
+
+/** 需挑總數 = pickCount * item.qty（item.qty 這裡為 1）。 */
+const pdNeed = (): number => {
+  const item = pickDialogItem.value;
+  if (!item) return 0;
+  return (pickCatOf(item)?.pickCount ?? 0) * item.qty;
+};
+/** 彈窗內已選數量加總。 */
+const pdTotal = (): number =>
+  pickDialogList.value.reduce((s, b) => s + (b.qty || 0), 0);
+/** 已選是否超過需挑總數。 */
+const pdOver = (): boolean => pdTotal() > pdNeed();
+
+/** 該 option 的限購上限（跨規格加總）= (maxQty ?? pickCount) * item.qty。 */
+const pdOptionMax = (option: PickOption): number => {
+  const item = pickDialogItem.value;
+  if (!item) return 0;
+  return (option.maxQty ?? pickCatOf(item)?.pickCount ?? 0) * item.qty;
+};
+/** 該 option 目前在已選清單中的加總（跨規格）。 */
+const pdOptionUsed = (optionName: string): number =>
+  pickDialogList.value
+    .filter((b) => b.name === optionName)
+    .reduce((s, b) => s + (b.qty || 0), 0);
+/** 該 option 剩餘可選 = 上限 - 已用。 */
+const pdOptionRemaining = (option: PickOption): number =>
+  Math.max(0, pdOptionMax(option) - pdOptionUsed(option.name));
+
+/** 選項下拉清單：達上限者禁用並標「（已達上限）」。 */
+const pdOptionChoices = () => {
+  const item = pickDialogItem.value;
+  if (!item) return [];
+  return (pickCatOf(item)?.pickOptions ?? []).map((o) => {
+    const isFull = pdOptionRemaining(o) <= 0;
+    return {
+      label: isFull ? `${o.name}（已達上限）` : o.name,
+      value: o.name,
+      disabled: isFull,
+    };
+  });
+};
+
+/** 目前草稿選中的 option 物件。 */
+const pdDraftOption = (): PickOption | undefined => {
+  const item = pickDialogItem.value;
+  if (!item || !pickRowDraft.value.name) return undefined;
+  return pickCatOf(item)?.pickOptions?.find(
+    (o) => o.name === pickRowDraft.value.name,
+  );
+};
+/** 目前選中 option 的可選規格（specOptions ?? [spec]）。 */
+const pdSpecChoices = (): string[] => {
+  const opt = pdDraftOption();
+  if (!opt) return [];
+  return opt.specOptions?.length ? opt.specOptions : [opt.spec];
+};
+/** 該 option 是否需要選規格（>1 種才需要）。 */
+const pdNeedsSpec = (): boolean => pdSpecChoices().length > 1;
+
+/** 草稿數量上限 = min(該 option 剩餘可選, 尚需挑選數)。 */
+const pdDraftMax = (): number => {
+  const opt = pdDraftOption();
+  if (!opt) return 0;
+  const need = Math.max(0, pdNeed() - pdTotal());
+  return Math.min(pdOptionRemaining(opt), need);
+};
+/** 新增列是否可加入：已選 option +（需規格時）規格 + qty>0 + 未超限。 */
+const pdCanAdd = (): boolean => {
+  const opt = pdDraftOption();
+  if (!opt) return false;
+  if (pdNeedsSpec() && !pickRowDraft.value.spec) return false;
+  const qty = pickRowDraft.value.qty ?? 0;
+  return qty > 0 && qty <= pdDraftMax();
+};
+
+const setPdName = (value: string | null) => {
+  // 換 option 時重置規格與數量
+  pickRowDraft.value = { name: value, spec: null, qty: 1 };
+};
+const setPdSpec = (value: string | null) => {
+  pickRowDraft.value = { ...pickRowDraft.value, spec: value };
+};
+const setPdDraftQty = (value: number | null) => {
+  pickRowDraft.value = { ...pickRowDraft.value, qty: value };
+};
+
+const addPdRow = () => {
+  if (!pdCanAdd()) return;
+  const opt = pdDraftOption()!;
+  const spec = pdNeedsSpec() ? pickRowDraft.value.spec! : pdSpecChoices()[0];
+  const qty = Math.max(1, Math.min(pickRowDraft.value.qty ?? 1, pdDraftMax()));
+  const existing = pickDialogList.value.find(
+    (b) => b.name === opt.name && b.spec === spec,
+  );
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    pickDialogList.value.push({ name: opt.name, image: opt.image, spec, qty });
+  }
+  pickRowDraft.value = { name: null, spec: null, qty: 1 };
+};
+
+const setPdRowQty = (idx: number, value: number | null) => {
+  const row = pickDialogList.value[idx];
+  const item = pickDialogItem.value;
+  if (!row || !item) return;
+  const opt = pickCatOf(item)?.pickOptions?.find((o) => o.name === row.name);
+  const max = opt ? pdOptionMax(opt) : row.qty;
+  // 扣除同 option 其他列已用量後，本列可用上限
+  const otherUsed = pickDialogList.value
+    .filter((b, i) => i !== idx && b.name === row.name)
+    .reduce((s, b) => s + (b.qty || 0), 0);
+  row.qty = Math.max(1, Math.min(value ?? 1, max - otherUsed));
+};
+const removePdRow = (idx: number) => {
+  pickDialogList.value = pickDialogList.value.filter((_, i) => i !== idx);
+};
+
+const confirmPickDialog = () => {
+  const item = pickDialogItem.value;
+  if (!item) return;
+  if (pdTotal() > pdNeed()) {
+    ui.toast(`挑選數量已超過 ${pdNeed()} 件，請調整`, 'warn');
+    return;
+  }
+  item.bundleItems = pickDialogList.value.map((b) => ({ ...b }));
+  closePickDialog();
 };
 
 // 加價購：跟商品分類頁一樣，點按鈕跳 Dialog 選規格 + 數量。
@@ -671,13 +1042,90 @@ const handleGoProduct = (productId?: number) => {
                 >
                   {{ item.name }}
                 </p>
+                <!-- 批次下標：已挑選規格摘要（規格 + 數量，太多列可展開）+ 挑選按鈕 -->
+                <div v-if="item.isBidBatch" class="flex flex-col gap-1.5">
+                  <div
+                    v-if="bidAllocRows(item).length"
+                    class="flex flex-col gap-0.5 text-sm text-slate-700"
+                  >
+                    <span
+                      v-for="row in visibleBidRows(item)"
+                      :key="row.skuId"
+                    >
+                      {{ row.label }} ×{{ row.qty }}
+                    </span>
+                    <button
+                      v-if="bidAllocRows(item).length > BID_SUMMARY_LIMIT"
+                      type="button"
+                      class="flex w-fit items-center gap-1 text-xs text-slate-500 hover:text-[color:var(--primary)]"
+                      @click="toggleBidRows(item)"
+                    >
+                      <span>{{
+                        bidRowsExpanded[item.id]
+                          ? '收合'
+                          : `查看更多（${bidAllocRows(item).length - BID_SUMMARY_LIMIT}）`
+                      }}</span>
+                      <i
+                        :class="[
+                          'pi text-[10px]',
+                          bidRowsExpanded[item.id]
+                            ? 'pi-chevron-up'
+                            : 'pi-chevron-down',
+                        ]"
+                      />
+                    </button>
+                  </div>
+                  <Button
+                    :label="committedTotal(item) > 0 ? '修改規格' : '挑選規格'"
+                    icon="pi pi-sliders-h"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    class="!min-h-8 w-fit"
+                    @click="openBidDialog(item)"
+                  />
+                </div>
+                <!-- 單品後選規格：SKU 規格下拉常駐可改；未選滿顯示「待選規格」 -->
                 <div
-                  v-if="item.spec && item.spec !== '預設'"
+                  v-else-if="specAxesOf(item).length"
+                  class="flex flex-col gap-2"
+                >
+                  <span
+                    v-if="item.specPending"
+                    class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
+                  >
+                    <i class="pi pi-exclamation-circle text-[10px]" />
+                    待選規格
+                  </span>
+                  <div
+                    v-for="axis in specAxesOf(item)"
+                    :key="axis.name"
+                    class="flex items-center gap-2 text-sm"
+                  >
+                    <span class="w-10 shrink-0 text-slate-600">{{
+                      axis.name
+                    }}</span>
+                    <Select
+                      :model-value="draftValueOf(item, axis.name)"
+                      :options="axisOptionsFor(item, axis)"
+                      option-label="label"
+                      option-value="value"
+                      option-disabled="disabled"
+                      placeholder="請選擇"
+                      class="min-w-0 flex-1"
+                      @update:model-value="
+                        (v) => setPendingAxis(item, axis.name, v)
+                      "
+                    />
+                  </div>
+                </div>
+                <div
+                  v-else-if="item.spec && item.spec !== '預設'"
                   class="text-sm text-slate-600"
                 >
-                  規格 {{ item.spec }}
+                  {{ item.spec }}
                 </div>
-                <!-- 平板以上：數量與商品名同欄、與價格並排（維持現狀） -->
+                <!-- 平板以上：數量與商品名同欄、與價格並排（維持現狀）-->
                 <div class="hidden items-center gap-3 text-sm @3xl:flex">
                   <span class="text-slate-600">數量</span>
                   <InputNumber
@@ -691,6 +1139,14 @@ const handleGoProduct = (productId?: number) => {
                     class="qty-stepper"
                   />
                 </div>
+                <!-- 批次下標「待挑選規格」badge（平板以上：緊接數量下方） -->
+                <span
+                  v-if="item.isBidBatch && item.specPending"
+                  class="hidden w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 @3xl:flex"
+                >
+                  <i class="pi pi-exclamation-circle text-[10px]" />
+                  待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
+                </span>
                 <!-- 買多優惠提示（平板以上：緊接在數量下方） -->
                 <div
                   v-if="item.bulkDiscount"
@@ -704,7 +1160,7 @@ const handleGoProduct = (productId?: number) => {
                   <i class="pi pi-tag text-[10px]" />
                   <span>{{ item.bulkDiscount.note }}</span>
                   <span v-if="hasBulkDiscount(item)" class="font-medium">
-                    · 已折抵 -${{ bulkDiscountAmount(item).toLocaleString() }}
+                    · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
                   </span>
                 </div>
               </div>
@@ -722,13 +1178,13 @@ const handleGoProduct = (productId?: number) => {
                     class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
                     style="color: var(--primary)"
                   >
-                    NTD ${{ lineDisplayTotal(item).toLocaleString() }}
+                    ${{ formatMoney(lineDisplayTotal(item)) }}
                   </span>
                   <span
                     v-if="hasBulkDiscount(item)"
                     class="text-xs whitespace-nowrap text-slate-500 line-through"
                   >
-                    ${{ preBulkDiscountTotal(item).toLocaleString() }}
+                    ${{ formatMoney(preBulkDiscountTotal(item)) }}
                   </span>
                 </div>
                 <Button
@@ -773,6 +1229,15 @@ const handleGoProduct = (productId?: number) => {
               />
             </div>
 
+            <!-- 手機版：待挑選規格 badge 獨立整行、排在數量列下方 -->
+            <div
+              v-if="item.isBidBatch && item.specPending"
+              class="flex w-fit basis-full items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 @3xl:hidden"
+            >
+              <i class="pi pi-exclamation-circle text-[10px]" />
+              待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
+            </div>
+
             <!-- 手機版：買多優惠 tag 獨立整行、排在數量列下方 -->
             <div
               v-if="item.bulkDiscount"
@@ -786,7 +1251,7 @@ const handleGoProduct = (productId?: number) => {
               <i class="pi pi-tag text-[10px]" />
               <span>{{ item.bulkDiscount.note }}</span>
               <span v-if="hasBulkDiscount(item)" class="font-medium">
-                · 已折抵 -${{ bulkDiscountAmount(item).toLocaleString() }}
+                · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
               </span>
             </div>
           </div>
@@ -828,16 +1293,41 @@ const handleGoProduct = (productId?: number) => {
                 <span>{{ bundleWarningMessage(item) }}</span>
               </div>
 
-              <!-- Sub-items grid：一律兩欄 -->
-              <!-- 部分限購（任選組合）：一行一件；固定組合：兩欄 -->
+              <!-- 任選組合：已選摘要清單 + 挑選內容按鈕（比照批次下標挑選規格）-->
               <div
-                v-if="item.bundleExpanded"
-                class="grid gap-3"
-                :class="
-                  isPickBundleItem(item)
-                    ? 'grid-cols-1'
-                    : 'grid-cols-1 @3xl:grid-cols-2'
-                "
+                v-if="item.bundleExpanded && isPickBundleItem(item)"
+                class="flex flex-col gap-2"
+              >
+                <div
+                  v-if="item.bundleItems?.length"
+                  class="flex flex-col gap-0.5 text-sm text-slate-700"
+                >
+                  <span v-for="(sub, si) in item.bundleItems" :key="si">
+                    {{ sub.name
+                    }}<span
+                      v-if="sub.spec && sub.spec !== '預設'"
+                      class="text-slate-500"
+                    >
+                      / {{ sub.spec }}</span
+                    >
+                    ×{{ sub.qty }}
+                  </span>
+                </div>
+                <Button
+                  :label="pickedTotalOf(item) > 0 ? '修改內容' : '挑選內容'"
+                  icon="pi pi-sliders-h"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  class="!min-h-8 w-fit"
+                  @click="openPickDialog(item)"
+                />
+              </div>
+
+              <!-- 固定組合：子品內嵌顯示（規格下拉可改 / 數量顯示），維持原樣 -->
+              <div
+                v-else-if="item.bundleExpanded"
+                class="grid grid-cols-1 gap-3 @3xl:grid-cols-2"
               >
                 <div
                   v-for="(sub, si) in item.bundleItems"
@@ -867,7 +1357,6 @@ const handleGoProduct = (productId?: number) => {
                       <div
                         class="flex items-center gap-2 text-sm text-slate-700"
                       >
-                        <span class="shrink-0">規格</span>
                         <Select
                           :model-value="sub.spec || null"
                           :options="subSpecOptionsFor(item, sub, si) ?? []"
@@ -881,7 +1370,7 @@ const handleGoProduct = (productId?: number) => {
                       v-else-if="sub.spec && sub.spec !== '預設'"
                       class="flex gap-4 text-sm text-slate-700"
                     >
-                      <span>規格</span><span>{{ sub.spec }}</span>
+                      <span>{{ sub.spec }}</span>
                     </div>
                     <!-- 任選組合：可調整子品數量（+/- stepper）；固定組合：純顯示數量 -->
                     <div
@@ -921,7 +1410,7 @@ const handleGoProduct = (productId?: number) => {
             class="text-xl font-bold @3xl:text-3xl"
             style="color: var(--primary)"
           >
-            ${{ groupSubtotal(group).toLocaleString() }}
+            NT${{ formatMoney(groupSubtotal(group)) }}
           </span>
         </div>
       </div>
@@ -1197,7 +1686,7 @@ const handleGoProduct = (productId?: number) => {
               class="truncate text-xl font-bold @7xl:text-2xl"
               style="color: var(--primary)"
             >
-              ${{ globalTotal.toLocaleString() }}
+              NT${{ formatMoney(globalTotal) }}
             </span>
           </div>
           <Button
@@ -1304,7 +1793,7 @@ const handleGoProduct = (productId?: number) => {
           <InputNumber
             v-model="addOnDialogQty"
             :min="1"
-            :max="10"
+            :max="999"
             show-buttons
             button-layout="horizontal"
             increment-button-icon="pi pi-plus"
@@ -1354,6 +1843,261 @@ const handleGoProduct = (productId?: number) => {
           <i class="pi pi-times" />
         </button>
       </div>
+    </Dialog>
+
+    <!-- 批次下標：規格分配彈窗（最多 3 軸規格 + 數量 → 加入 → 清單 → 確定）-->
+    <Dialog
+      :visible="!!bidDialogItem"
+      modal
+      :draggable="false"
+      header="挑選規格"
+      :breakpoints="{ '768px': '92vw' }"
+      :style="{ width: '520px' }"
+      @update:visible="(v) => !v && closeBidDialog()"
+    >
+      <div v-if="bidDialogItem" class="flex flex-col gap-4">
+        <div class="flex flex-col gap-0.5">
+          <p class="text-sm font-medium text-slate-700">
+            {{ bidDialogItem.name }}
+          </p>
+          <p class="text-sm text-slate-500">
+            得標 {{ bidDialogItem.qty }} 件 ·
+            <span
+              :class="
+                dlgOver()
+                  ? 'font-medium text-red-500'
+                  : dlgRemaining() === 0
+                    ? 'font-medium text-green-700'
+                    : 'text-amber-700'
+              "
+              >已挑選 {{ dlgTotal() }}/{{ bidDialogItem.qty }}</span
+            >
+          </p>
+        </div>
+
+        <!-- 新增分配列：各軸規格（最多 3）+ 數量 → 加入 -->
+        <div
+          class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3"
+        >
+          <div class="grid grid-cols-2 gap-2">
+            <div
+              v-for="axis in specAxesOf(bidDialogItem)"
+              :key="axis.name"
+              class="flex flex-col gap-1"
+            >
+              <label class="text-xs text-slate-500">{{ axis.name }}</label>
+              <Select
+                :model-value="bidRowDraft.spec[axis.name] || null"
+                :options="dlgAxisOptions(axis)"
+                option-label="label"
+                option-value="value"
+                option-disabled="disabled"
+                :placeholder="`選擇${axis.name}`"
+                class="w-full min-w-0"
+                @update:model-value="(v) => setDlgAxis(axis.name, v)"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-slate-500">數量</label>
+              <InputNumber
+                :model-value="bidRowDraft.qty"
+                :min="1"
+                :max="dlgDraftMax()"
+                placeholder="數量"
+                class="w-full"
+                :input-style="{ textAlign: 'center' }"
+                @update:model-value="(v) => setDlgQty(v)"
+              />
+            </div>
+          </div>
+          <Button
+            label="加入"
+            icon="pi pi-plus"
+            size="small"
+            class="w-fit"
+            :severity="dlgCanAdd() ? undefined : 'secondary'"
+            :disabled="!dlgCanAdd()"
+            @click="dlgAdd()"
+          />
+        </div>
+
+        <!-- 已加入清單 -->
+        <div v-if="dlgRows().length" class="flex flex-col gap-2">
+          <p class="text-xs font-medium text-slate-500">已選規格</p>
+          <div
+            v-for="row in dlgRows()"
+            :key="row.skuId"
+            class="flex items-center gap-2"
+          >
+            <span class="min-w-0 flex-1 truncate text-sm text-slate-700">{{
+              row.label
+            }}</span>
+            <InputNumber
+              :model-value="row.qty"
+              :min="1"
+              size="small"
+              class="w-16 shrink-0"
+              :input-style="{ width: '100%', textAlign: 'center' }"
+              @update:model-value="(v) => dlgSetQty(row.skuId, v)"
+            />
+            <button
+              type="button"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-red-500"
+              aria-label="移除此規格"
+              @click="dlgRemove(row.skuId)"
+            >
+              <i class="pi pi-trash text-xs" />
+            </button>
+          </div>
+        </div>
+        <p v-else class="text-sm text-slate-400">尚未挑選任何規格</p>
+      </div>
+
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <Button
+            label="取消"
+            severity="secondary"
+            outlined
+            @click="closeBidDialog()"
+          />
+          <Button label="確定" @click="confirmBidDialog()" />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- 任選組合：挑選內容彈窗（選項 + 規格 + 數量 → 加入 → 清單 → 確定）-->
+    <Dialog
+      :visible="!!pickDialogItem"
+      modal
+      :draggable="false"
+      header="挑選內容"
+      :breakpoints="{ '768px': '92vw' }"
+      :style="{ width: '520px' }"
+      @update:visible="(v) => !v && closePickDialog()"
+    >
+      <div v-if="pickDialogItem" class="flex flex-col gap-4">
+        <div class="flex flex-col gap-0.5">
+          <p class="text-sm font-medium text-slate-700">
+            {{ pickDialogItem.name }}
+          </p>
+          <p class="text-sm text-slate-500">
+            任選 {{ pdNeed() }} 件 ·
+            <span
+              :class="
+                pdOver()
+                  ? 'font-medium text-red-500'
+                  : pdTotal() === pdNeed()
+                    ? 'font-medium text-green-700'
+                    : 'text-amber-700'
+              "
+              >已選 {{ pdTotal() }}/{{ pdNeed() }}</span
+            >
+          </p>
+        </div>
+
+        <!-- 新增列：選項 + 規格 + 數量 → 加入 -->
+        <div
+          class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3"
+        >
+          <div class="grid grid-cols-2 gap-2">
+            <div class="col-span-2 flex flex-col gap-1">
+              <label class="text-xs text-slate-500">選項</label>
+              <Select
+                :model-value="pickRowDraft.name"
+                :options="pdOptionChoices()"
+                option-label="label"
+                option-value="value"
+                option-disabled="disabled"
+                placeholder="選擇選項"
+                class="w-full min-w-0"
+                @update:model-value="(v) => setPdName(v)"
+              />
+            </div>
+            <div v-if="pdNeedsSpec()" class="flex flex-col gap-1">
+              <label class="text-xs text-slate-500">規格</label>
+              <Select
+                :model-value="pickRowDraft.spec"
+                :options="pdSpecChoices()"
+                placeholder="選擇規格"
+                class="w-full min-w-0"
+                @update:model-value="(v) => setPdSpec(v)"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-slate-500">數量</label>
+              <InputNumber
+                :model-value="pickRowDraft.qty"
+                :min="1"
+                :max="pdDraftMax()"
+                :disabled="!pdDraftOption()"
+                placeholder="數量"
+                class="w-full"
+                :input-style="{ textAlign: 'center' }"
+                @update:model-value="(v) => setPdDraftQty(v)"
+              />
+            </div>
+          </div>
+          <Button
+            label="加入"
+            icon="pi pi-plus"
+            size="small"
+            class="w-fit"
+            :severity="pdCanAdd() ? undefined : 'secondary'"
+            :disabled="!pdCanAdd()"
+            @click="addPdRow()"
+          />
+        </div>
+
+        <!-- 已選清單 -->
+        <div v-if="pickDialogList.length" class="flex flex-col gap-2">
+          <p class="text-xs font-medium text-slate-500">已選內容</p>
+          <div
+            v-for="(row, idx) in pickDialogList"
+            :key="`${row.name}-${row.spec}`"
+            class="flex items-center gap-2"
+          >
+            <span class="min-w-0 flex-1 truncate text-sm text-slate-700">
+              {{ row.name
+              }}<span
+                v-if="row.spec && row.spec !== '預設'"
+                class="text-slate-500"
+              >
+                / {{ row.spec }}</span
+              >
+            </span>
+            <InputNumber
+              :model-value="row.qty"
+              :min="1"
+              size="small"
+              class="w-16 shrink-0"
+              :input-style="{ width: '100%', textAlign: 'center' }"
+              @update:model-value="(v) => setPdRowQty(idx, v)"
+            />
+            <button
+              type="button"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-red-500"
+              aria-label="移除此項"
+              @click="removePdRow(idx)"
+            >
+              <i class="pi pi-trash text-xs" />
+            </button>
+          </div>
+        </div>
+        <p v-else class="text-sm text-slate-400">尚未挑選任何內容</p>
+      </div>
+
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <Button
+            label="取消"
+            severity="secondary"
+            outlined
+            @click="closePickDialog()"
+          />
+          <Button label="確定" @click="confirmPickDialog()" />
+        </div>
+      </template>
     </Dialog>
   </div>
 </template>

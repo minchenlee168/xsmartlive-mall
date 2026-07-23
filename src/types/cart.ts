@@ -28,6 +28,14 @@ export interface CartItem {
   bulkDiscount?: BulkDiscount;
   /** 商品備註（顯示於商品列下方，例如冷藏須知、賣家提醒） */
   note?: string;
+  /** 直播下標後尚未選規格：購物車需補選 SKU 才能結帳（見 [[live-bid-deferred-spec-plan]]）。 */
+  specPending?: boolean;
+  /** 後選規格選定的 SKU id（對應 products.ts 的 skus[].id / 庫存）。 */
+  selectedSkuId?: string;
+  /** 批次下標：同商品聚合成一列（qty = 下標總數），規格用分配矩陣批次填。 */
+  isBidBatch?: boolean;
+  /** 批次規格分配：skuId → 分配數量；總和需等於 qty 才可結帳。 */
+  specAllocation?: Record<string, number>;
 }
 
 export interface CartTag {
