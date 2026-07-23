@@ -208,7 +208,7 @@ const handleCompleteBind = () => {
   if (!canCompleteBind.value) return;
   authStore.setPhone(bindPhoneCode.value, bindPhone.value);
   isBindPhoneDialogVisible.value = false;
-  ui.toast('手機號碼綁定完成');
+  ui.toast('手機號碼驗證完成');
   // 綁完後直接繼續走結帳流程（此時 hasPhoneBound 已 true，不會再被攔）
   handlePlaceOrder();
 };
@@ -313,6 +313,33 @@ const hasAnyShipMethod = computed(() =>
   checkoutGroups.value.some((g) => groupShipMethod(g) !== null),
 );
 const selectedPickupId = ref(PICKUP_LOCATIONS[0].id);
+
+// 自取聯絡人（與自取門市同為全域單一）；可勾「同訂購人」直接帶入會員資料 + 電話
+const pickupContactName = ref('');
+const pickupContactPhoneCode = ref('+886');
+const pickupContactPhone = ref('');
+const isPickupSameAsOrderer = ref(false);
+/** 把訂購人（會員）資料 + 電話帶進自取聯絡人。 */
+const fillPickupContactFromOrderer = () => {
+  pickupContactName.value = authStore.displayName;
+  pickupContactPhoneCode.value = authStore.phoneCode || '+886';
+  pickupContactPhone.value = authStore.phone;
+};
+// 勾「同訂購人」→ 立即帶入；會員資料 / 電話之後才補（如去付款時完成驗證）也同步回填
+watch(isPickupSameAsOrderer, (same) => {
+  if (same) fillPickupContactFromOrderer();
+});
+watch(
+  () => [authStore.displayName, authStore.phoneCode, authStore.phone],
+  () => {
+    if (isPickupSameAsOrderer.value) fillPickupContactFromOrderer();
+  },
+);
+/** 是否至少有一筆訂單選了自取（決定要不要驗自取聯絡人）。 */
+const hasPickupOrder = computed(() =>
+  checkoutGroups.value.some((g) => groupShipMethod(g) === 'pickup'),
+);
+
 const addressStore = useAddressStore();
 /** 會員的超商門市清單（封裝 store，供 template 用）。 */
 const cvsStoreList = computed(() => addressStore.storeAddrs);
@@ -946,7 +973,20 @@ const handlePlaceOrder = () => {
     handleOpenShipDrawer();
     return;
   }
-  // 未綁定手機 → 攔下、開 inline 綁定 Dialog；綁完會自動再跑一次這個函式
+  // 自取需填聯絡人 + 電話；勾「同訂購人」但會員還沒電話時不擋在這，交給下方手機驗證補齊
+  if (hasPickupOrder.value) {
+    if (!pickupContactName.value.trim()) {
+      ui.toast('請填寫自取聯絡人姓名');
+      handleOpenShipDrawer();
+      return;
+    }
+    if (!pickupContactPhone.value.trim() && !isPickupSameAsOrderer.value) {
+      ui.toast('請填寫自取聯絡電話');
+      handleOpenShipDrawer();
+      return;
+    }
+  }
+  // 未完成手機驗證 → 攔下、開 inline 驗證 Dialog；驗證完會自動再跑一次這個函式
   if (!authStore.hasPhoneBound) {
     openBindPhoneDialog();
     return;
@@ -971,9 +1011,14 @@ const handlePlaceOrder = () => {
     }),
   );
 
-  // 收件聯絡人 / 電話沿用共用地址簿；配送地址依各訂單方式組出摘要
-  const buyerName = selectedHome.value?.name ?? '';
-  const buyerPhone = selectedHome.value?.phone ?? '';
+  // 收件聯絡人 / 電話：整筆自取 → 用自取聯絡人；否則沿用共用宅配地址簿
+  const isAllPickup = sharedShipMethod.value === 'pickup';
+  const buyerName = isAllPickup
+    ? pickupContactName.value
+    : (selectedHome.value?.name ?? '');
+  const buyerPhone = isAllPickup
+    ? `${pickupContactPhoneCode.value} ${pickupContactPhone.value}`.trim()
+    : (selectedHome.value?.phone ?? '');
   const deliveryAddress =
     sharedShipMethod.value === 'home' || sharedShipMethod.value === 'post'
       ? (selectedHome.value?.address ?? '')
@@ -1619,12 +1664,10 @@ const handlePlaceOrder = () => {
       :breakpoints="{ '768px': '92vw' }"
     >
       <template #header>
-        <span class="text-base font-bold text-slate-950">綁定手機號碼</span>
+        <span class="text-base font-bold text-slate-950">驗證手機號碼</span>
       </template>
       <div class="flex flex-col gap-4 py-1">
-        <p class="text-sm text-slate-600">
-          結帳前需要一組手機號碼作為訂單聯絡方式，輸入並完成驗證即可繼續。
-        </p>
+        <p class="text-sm text-slate-600">尚未完成手機號碼驗證</p>
         <div class="flex flex-col gap-1.5">
           <label class="text-sm font-medium text-slate-700">手機號碼</label>
           <div class="flex gap-2">
@@ -1685,7 +1728,7 @@ const handlePlaceOrder = () => {
             @click="isBindPhoneDialogVisible = false"
           />
           <Button
-            label="完成綁定"
+            label="完成"
             :disabled="!canCompleteBind"
             @click="handleCompleteBind"
           />
@@ -2118,6 +2161,60 @@ const handlePlaceOrder = () => {
                         {{ p.address }} · {{ p.hours }}
                       </div>
                     </button>
+
+                    <!-- 自取聯絡人：姓名 + 電話；可勾「同訂購人」帶入會員資料 -->
+                    <div
+                      class="mt-1 flex flex-col gap-3 border-t border-slate-200 pt-3"
+                    >
+                      <div class="flex items-center gap-2">
+                        <Checkbox
+                          v-model="isPickupSameAsOrderer"
+                          binary
+                          input-id="pickup-same-as-orderer"
+                        />
+                        <label
+                          for="pickup-same-as-orderer"
+                          class="cursor-pointer text-sm text-slate-700"
+                        >
+                          同訂購人（帶入會員資料與電話）
+                        </label>
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <label class="text-sm text-slate-700">聯絡人姓名</label>
+                        <InputText
+                          v-model="pickupContactName"
+                          :disabled="isPickupSameAsOrderer"
+                          placeholder="請輸入自取聯絡人姓名"
+                          class="w-full"
+                        />
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <label class="text-sm text-slate-700">聯絡電話</label>
+                        <div class="flex gap-2">
+                          <Select
+                            v-model="pickupContactPhoneCode"
+                            :options="DRAWER_COUNTRY_CODES"
+                            :disabled="isPickupSameAsOrderer"
+                            class="w-[120px]"
+                          />
+                          <InputText
+                            v-model="pickupContactPhone"
+                            type="tel"
+                            :disabled="isPickupSameAsOrderer"
+                            placeholder="請輸入聯絡電話"
+                            class="flex-1"
+                          />
+                        </div>
+                        <p
+                          v-if="
+                            isPickupSameAsOrderer && !pickupContactPhone.trim()
+                          "
+                          class="text-xs text-slate-500"
+                        >
+                          會員尚未有手機號碼，去付款時將進行驗證。
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- 超商取貨：各訂單依溫層選品牌 → 帶出門市 -->
@@ -2188,14 +2285,25 @@ const handlePlaceOrder = () => {
                       </div>
                       <div
                         v-if="cvsPickOf(g)"
-                        class="flex flex-wrap items-center gap-2 text-sm text-slate-700"
+                        class="flex flex-col gap-1 text-sm text-slate-700"
                       >
-                        <i class="pi pi-map-marker text-xs" />
-                        <span
-                          >門市：<span class="font-medium">{{
-                            cvsPickOf(g)!.store.storeName
-                          }}</span></span
-                        >
+                        <div class="flex flex-wrap items-center gap-2">
+                          <i class="pi pi-map-marker text-xs" />
+                          <span
+                            >門市：<span class="font-medium">{{
+                              cvsPickOf(g)!.store.storeName
+                            }}</span></span
+                          >
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <i class="pi pi-user text-xs" />
+                          <span
+                            >收件人：<span class="font-medium">{{
+                              cvsPickOf(g)!.store.name
+                            }}</span></span
+                          >
+                          <span>{{ cvsPickOf(g)!.store.phone }}</span>
+                        </div>
                       </div>
                     </div>
                     <!-- 新增超商門市：加入會員門市清單（會員中心同步） -->

@@ -156,11 +156,9 @@ const bulkDiscountAmount = (item: CartItem): number =>
 const lineDisplayTotal = (item: CartItem): number =>
   effectiveUnitPrice(item) * item.qty;
 
-/** 對照用的原價總計（劃線用）：達買多優惠 → price × qty；否則 → original × qty。 */
-const lineOriginalTotal = (item: CartItem): number => {
-  if (hasBulkDiscount(item)) return item.price * item.qty;
-  return (item.original ?? item.price) * item.qty;
-};
+/** 尚未套用買多優惠的價格（僅買多優惠達標時顯示、劃線用）：單價 × 數量。 */
+const preBulkDiscountTotal = (item: CartItem): number =>
+  item.price * item.qty;
 
 const isGroupAllChecked = (group: CartGroup) =>
   group.items.length > 0 && group.items.every((i) => i.checked);
@@ -218,6 +216,8 @@ const isPausedMode = (g: CartGroup) => g.checkoutMode === 'paused';
 const isGroupCheckable = (g: CartGroup) => !isPausedMode(g);
 /** 商品層級是否可勾選（default 是「整台一起」不能單選；paused 也不行）。 */
 const isItemCheckable = (g: CartGroup) => isPickableMode(g) || isAbandonMode(g);
+/** 數量是否鎖定：暫停收單（paused）與禁止棄標（default）的購物車都不可調整數量。 */
+const isQtyLocked = (g: CartGroup) => isPausedMode(g) || isDefaultMode(g);
 /** 模式徽章：只有 default 需要顯示「禁止棄標」；其他模式不特別打 tag。 */
 const modeBadgeOf = (
   g: CartGroup,
@@ -683,7 +683,7 @@ const handleGoProduct = (productId?: number) => {
                   <InputNumber
                     v-model="item.qty"
                     :min="1"
-                    :disabled="isPausedMode(group)"
+                    :disabled="isQtyLocked(group)"
                     show-buttons
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"
@@ -691,10 +691,10 @@ const handleGoProduct = (productId?: number) => {
                     class="qty-stepper"
                   />
                 </div>
-                <!-- 買多優惠提示 -->
+                <!-- 買多優惠提示（平板以上：緊接在數量下方） -->
                 <div
                   v-if="item.bulkDiscount"
-                  class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                  class="hidden w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs @3xl:flex"
                   :class="
                     hasBulkDiscount(item)
                       ? 'bg-green-50 text-green-700'
@@ -712,38 +712,24 @@ const handleGoProduct = (productId?: number) => {
               <!-- Right column：NTD 價格（上）+ 刪除（下） -->
               <div class="flex shrink-0 flex-col items-end gap-2">
                 <div class="flex flex-col items-end gap-0.5">
-                  <template v-if="hasBulkDiscount(item)">
-                    <Tag
-                      value="已達買多優惠"
-                      severity="success"
-                      class="!py-0.5 !text-[10px]"
-                    />
-                    <span
-                      class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
-                      style="color: var(--primary)"
-                    >
-                      NTD ${{ lineDisplayTotal(item).toLocaleString() }}
-                    </span>
-                    <span
-                      class="text-xs whitespace-nowrap text-slate-500 line-through"
-                    >
-                      ${{ lineOriginalTotal(item).toLocaleString() }}
-                    </span>
-                  </template>
-                  <template v-else>
-                    <span
-                      class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
-                      style="color: var(--primary)"
-                    >
-                      NTD ${{ lineDisplayTotal(item).toLocaleString() }}
-                    </span>
-                    <span
-                      v-if="item.original"
-                      class="text-xs whitespace-nowrap text-slate-500 line-through"
-                    >
-                      ${{ lineOriginalTotal(item).toLocaleString() }}
-                    </span>
-                  </template>
+                  <Tag
+                    v-if="hasBulkDiscount(item)"
+                    value="已達買多優惠"
+                    severity="success"
+                    class="!py-0.5 !text-[10px]"
+                  />
+                  <span
+                    class="text-base leading-none font-bold whitespace-nowrap @7xl:text-lg"
+                    style="color: var(--primary)"
+                  >
+                    NTD ${{ lineDisplayTotal(item).toLocaleString() }}
+                  </span>
+                  <span
+                    v-if="hasBulkDiscount(item)"
+                    class="text-xs whitespace-nowrap text-slate-500 line-through"
+                  >
+                    ${{ preBulkDiscountTotal(item).toLocaleString() }}
+                  </span>
                 </div>
                 <Button
                   v-if="!isDefaultMode(group)"
@@ -752,25 +738,56 @@ const handleGoProduct = (productId?: number) => {
                   severity="secondary"
                   outlined
                   size="small"
-                  class="!min-h-8 !px-2 !py-1"
+                  class="!hidden !min-h-8 !px-2 !py-1 @3xl:!inline-flex"
                   @click="removeItem(group, item.id)"
                 />
               </div>
             </div>
 
-            <!-- 手機版：數量獨立成一行、佔整列寬度，避免被右側價格欄夾窄 -->
-            <div class="flex basis-full items-center gap-3 text-sm @3xl:hidden">
-              <span class="text-slate-600">數量</span>
-              <InputNumber
-                v-model="item.qty"
-                :min="1"
-                :disabled="isPausedMode(group)"
-                show-buttons
-                button-layout="horizontal"
-                increment-button-icon="pi pi-plus"
-                decrement-button-icon="pi pi-minus"
-                class="qty-stepper"
+            <!-- 手機版：數量靠左、刪除靠右同一排，佔整列寬度 -->
+            <div
+              class="flex basis-full items-center justify-between gap-3 text-sm @3xl:hidden"
+            >
+              <div class="flex items-center gap-3">
+                <span class="text-slate-600">數量</span>
+                <InputNumber
+                  v-model="item.qty"
+                  :min="1"
+                  :disabled="isQtyLocked(group)"
+                  show-buttons
+                  button-layout="horizontal"
+                  increment-button-icon="pi pi-plus"
+                  decrement-button-icon="pi pi-minus"
+                  class="qty-stepper"
+                />
+              </div>
+              <Button
+                v-if="!isDefaultMode(group)"
+                label="刪除"
+                icon="pi pi-trash"
+                severity="secondary"
+                outlined
+                size="small"
+                class="!min-h-8 !px-2 !py-1"
+                @click="removeItem(group, item.id)"
               />
+            </div>
+
+            <!-- 手機版：買多優惠 tag 獨立整行、排在數量列下方 -->
+            <div
+              v-if="item.bulkDiscount"
+              class="flex w-fit basis-full items-center gap-1.5 rounded-md px-2 py-1 text-xs @3xl:hidden"
+              :class="
+                hasBulkDiscount(item)
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-amber-50 text-amber-700'
+              "
+            >
+              <i class="pi pi-tag text-[10px]" />
+              <span>{{ item.bulkDiscount.note }}</span>
+              <span v-if="hasBulkDiscount(item)" class="font-medium">
+                · 已折抵 -${{ bulkDiscountAmount(item).toLocaleString() }}
+              </span>
             </div>
           </div>
 
@@ -875,7 +892,7 @@ const handleGoProduct = (productId?: number) => {
                       <InputNumber
                         :model-value="sub.qty"
                         :min="0"
-                        :disabled="isPausedMode(group)"
+                        :disabled="isQtyLocked(group)"
                         show-buttons
                         button-layout="horizontal"
                         increment-button-icon="pi pi-plus"

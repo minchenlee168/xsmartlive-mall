@@ -340,9 +340,13 @@ const timelineFor = (pkg: PackageInfo): TimelineRow[] => {
   }));
 };
 
-// ── 更換配送地址 dialog ──
+// ── 更換配送地址 / 更換門市 dialog ──
 const isChangeAddressVisible = ref(false);
-const handleOpenChangeAddress = (): void => {
+const changeAddressMode = ref<'home' | 'store'>('home');
+const isStoreDelivery = (order: OrderRecord): boolean =>
+  order.delivery === '超商取貨';
+const handleOpenChangeAddress = (order: OrderRecord): void => {
+  changeAddressMode.value = isStoreDelivery(order) ? 'store' : 'home';
   isChangeAddressVisible.value = true;
 };
 
@@ -913,11 +917,11 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <!-- 更換地址 tab：全寬「更換配送地址」按鈕；備貨中之後不可改 -->
               <Button
                 v-if="order.detailTab === 'address'"
-                label="更換配送地址"
+                :label="isStoreDelivery(order) ? '更換門市' : '更換配送地址'"
                 outlined
                 class="w-full"
                 :disabled="!orderCanChangeAddress(order)"
-                @click="handleOpenChangeAddress"
+                @click="handleOpenChangeAddress(order)"
               />
             </div>
           </template>
@@ -951,7 +955,11 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                   "
                   @click="handleSelectDetailTab(order, dt.key)"
                 >
-                  {{ dt.label }}
+                  {{
+                    dt.key === 'address' && isStoreDelivery(order)
+                      ? '更換門市'
+                      : dt.label
+                  }}
                 </button>
               </div>
             </div>
@@ -969,12 +977,12 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             <!-- 更換地址 tab：右側「更換配送地址」按鈕；備貨中之後不可改 -->
             <Button
               v-if="order.detailTab === 'address'"
-              label="更換配送地址"
+              :label="isStoreDelivery(order) ? '更換門市' : '更換配送地址'"
               outlined
               size="small"
               class="shrink-0"
               :disabled="!orderCanChangeAddress(order)"
-              @click="handleOpenChangeAddress"
+              @click="handleOpenChangeAddress(order)"
             />
           </div>
         </div>
@@ -1203,7 +1211,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
     </div>
 
     <!-- 更換配送地址 dialog -->
-    <ChangeAddressDialog v-model:visible="isChangeAddressVisible" />
+    <ChangeAddressDialog
+      v-model:visible="isChangeAddressVisible"
+      :mode="changeAddressMode"
+    />
 
     <!-- 購物權益與售後說明 dialog（手機版用） -->
     <Dialog
