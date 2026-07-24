@@ -203,6 +203,9 @@ body {
 /* 觸控友善：表單文字輸入框最小高度 44px（數量步進器維持自有尺寸） */
 .p-inputtext {
   min-height: 44px;
+  /* flex / grid 容器內需能縮到容器寬，否則內層 input 會以固有寬度（約 197px）
+     向右溢出彈窗（手機尤其明顯）。InputNumber 內層 input 亦帶 .p-inputtext，一併涵蓋。 */
+  min-width: 0;
 }
 /* 全站下拉選單統一高度 40px（略低於輸入框、仍接近觸控友善）。
    內部 label 與 chevron 需明確垂直置中，否則 label 會落在 padding 頂端、
