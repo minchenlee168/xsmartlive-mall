@@ -570,16 +570,28 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
       >
         <p class="text-xs font-medium text-slate-500">選擇商品</p>
 
-        <!-- 選項清單：每列右邊一顆「加入」；照片與加入鈕靠上對齊 -->
+        <!-- 選項清單：柔和淺底卡片（無線框）；已加入 → 主色淺底 + 圖片角落打勾 -->
         <div
           v-for="opt in product.pickOptions"
           :key="opt.id"
-          class="flex items-start gap-3 rounded-lg border-2 border-slate-200 p-2 transition"
+          class="flex items-start gap-3 rounded-xl p-3 transition-colors"
+          :class="optPickedQty(opt.name) > 0 ? '' : 'bg-slate-50'"
+          :style="
+            optPickedQty(opt.name) > 0
+              ? 'background: var(--primary-surface)'
+              : ''
+          "
         >
           <div
-            class="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-slate-200"
+            class="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-slate-200"
           >
             <ProductImage :src="opt.image" :alt="opt.name" size="sm" />
+            <span
+              v-if="optPickedQty(opt.name) > 0"
+              class="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 shadow-sm"
+            >
+              <i class="pi pi-check text-xs" style="color: var(--primary)" />
+            </span>
           </div>
           <div class="flex min-w-0 flex-1 flex-col gap-1.5">
             <p class="line-clamp-2 text-sm leading-snug text-slate-950">
