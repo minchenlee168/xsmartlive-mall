@@ -2023,7 +2023,7 @@ const handlePlaceOrder = () => {
             <!-- Footer -->
             <div class="mt-4 flex justify-end gap-2">
               <Button
-                label="不使用優惠券"
+                label="不使用"
                 severity="secondary"
                 outlined
                 @click="
