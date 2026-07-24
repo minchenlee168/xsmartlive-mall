@@ -1510,9 +1510,13 @@ const handlePlaceOrder = () => {
         <div
           class="cart-divider-top flex items-center justify-between gap-4 px-4 py-4"
         >
-          <span class="text-base font-bold text-slate-950">訂單金額小計</span>
-          <span class="text-2xl font-bold" style="color: var(--primary)"
-            ><span class="text-base">NT$</span
+          <span class="text-sm font-bold text-slate-950 @3xl:text-lg"
+            >訂單金額小計</span
+          >
+          <span
+            class="text-xl font-bold @3xl:text-3xl"
+            style="color: var(--primary)"
+            ><span class="text-sm @3xl:text-lg">NT$</span
             >{{ groupDisplayTotal(group).toLocaleString() }}</span
           >
         </div>
