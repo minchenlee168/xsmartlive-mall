@@ -594,7 +594,7 @@ const closePickDialog = () => {
   pickDialogItem.value = null;
 };
 
-/** 需挑總數 = pickCount * item.qty（item.qty 這裡為 1）。 */
+/** 需挑總數 = pickCount * item.qty（item.qty 為購買組數）。 */
 const pdNeed = (): number => {
   const item = pickDialogItem.value;
   if (!item) return 0;
@@ -636,11 +636,8 @@ const pdOptAddDisabled = (opt: PickOption): boolean =>
   pdOptionRemaining(opt) <= 0 || pdTotal() >= pdNeed();
 /** 逐選項「加入」：帶該選項的規格 / 數量草稿，套上限後併入已選清單。 */
 const pdAddOption = (opt: PickOption): void => {
-  const specChoices = opt.specOptions?.length ? opt.specOptions : [opt.spec];
-  const spec =
-    specChoices.length > 1
-      ? (pickOptSpecDraft.value[opt.id] ?? specChoices[0])
-      : specChoices[0];
+  // 預設值與下拉顯示（pickOptSpecDraft[opt.id] ?? opt.spec）同源，避免看到 A 卻加入 B
+  const spec = pickOptSpecDraft.value[opt.id] ?? opt.spec;
   const optRemain = pdOptionRemaining(opt);
   const totalRemain = Math.max(0, pdNeed() - pdTotal());
   if (optRemain <= 0) {
