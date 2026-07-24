@@ -1327,7 +1327,7 @@ const handleGoProduct = (productId?: number) => {
 
         <!-- Group subtotal -->
         <div
-          class="cart-divider-top flex items-center justify-end gap-4 px-[var(--card-pad)] py-4"
+          class="cart-divider-top flex items-center justify-between gap-4 px-[var(--card-pad)] py-4"
         >
           <span class="text-sm text-slate-700 @3xl:text-lg">訂單金額小計</span>
           <span
