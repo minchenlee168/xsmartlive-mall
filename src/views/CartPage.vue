@@ -1944,12 +1944,24 @@ const handleGoProduct = (productId?: number) => {
           <div
             v-for="opt in pickCatOf(pickDialogItem)?.pickOptions ?? []"
             :key="opt.id"
-            class="flex items-start gap-3 rounded-lg border-2 border-slate-200 p-2 transition"
+            class="flex items-start gap-3 rounded-xl p-3 transition-colors"
+            :class="pdOptionUsed(opt.name) > 0 ? '' : 'bg-slate-50'"
+            :style="
+              pdOptionUsed(opt.name) > 0
+                ? 'background: var(--primary-surface)'
+                : ''
+            "
           >
             <div
-              class="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-slate-200"
+              class="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-slate-200"
             >
               <ProductImage :src="opt.image" :alt="opt.name" size="sm" />
+              <span
+                v-if="pdOptionUsed(opt.name) > 0"
+                class="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 shadow-sm"
+              >
+                <i class="pi pi-check text-xs" style="color: var(--primary)" />
+              </span>
             </div>
             <div class="flex min-w-0 flex-1 flex-col gap-1.5">
               <p class="line-clamp-2 text-sm leading-snug text-slate-950">
