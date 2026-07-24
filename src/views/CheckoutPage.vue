@@ -1512,7 +1512,8 @@ const handlePlaceOrder = () => {
         >
           <span class="text-base font-bold text-slate-950">訂單金額小計</span>
           <span class="text-2xl font-bold" style="color: var(--primary)"
-            >${{ groupDisplayTotal(group).toLocaleString() }}</span
+            ><span class="text-base">NT$</span
+            >{{ groupDisplayTotal(group).toLocaleString() }}</span
           >
         </div>
       </section>

@@ -1334,7 +1334,8 @@ const handleGoProduct = (productId?: number) => {
             class="text-xl font-bold @3xl:text-3xl"
             style="color: var(--primary)"
           >
-            NT${{ formatMoney(groupSubtotal(group)) }}
+            <span class="text-sm @3xl:text-lg">NT$</span
+            >{{ formatMoney(groupSubtotal(group)) }}
           </span>
         </div>
       </div>
