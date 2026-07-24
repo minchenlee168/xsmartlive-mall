@@ -1611,7 +1611,8 @@ const handleGoProduct = (productId?: number) => {
               class="truncate text-xl font-bold @7xl:text-2xl"
               style="color: var(--primary)"
             >
-              NT${{ formatMoney(globalTotal) }}
+              <span class="text-sm @7xl:text-base">NT$</span
+              >{{ formatMoney(globalTotal) }}
             </span>
           </div>
           <Button

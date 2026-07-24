@@ -1740,7 +1740,8 @@ const handlePlaceOrder = () => {
             <span
               class="truncate text-2xl font-bold @3xl:text-3xl"
               style="color: var(--primary)"
-              >${{ finalTotal.toLocaleString() }}</span
+              ><span class="text-base @3xl:text-lg">NT$</span
+              >{{ finalTotal.toLocaleString() }}</span
             >
             <i
               class="pi text-sm"
