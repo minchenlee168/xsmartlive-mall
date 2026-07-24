@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
@@ -881,6 +881,45 @@ const handleFakeScanResult = () => {
   isCouponScannerVisible.value = false;
   handleApplyCouponCode();
 };
+
+// 掃描 QR：開啟彈窗時跳出實體相機（後鏡頭），關閉時釋放相機。
+const scannerVideoRef = ref<HTMLVideoElement | null>(null);
+const cameraError = ref<string | null>(null);
+let cameraStream: MediaStream | null = null;
+
+const startCamera = async () => {
+  cameraError.value = null;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    cameraError.value = '此裝置 / 瀏覽器不支援相機掃描';
+    return;
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false,
+    });
+    await nextTick();
+    if (scannerVideoRef.value) {
+      scannerVideoRef.value.srcObject = cameraStream;
+      await scannerVideoRef.value.play().catch(() => {});
+    }
+  } catch {
+    // 使用者拒絕授權 / 無可用相機
+    cameraError.value = '無法開啟相機，請確認已授權相機權限';
+  }
+};
+
+const stopCamera = () => {
+  cameraStream?.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  if (scannerVideoRef.value) scannerVideoRef.value.srcObject = null;
+};
+
+watch(isCouponScannerVisible, (isOpen) => {
+  if (isOpen) void startCamera();
+  else stopCamera();
+});
+onBeforeUnmount(stopCamera);
 
 // ---- 紅利點數（每組獨立；跨組合計不能超過餘額）------------------------------
 const rewardPointsByGroup = ref<Record<number, number>>({});
@@ -1822,10 +1861,17 @@ const handlePlaceOrder = () => {
         <span class="text-base font-bold text-slate-950">掃描優惠券 QR</span>
       </template>
       <div class="flex flex-col items-center gap-3">
-        <!-- 模擬相機畫面 -->
+        <!-- 相機畫面：實體後鏡頭 video（授權失敗則顯示 QR icon fallback） -->
         <div
           class="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl bg-slate-900"
         >
+          <video
+            ref="scannerVideoRef"
+            autoplay
+            muted
+            playsinline
+            class="absolute inset-0 h-full w-full object-cover"
+          ></video>
           <!-- 角落 frame -->
           <span
             class="absolute top-3 left-3 h-8 w-8 rounded-tl border-t-2 border-l-2 border-white/80"
@@ -1843,9 +1889,19 @@ const handlePlaceOrder = () => {
           <span
             class="absolute right-6 left-6 h-px bg-[var(--primary)] shadow-[0_0_12px_2px_var(--primary)]"
           ></span>
-          <i class="pi pi-qrcode text-6xl text-white/40"></i>
+          <!-- 授權失敗 fallback -->
+          <i
+            v-if="cameraError"
+            class="pi pi-qrcode text-6xl text-white/40"
+          ></i>
         </div>
-        <p class="text-center text-sm text-slate-500">
+        <p
+          v-if="cameraError"
+          class="text-center text-sm font-medium text-red-500"
+        >
+          {{ cameraError }}
+        </p>
+        <p v-else class="text-center text-sm text-slate-500">
           將 QR 對準畫面中央，自動辨識後即填入優惠代碼。
         </p>
       </div>
