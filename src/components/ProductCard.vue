@@ -76,20 +76,13 @@ const isPickOverCard = computed(
 /** 某選項（依 name）在已選清單中的數量加總。 */
 const optPickedQty = (name: string): number =>
   pickedList.value.reduce((s, r) => s + (r.name === name ? r.qty : 0), 0);
-/** 選項是否已達可加入上限（該項限購 或 總數已滿）。 */
-const isOptAddDisabled = (opt: {
-  name: string;
-  maxQty?: number;
-}): boolean =>
-  optPickedQty(opt.name) >= optMaxQtyCard(opt) ||
-  pickedTotal.value >= totalPickCount.value;
-/** 把選項加進已選清單（同 name+spec 則 qty+1）。 */
 /** 各選項「加入前」的數量暫存值（預設 1）。 */
 const optQtyDraft = ref<Record<number, number>>({});
 const optQtyOf = (id: number): number => optQtyDraft.value[id] ?? 1;
 const setOptQty = (id: number, n: number): void => {
   optQtyDraft.value = { ...optQtyDraft.value, [id]: Math.max(1, n || 1) };
 };
+/** 把選項加進已選清單（同 name+spec 則合併）。不限制數量，超過限購 / 總數只提醒。 */
 const addPickOption = (opt: {
   id: number;
   name: string;
@@ -98,28 +91,20 @@ const addPickOption = (opt: {
   maxQty?: number;
 }): void => {
   const spec = optSpecDraft.value[opt.id] ?? opt.spec;
-  const optRemain = optMaxQtyCard(opt) - optPickedQty(opt.name);
-  const totalRemain = totalPickCount.value - pickedTotal.value;
-  if (optRemain <= 0) {
-    ui.toast(`「${opt.name}」限購 ${optMaxQtyCard(opt)} 個`, 'warn');
-    return;
-  }
-  if (totalRemain <= 0) {
-    ui.toast(`已達 ${totalPickCount.value} 件，請先移除其他項目`, 'warn');
-    return;
-  }
-  const want = optQtyOf(opt.id);
-  const addQty = Math.min(want, optRemain, totalRemain);
+  const addQty = optQtyOf(opt.id);
   const exist = pickedList.value.find(
     (r) => r.name === opt.name && r.spec === spec,
   );
   if (exist) exist.qty += addQty;
   else
     pickedList.value.push({ name: opt.name, image: opt.image, spec, qty: addQty });
-  if (addQty < want) {
-    ui.toast(`「${opt.name}」僅剩 ${addQty} 件可加入`, 'warn');
-  }
   optQtyDraft.value = { ...optQtyDraft.value, [opt.id]: 1 };
+  // 不限制數量；超過限購 / 總數只提醒，不阻擋
+  if (optPickedQty(opt.name) > optMaxQtyCard(opt)) {
+    ui.toast(`「${opt.name}」已超過限購 ${optMaxQtyCard(opt)} 個`, 'warn');
+  } else if (pickedTotal.value > totalPickCount.value) {
+    ui.toast(`已超過 ${totalPickCount.value} 件`, 'warn');
+  }
 };
 /** 修改已選清單某列數量。 */
 const setPickedRowQty = (idx: number, n: number): void => {
@@ -623,7 +608,6 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
               <InputNumber
                 :model-value="optQtyOf(opt.id)"
                 :min="1"
-                :disabled="isOptAddDisabled(opt)"
                 show-buttons
                 button-layout="horizontal"
                 increment-button-icon="pi pi-plus"
@@ -638,8 +622,6 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
             icon="pi pi-plus"
             size="small"
             class="pick-add-btn shrink-0"
-            :severity="isOptAddDisabled(opt) ? 'secondary' : undefined"
-            :disabled="isOptAddDisabled(opt)"
             @click="addPickOption(opt)"
           />
         </div>

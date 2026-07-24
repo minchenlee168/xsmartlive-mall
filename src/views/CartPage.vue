@@ -617,9 +617,6 @@ const pdOptionUsed = (optionName: string): number =>
   pickDialogList.value
     .filter((b) => b.name === optionName)
     .reduce((s, b) => s + (b.qty || 0), 0);
-/** 該 option 剩餘可選 = 上限 - 已用。 */
-const pdOptionRemaining = (option: PickOption): number =>
-  Math.max(0, pdOptionMax(option) - pdOptionUsed(option.name));
 
 // ── 逐選項列（比照商品分類頁任選4件彈窗）：各選項的規格 / 數量草稿（key = option.id）──
 const pickOptSpecDraft = ref<Record<number, string>>({});
@@ -631,25 +628,11 @@ const pdSetOptQty = (optId: number, n: number | null): void => {
     [optId]: Math.max(1, n ?? 1),
   };
 };
-/** 該選項是否已無可加入額度（達選項上限或總需求已滿）。 */
-const pdOptAddDisabled = (opt: PickOption): boolean =>
-  pdOptionRemaining(opt) <= 0 || pdTotal() >= pdNeed();
-/** 逐選項「加入」：帶該選項的規格 / 數量草稿，套上限後併入已選清單。 */
+/** 逐選項「加入」：帶該選項的規格 / 數量草稿併入已選清單。不限制數量，超過限購 / 總數只提醒。 */
 const pdAddOption = (opt: PickOption): void => {
   // 預設值與下拉顯示（pickOptSpecDraft[opt.id] ?? opt.spec）同源，避免看到 A 卻加入 B
   const spec = pickOptSpecDraft.value[opt.id] ?? opt.spec;
-  const optRemain = pdOptionRemaining(opt);
-  const totalRemain = Math.max(0, pdNeed() - pdTotal());
-  if (optRemain <= 0) {
-    ui.toast(`「${opt.name}」限購 ${pdOptionMax(opt)} 個`, 'warn');
-    return;
-  }
-  if (totalRemain <= 0) {
-    ui.toast(`已達 ${pdNeed()} 件，請先移除其他項目`, 'warn');
-    return;
-  }
-  const want = pdOptQtyOf(opt.id);
-  const addQty = Math.min(want, optRemain, totalRemain);
+  const addQty = pdOptQtyOf(opt.id);
   const exist = pickDialogList.value.find(
     (b) => b.name === opt.name && b.spec === spec,
   );
@@ -661,23 +644,19 @@ const pdAddOption = (opt: PickOption): void => {
       spec,
       qty: addQty,
     });
-  if (addQty < want) {
-    ui.toast(`「${opt.name}」僅剩 ${addQty} 件可加入`, 'warn');
-  }
   pickOptQtyDraft.value = { ...pickOptQtyDraft.value, [opt.id]: 1 };
+  // 不限制數量；超過限購 / 總數只提醒，不阻擋
+  if (pdOptionUsed(opt.name) > pdOptionMax(opt)) {
+    ui.toast(`「${opt.name}」已超過限購 ${pdOptionMax(opt)} 個`, 'warn');
+  } else if (pdTotal() > pdNeed()) {
+    ui.toast(`已超過 ${pdNeed()} 件`, 'warn');
+  }
 };
 
+// 已選列數量：不限制，超過由「已選 X/Y」轉紅提醒。
 const setPdRowQty = (idx: number, value: number | null) => {
   const row = pickDialogList.value[idx];
-  const item = pickDialogItem.value;
-  if (!row || !item) return;
-  const opt = pickCatOf(item)?.pickOptions?.find((o) => o.name === row.name);
-  const max = opt ? pdOptionMax(opt) : row.qty;
-  // 扣除同 option 其他列已用量後，本列可用上限
-  const otherUsed = pickDialogList.value
-    .filter((b, i) => i !== idx && b.name === row.name)
-    .reduce((s, b) => s + (b.qty || 0), 0);
-  row.qty = Math.max(1, Math.min(value ?? 1, max - otherUsed));
+  if (row) row.qty = Math.max(1, value ?? 1);
 };
 const removePdRow = (idx: number) => {
   pickDialogList.value = pickDialogList.value.filter((_, i) => i !== idx);
@@ -1998,7 +1977,6 @@ const handleGoProduct = (productId?: number) => {
                   :min="1"
                   :max-fraction-digits="0"
                   :allow-empty="false"
-                  :disabled="pdOptAddDisabled(opt)"
                   show-buttons
                   button-layout="horizontal"
                   increment-button-icon="pi pi-plus"
@@ -2013,8 +1991,6 @@ const handleGoProduct = (productId?: number) => {
               icon="pi pi-plus"
               size="small"
               class="pick-add-btn shrink-0"
-              :severity="pdOptAddDisabled(opt) ? 'secondary' : undefined"
-              :disabled="pdOptAddDisabled(opt)"
               @click="pdAddOption(opt)"
             />
           </div>
