@@ -1099,8 +1099,8 @@ const handleGoProduct = (productId?: number) => {
                 >
                   {{ item.spec }}
                 </div>
-                <!-- 平板以上：數量與商品名同欄、與價格並排（維持現狀）-->
-                <div class="hidden items-center gap-3 text-sm @3xl:flex">
+                <!-- 數量：全尺寸都與商品名同欄（對齊商品名稱）、刪除移至右側價格欄 -->
+                <div class="flex items-center gap-3 text-sm">
                   <span class="text-slate-600">數量</span>
                   <InputNumber
                     v-model="item.qty"
@@ -1115,18 +1115,18 @@ const handleGoProduct = (productId?: number) => {
                     class="qty-stepper"
                   />
                 </div>
-                <!-- 批次下標「待挑選規格」badge（平板以上：緊接數量下方） -->
+                <!-- 批次下標「待挑選規格」badge（緊接數量下方） -->
                 <span
                   v-if="item.isBidBatch && item.specPending"
-                  class="hidden w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 @3xl:flex"
+                  class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
                 >
                   <i class="pi pi-exclamation-circle text-[10px]" />
                   待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
                 </span>
-                <!-- 買多優惠提示（平板以上：緊接在數量下方） -->
+                <!-- 買多優惠提示（緊接在數量下方） -->
                 <div
                   v-if="item.bulkDiscount"
-                  class="hidden w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs @3xl:flex"
+                  class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
                   :class="
                     hasBulkDiscount(item)
                       ? 'bg-green-50 text-green-700'
@@ -1170,68 +1170,12 @@ const handleGoProduct = (productId?: number) => {
                   severity="secondary"
                   outlined
                   size="small"
-                  class="!hidden !min-h-8 !px-2 !py-1 @3xl:!inline-flex"
+                  class="!inline-flex !min-h-8 !px-2 !py-1"
                   @click="removeItem(group, item.id)"
                 />
               </div>
             </div>
 
-            <!-- 手機版：數量靠左、刪除靠右同一排，佔整列寬度 -->
-            <div
-              class="flex basis-full items-center justify-between gap-3 text-sm @3xl:hidden"
-            >
-              <div class="flex items-center gap-3">
-                <span class="text-slate-600">數量</span>
-                <InputNumber
-                  v-model="item.qty"
-                  :min="1"
-                  :max-fraction-digits="0"
-                  :allow-empty="false"
-                  :disabled="isQtyLocked(group)"
-                  show-buttons
-                  button-layout="horizontal"
-                  increment-button-icon="pi pi-plus"
-                  decrement-button-icon="pi pi-minus"
-                  class="qty-stepper"
-                />
-              </div>
-              <Button
-                v-if="!isDefaultMode(group)"
-                label="刪除"
-                icon="pi pi-trash"
-                severity="secondary"
-                outlined
-                size="small"
-                class="!min-h-8 !px-2 !py-1"
-                @click="removeItem(group, item.id)"
-              />
-            </div>
-
-            <!-- 手機版：待挑選規格 badge 獨立整行、排在數量列下方 -->
-            <div
-              v-if="item.isBidBatch && item.specPending"
-              class="flex w-fit basis-full items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 @3xl:hidden"
-            >
-              <i class="pi pi-exclamation-circle text-[10px]" />
-              待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
-            </div>
-
-            <!-- 手機版：買多優惠 tag 獨立整行、排在數量列下方 -->
-            <div
-              v-if="item.bulkDiscount"
-              class="flex w-fit basis-full items-center gap-1.5 rounded-md px-2 py-1 text-xs @3xl:hidden"
-              :class="
-                hasBulkDiscount(item)
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-amber-50 text-amber-700'
-              "
-            >
-              <i class="pi pi-tag text-[10px]" />
-              <span>{{ item.bulkDiscount.note }}</span>
-              <span v-if="hasBulkDiscount(item)" class="font-medium">
-                · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
-              </span>
-            </div>
           </div>
 
           <!-- 商品備註：跟在商品列下方，若有 note 才顯示 -->
