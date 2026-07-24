@@ -128,6 +128,32 @@ body {
   min-width: 0;
 }
 
+/* 手機尺寸（< 768px）：數量欄只顯示純輸入框，隱藏 +/- 按鈕；平板 / PC 才有加減 stepper。
+   刻意用 @media 而非 @container：挑選內容等彈窗會 teleport 到 body、跑出裝置模擬 frame，
+   @container 無法涵蓋彈窗內的數量欄；改用視窗寬度（預覽時瀏覽器寬度即裝置寬度）統一涵蓋頁面內 + 彈窗內。 */
+@media (max-width: 767px) {
+  .qty-stepper .p-inputnumber-button {
+    display: none;
+  }
+  .qty-stepper .p-inputnumber-input {
+    width: 58px;
+    border-radius: 6px;
+  }
+  .qty-stepper.is-sm .p-inputnumber-input {
+    width: 44px;
+  }
+  .qty-stepper.is-fluid .p-inputnumber-input {
+    width: auto;
+  }
+  /* 任選4件彈窗「加入」鈕：手機尺寸只顯示 icon,隱藏文字 */
+  .pick-add-btn .p-button-label {
+    display: none;
+  }
+  .pick-add-btn .p-button-icon {
+    margin: 0;
+  }
+}
+
 /* 加入購物車按鈕（分類頁 ProductCard 與購物車加購區共用）：成功後 pop 動畫 */
 .add-cart-btn.added-pop {
   animation: cart-added-pop 0.5s ease;
@@ -174,16 +200,18 @@ body {
   }
 }
 
-/* 觸控友善：表單文字輸入框與下拉選單最小高度 44px（數量步進器維持自有尺寸） */
-.p-inputtext,
-.p-select {
+/* 觸控友善：表單文字輸入框最小高度 44px（數量步進器維持自有尺寸） */
+.p-inputtext {
   min-height: 44px;
 }
-/* Select 被撐到 44px 時，內部 label 與 chevron 需明確垂直置中，
-   否則 label 會落在 padding 頂端、chevron 在中間，造成兩者不對齊 */
+/* 全站下拉選單統一高度 40px（略低於輸入框、仍接近觸控友善）。
+   內部 label 與 chevron 需明確垂直置中，否則 label 會落在 padding 頂端、
+   chevron 在中間，造成兩者不對齊 */
 .p-select {
   display: inline-flex;
   align-items: center;
+  min-height: 40px;
+  height: 40px;
 }
 .p-select-label {
   display: flex;
@@ -200,6 +228,11 @@ body {
 }
 .qty-stepper .p-inputnumber-input {
   min-height: 0;
+}
+/* 底部黏著「已選 / 已挑選」區塊的彈窗（任選4件、購物車挑選內容 / 挑選規格）：
+   清掉 content 底部 20px padding，讓黏底區塊各捲動狀態下都貼齊 footer、下方無縫隙 */
+.picked-sticky-dialog .p-dialog-content {
+  padding-bottom: 0;
 }
 
 /* ══════ 下拉 / 選單 hover：參考 Material UI 的絲滑感 ══════
