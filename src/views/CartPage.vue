@@ -625,7 +625,7 @@ const pdOptQtyOf = (optId: number): number => pickOptQtyDraft.value[optId] ?? 1;
 const pdSetOptQty = (optId: number, n: number | null): void => {
   pickOptQtyDraft.value = {
     ...pickOptQtyDraft.value,
-    [optId]: Math.max(1, n ?? 1),
+    [optId]: Math.max(1, n || 1),
   };
 };
 /** 逐選項「加入」：帶該選項的規格 / 數量草稿併入已選清單。不限制數量，超過限購 / 總數只提醒。 */
@@ -645,8 +645,9 @@ const pdAddOption = (opt: PickOption): void => {
       qty: addQty,
     });
   pickOptQtyDraft.value = { ...pickOptQtyDraft.value, [opt.id]: 1 };
-  // 不限制數量；超過限購 / 總數只提醒，不阻擋
-  if (pdOptionUsed(opt.name) > pdOptionMax(opt)) {
+  // 不限制數量；超過限購 / 總數只提醒，不阻擋。
+  // 僅有設定 maxQty 的選項才有 per-option 限購，否則只受總數約束（避免謊報限購）。
+  if (opt.maxQty != null && pdOptionUsed(opt.name) > pdOptionMax(opt)) {
     ui.toast(`「${opt.name}」已超過限購 ${pdOptionMax(opt)} 個`, 'warn');
   } else if (pdTotal() > pdNeed()) {
     ui.toast(`已超過 ${pdNeed()} 件`, 'warn');
@@ -656,7 +657,7 @@ const pdAddOption = (opt: PickOption): void => {
 // 已選列數量：不限制，超過由「已選 X/Y」轉紅提醒。
 const setPdRowQty = (idx: number, value: number | null) => {
   const row = pickDialogList.value[idx];
-  if (row) row.qty = Math.max(1, value ?? 1);
+  if (row) row.qty = Math.max(1, value || 1);
 };
 const removePdRow = (idx: number) => {
   pickDialogList.value = pickDialogList.value.filter((_, i) => i !== idx);

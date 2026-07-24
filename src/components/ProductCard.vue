@@ -99,8 +99,9 @@ const addPickOption = (opt: {
   else
     pickedList.value.push({ name: opt.name, image: opt.image, spec, qty: addQty });
   optQtyDraft.value = { ...optQtyDraft.value, [opt.id]: 1 };
-  // 不限制數量；超過限購 / 總數只提醒，不阻擋
-  if (optPickedQty(opt.name) > optMaxQtyCard(opt)) {
+  // 不限制數量；超過限購 / 總數只提醒，不阻擋。
+  // 僅有設定 maxQty 的選項才有 per-option 限購，否則只受總數約束（避免謊報限購）。
+  if (opt.maxQty != null && optPickedQty(opt.name) > optMaxQtyCard(opt)) {
     ui.toast(`「${opt.name}」已超過限購 ${optMaxQtyCard(opt)} 個`, 'warn');
   } else if (pickedTotal.value > totalPickCount.value) {
     ui.toast(`已超過 ${totalPickCount.value} 件`, 'warn');
