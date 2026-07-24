@@ -2660,10 +2660,11 @@ html.frame-mode .drawer-panel {
   width: min(720px, var(--frame-width, 100vw));
 }
 
-/* 瀏覽器實體視窗窄於 768px：抽屜縮到手機設計稿寬度 */
+/* 手機（真實視窗 < 768px、非裝置模擬）：抽屜滿寬。
+   裝置模擬（frame-mode）走上面 .frame-mode 規則貼合框寬，不套此規則。 */
 @media (max-width: 768px) {
-  .drawer-panel {
-    width: min(390px, 100vw) !important;
+  html:not(.frame-mode) .drawer-panel {
+    width: 100vw !important;
   }
 }
 
