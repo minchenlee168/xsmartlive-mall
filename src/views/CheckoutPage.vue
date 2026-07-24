@@ -1938,7 +1938,7 @@ const handlePlaceOrder = () => {
               >
                 <!-- Amount block -->
                 <div
-                  class="flex w-[76px] shrink-0 items-center justify-center gap-1 rounded-l-[10px] px-2 py-3 @3xl:w-[140px] @3xl:gap-2 @3xl:px-3 @3xl:py-4"
+                  class="flex w-24 shrink-0 items-center justify-center gap-1 rounded-l-[10px] px-2 py-3 @3xl:w-[140px] @3xl:gap-2 @3xl:px-3 @3xl:py-4"
                   :class="
                     isCouponUsableFor(couponDrawerGroup, c)
                       ? ''
