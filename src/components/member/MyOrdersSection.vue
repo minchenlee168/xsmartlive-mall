@@ -547,7 +547,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           style:
             'background: #ffffff; border-radius: 8px 8px 0 0; padding: 8px 16px',
         },
-        title: { style: 'font-size: 14px; font-weight: 600; color: var(--surface-700)' },
+        title: {
+          style: 'font-size: 14px; font-weight: 600; color: var(--surface-700)',
+        },
         content: {
           style:
             'padding: 14px 16px; font-size: 12.5px; line-height: 1.7; color: #475569',
@@ -728,7 +730,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
           <div>
             <p class="text-xs text-slate-500">訂單總額</p>
-            <p class="font-bold" style="color: var(--danger)">${{ order.total }}</p>
+            <p class="font-bold" style="color: var(--danger)">
+              ${{ order.total }}
+            </p>
           </div>
           <div>
             <p class="text-xs text-slate-500">付款方式</p>
@@ -864,7 +868,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           class="flex flex-col gap-1 border-t border-slate-200 px-4 py-3 text-sm"
         >
           <span class="text-xs text-slate-500">訂單備註</span>
-          <p class="whitespace-pre-wrap break-words text-slate-700">
+          <p class="break-words whitespace-pre-wrap text-slate-700">
             {{ order.buyerNote }}
           </p>
         </div>
@@ -1487,13 +1491,13 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
         <div class="flex flex-col gap-1">
           <span class="text-xs text-slate-500">發票類型</span>
           <span class="text-slate-950">
-            {{ paymentInfoTargetOrder?.invoice ?? '個人載具' }}
+            {{ paymentInfoTargetOrder?.invoice ?? '個人發票（紙本）' }}
           </span>
         </div>
         <div class="flex flex-col gap-1">
           <span class="text-xs text-slate-500">付款方式</span>
           <span class="text-slate-950">
-            {{ paymentInfoTargetOrder?.payment ?? '線上刷卡' }}
+            {{ paymentInfoTargetOrder?.payment ?? '線上信用卡（藍新）' }}
           </span>
         </div>
       </div>
@@ -1607,7 +1611,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <div>
             <p class="text-slate-500">發票類型</p>
             <p class="font-medium">
-              {{ invoicePreviewOrder.invoice || '個人載具' }}
+              {{ invoicePreviewOrder.invoice || '個人發票（紙本）' }}
             </p>
           </div>
         </div>

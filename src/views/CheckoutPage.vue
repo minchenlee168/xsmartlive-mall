@@ -1091,6 +1091,9 @@ const handlePlaceOrder = () => {
   const method =
     PAYMENT_METHODS.find((m) => m.value === paymentMethod.value)?.label ??
     '線上信用卡（藍新）';
+  const invoiceLabel =
+    INVOICE_TYPES.find((t) => t.value === invoiceType.value)?.label ??
+    '個人發票（紙本）';
 
   // 每個群組（賣家 / 場次）拆成獨立一筆訂單，收集訂單編號
   const orderNos: string[] = checkoutGroups.value.map((g) =>
@@ -1105,6 +1108,7 @@ const handlePlaceOrder = () => {
       total: groupDisplayTotal(g),
       payment: method,
       delivery: SHIPPING_METHOD_LABELS[groupShipMethod(g)!],
+      invoice: invoiceLabel,
     }),
   );
 
