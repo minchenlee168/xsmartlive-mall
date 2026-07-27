@@ -183,18 +183,19 @@ export const useCartStore = defineStore('cart', () => {
       addOnProductIds: [9003, 9004, 9005, 9006],
       items: [
         {
+          // 固定組合：子品固定，規格用彈窗選擇（收合摘要 + 選擇規格按鈕）；spec 留空＝待選規格
           id: 'i4',
           productId: 13,
           name: '新款組合 包屁衣韓版小洋裝雙件組',
           image: products.find((p) => p.id === 13)?.image,
-          spec: '66cm',
+          spec: '預設',
           qty: 1,
           price: 290,
           original: 350,
           checked: true,
           isBundle: true,
           bundleExpanded: true,
-          note: '雙件為固定搭配，不接受單件替換；請於備註寫下想要的月齡。',
+          note: '雙件為固定搭配，不接受單件替換。',
           bundleItems: [
             {
               name: '新款 包屁衣韓版小洋裝 秋冬刺繡款',
@@ -203,9 +204,9 @@ export const useCartStore = defineStore('cart', () => {
               qty: 1,
             },
             {
-              name: '新款 包屁衣韓版小洋裝 秋冬刺繡款',
+              name: '新款 包屁衣韓版小洋裝 春夏蕾絲款',
               image: products.find((p) => p.id === 7)?.image,
-              spec: '白-S',
+              spec: '',
               qty: 1,
             },
           ],

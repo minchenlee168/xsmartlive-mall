@@ -309,16 +309,8 @@ const bundleWarningMessage = (item: CartItem): string | null => {
     return null;
   }
   return item.bundleItems.some((s) => subNeedsAttention(s, item))
-    ? '此組合商品尚未選擇規格或數量'
+    ? '此組合商品尚未選擇規格'
     : null;
-};
-
-const subMissingText = (sub: CartBundleItem, item?: CartItem): string => {
-  const isPick = !!(item && isPickBundleItem(item));
-  const missing: string[] = [];
-  if (!sub.spec && (!isPick || sub.qty > 0)) missing.push('規格');
-  if (!isPick && sub.qty <= 0) missing.push('數量');
-  return missing.length ? `請選擇${missing.join('與')}` : '';
 };
 
 /**
@@ -341,15 +333,6 @@ const subSpecOptionsFor = (
   }
   const catSpec = cat.bundleItems?.[subIndex];
   return catSpec?.specOptions?.length ? catSpec.specOptions : null;
-};
-
-/** 直接從購物車修改子品規格 — v-model 用 setter 寫回 sub.spec。 */
-const setSubSpec = (sub: CartBundleItem, value: string) => {
-  sub.spec = value;
-};
-
-const setSubQty = (sub: CartBundleItem, value: number) => {
-  sub.qty = value;
 };
 
 // ── 直播下標「後選規格」：多軸 SKU 選擇，下拉常駐可改（見 live-bid-deferred-spec-plan）──
@@ -585,8 +568,6 @@ const dlgRemove = (skuId: string) => {
 const pickDialogItem = ref<CartItem | null>(null);
 // pickDialogList 為編輯中的草稿已選，按「確定」才寫回 item.bundleItems。
 const pickDialogList = ref<CartBundleItem[]>([]);
-/** 底部「已選」區塊收合狀態，預設收合。 */
-const isPickPickedExpanded = ref(false);
 
 /** 取任選組合的商品目錄資料。 */
 const pickCatOf = (item: CartItem) =>
@@ -597,7 +578,6 @@ const openPickDialog = (item: CartItem) => {
   pickDialogList.value = (item.bundleItems ?? []).map((b) => ({ ...b }));
   pickOptSpecDraft.value = {};
   pickOptQtyDraft.value = {};
-  isPickPickedExpanded.value = false;
 };
 const closePickDialog = () => {
   pickDialogItem.value = null;
@@ -681,6 +661,39 @@ const confirmPickDialog = () => {
   }
   item.bundleItems = pickDialogList.value.map((b) => ({ ...b }));
   closePickDialog();
+};
+
+// ── 固定組合「選擇規格」彈窗：子品固定，只在彈窗選各子品規格。
+//    無「加入」、無「已選 X/Y」、無「任選 N 件」字眼（與任選組合區隔）──
+/** 固定組合：是否有可選規格的子品（→ 顯示「選擇規格」按鈕、走彈窗）。 */
+const fixedBundleHasSpec = (item: CartItem): boolean =>
+  !!item.bundleItems?.some((sub, i) => subSpecOptionsFor(item, sub, i));
+/** 固定組合：所有可選規格的子品是否都已選好規格。 */
+const fixedBundleAllChosen = (item: CartItem): boolean =>
+  !!item.bundleItems?.every(
+    (sub, i) =>
+      !subSpecOptionsFor(item, sub, i) || (!!sub.spec && sub.spec !== '預設'),
+  );
+
+const fixedDialogItem = ref<CartItem | null>(null);
+// fixedDialogList 為編輯中的草稿，按「確定」才寫回 item.bundleItems。
+const fixedDialogList = ref<CartBundleItem[]>([]);
+const openFixedDialog = (item: CartItem) => {
+  fixedDialogItem.value = item;
+  fixedDialogList.value = (item.bundleItems ?? []).map((b) => ({ ...b }));
+};
+const closeFixedDialog = () => {
+  fixedDialogItem.value = null;
+};
+const setFixedSpec = (idx: number, value: string) => {
+  const row = fixedDialogList.value[idx];
+  if (row) row.spec = value;
+};
+const confirmFixedDialog = () => {
+  const item = fixedDialogItem.value;
+  if (!item) return;
+  item.bundleItems = fixedDialogList.value.map((b) => ({ ...b }));
+  closeFixedDialog();
 };
 
 // 加價購：跟商品分類頁一樣，點按鈕跳 Dialog 選規格 + 數量。
@@ -1311,7 +1324,45 @@ const handleGoProduct = (productId?: number) => {
                 />
               </div>
 
-              <!-- 固定組合：子品內嵌顯示（規格下拉可改 / 數量顯示），維持原樣 -->
+              <!-- 固定組合(有可選規格)：收合摘要（子品 + 已選規格 / 待選規格）+ 選擇規格按鈕（規格改用彈窗選）-->
+              <div
+                v-else-if="item.bundleExpanded && fixedBundleHasSpec(item)"
+                class="flex flex-col gap-2"
+              >
+                <div
+                  v-if="item.bundleItems?.length"
+                  class="flex flex-col gap-1.5 text-sm text-slate-700"
+                >
+                  <template v-for="(sub, si) in item.bundleItems" :key="si">
+                    <!-- 已選規格：商品名稱（換行）規格 ×數量 -->
+                    <div
+                      v-if="sub.spec && sub.spec !== '預設'"
+                      class="flex flex-col"
+                    >
+                      <span>{{ sub.name }}</span>
+                      <span class="text-slate-500"
+                        >{{ sub.spec }} ×{{ (sub.qty || 0) * item.qty }}</span
+                      >
+                    </div>
+                    <!-- 待選規格：商品名稱 ×數量 / 待選規格 -->
+                    <span v-else>
+                      {{ sub.name }} ×{{ (sub.qty || 0) * item.qty }}
+                      <span class="text-red-500">/ 待選規格</span>
+                    </span>
+                  </template>
+                </div>
+                <Button
+                  :label="fixedBundleAllChosen(item) ? '修改規格' : '選擇規格'"
+                  icon="pi pi-sliders-h"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  class="!min-h-8 w-fit"
+                  @click="openFixedDialog(item)"
+                />
+              </div>
+
+              <!-- 固定組合(規格固定，無可選規格)：子品內嵌顯示（圖 + 名 + 規格文字 + 數量），維持原樣 -->
               <div
                 v-else-if="item.bundleExpanded"
                 class="grid grid-cols-1 gap-3 @3xl:grid-cols-2"
@@ -1329,60 +1380,16 @@ const handleGoProduct = (productId?: number) => {
                   >
                     <ProductImage :src="sub.image" :alt="sub.name" size="md" />
                   </button>
-                  <div class="flex min-w-0 flex-1 flex-col gap-1">
+                  <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                     <p class="truncate text-base font-semibold text-slate-700">
                       {{ sub.name }}
                     </p>
-                    <p
-                      v-if="subNeedsAttention(sub, item)"
-                      class="text-sm font-medium text-red-500"
-                    >
-                      {{ subMissingText(sub, item) }}
+                    <!-- 商品名稱（換行）規格 ×數量，不顯示「數量」label -->
+                    <p class="text-sm text-slate-500">
+                      <template v-if="sub.spec && sub.spec !== '預設'"
+                        >{{ sub.spec }} </template
+                      >×{{ (sub.qty || 0) * item.qty }}
                     </p>
-                    <!-- 規格：catalog 有 specOptions → 內嵌 Select 可改；否則顯示文字 -->
-                    <template v-if="subSpecOptionsFor(item, sub, si)">
-                      <div
-                        class="flex items-center gap-2 text-sm text-slate-700"
-                      >
-                        <Select
-                          :model-value="sub.spec || null"
-                          :options="subSpecOptionsFor(item, sub, si) ?? []"
-                          placeholder="請選擇規格"
-                          class="min-w-0 flex-1"
-                          @update:model-value="(v) => setSubSpec(sub, v)"
-                        />
-                      </div>
-                    </template>
-                    <div
-                      v-else-if="sub.spec && sub.spec !== '預設'"
-                      class="flex gap-4 text-sm text-slate-700"
-                    >
-                      <span>{{ sub.spec }}</span>
-                    </div>
-                    <!-- 任選組合：可調整子品數量（+/- stepper）；固定組合：純顯示數量 -->
-                    <div
-                      v-if="isPickBundleItem(item)"
-                      class="flex items-center gap-2 text-sm text-slate-700"
-                    >
-                      <span class="shrink-0">數量</span>
-                      <InputNumber
-                        :model-value="sub.qty"
-                        :min="0"
-                        :max-fraction-digits="0"
-                        :allow-empty="false"
-                        :disabled="isQtyLocked(group)"
-                        show-buttons
-                        button-layout="horizontal"
-                        increment-button-icon="pi pi-plus"
-                        decrement-button-icon="pi pi-minus"
-                        class="qty-stepper min-w-0 flex-1"
-                        @update:model-value="(v) => setSubQty(sub, v)"
-                      />
-                    </div>
-                    <div v-else class="flex gap-4 text-sm text-slate-700">
-                      <span>數量</span
-                      ><span>{{ (sub.qty || 0) * item.qty }}</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1887,13 +1894,13 @@ const handleGoProduct = (productId?: number) => {
                 :max="dlgDraftMax()"
                 :max-fraction-digits="0"
                 :allow-empty="false"
+                show-buttons
+                button-layout="horizontal"
+                increment-button-icon="pi pi-plus"
+                decrement-button-icon="pi pi-minus"
                 placeholder="數量"
-                class="w-full"
-                :input-style="{
-                  textAlign: 'center',
-                  height: '2.5rem',
-                  minHeight: '2.5rem',
-                }"
+                class="qty-stepper qty-keep-stepper is-fluid"
+                :input-style="{ textAlign: 'center' }"
                 @update:model-value="(v) => setDlgQty(v)"
               />
             </div>
@@ -2063,7 +2070,7 @@ const handleGoProduct = (productId?: number) => {
                   button-layout="horizontal"
                   increment-button-icon="pi pi-plus"
                   decrement-button-icon="pi pi-minus"
-                  class="qty-stepper min-w-0 flex-1"
+                  class="qty-stepper qty-keep-stepper min-w-0 flex-1"
                   @update:model-value="(v) => pdSetOptQty(opt.id, v)"
                 />
               </div>
@@ -2078,15 +2085,11 @@ const handleGoProduct = (productId?: number) => {
           </div>
         </div>
 
-        <!-- 已選：黏在彈窗底部，可收合，預設收合（全站一致排版） -->
+        <!-- 已選：黏在彈窗底部，明細直接展開（不收合） -->
         <div
           class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
         >
-          <button
-            type="button"
-            class="flex w-full items-center justify-between text-sm"
-            @click="isPickPickedExpanded = !isPickPickedExpanded"
-          >
+          <div class="flex w-full items-center text-sm">
             <span
               :class="
                 pdOver()
@@ -2098,17 +2101,8 @@ const handleGoProduct = (productId?: number) => {
             >
               已選 {{ pdTotal() }}/{{ pdNeed() }}
             </span>
-            <span class="flex items-center gap-1 text-xs text-slate-400">
-              {{ isPickPickedExpanded ? '收合' : '展開' }}
-              <i
-                class="pi text-xs"
-                :class="
-                  isPickPickedExpanded ? 'pi-chevron-down' : 'pi-chevron-up'
-                "
-              />
-            </span>
-          </button>
-          <div v-show="isPickPickedExpanded" class="mt-2 flex flex-col gap-2">
+          </div>
+          <div class="mt-2 flex flex-col gap-2">
             <p class="text-xs font-medium text-slate-500">已選內容</p>
             <template v-if="pickDialogList.length">
               <div
@@ -2159,6 +2153,67 @@ const handleGoProduct = (productId?: number) => {
             @click="closePickDialog()"
           />
           <Button label="確定" @click="confirmPickDialog()" />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- 固定組合：選擇規格彈窗（子品固定，只選規格；無加入 / 已選 / 任選件數）-->
+    <Dialog
+      :visible="!!fixedDialogItem"
+      modal
+      :draggable="false"
+      header="選擇規格"
+      :breakpoints="{ '768px': '92vw' }"
+      :style="{ width: '460px' }"
+      @update:visible="(v) => !v && closeFixedDialog()"
+    >
+      <div v-if="fixedDialogItem" class="flex flex-col gap-4">
+        <div class="flex flex-col gap-0.5">
+          <p class="text-sm font-medium text-slate-700">
+            {{ fixedDialogItem.name }}
+          </p>
+          <p class="text-sm text-slate-500">
+            此組合為固定搭配，請選擇各品項規格
+          </p>
+        </div>
+        <div class="flex flex-col gap-3">
+          <div
+            v-for="(sub, si) in fixedDialogList"
+            :key="si"
+            class="flex items-start gap-3"
+          >
+            <div
+              class="aspect-square w-16 shrink-0 overflow-hidden rounded-lg bg-slate-200"
+            >
+              <ProductImage :src="sub.image" :alt="sub.name" size="md" />
+            </div>
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <p class="text-sm font-semibold text-slate-700">
+                {{ sub.name }}
+              </p>
+              <Select
+                v-if="subSpecOptionsFor(fixedDialogItem, sub, si)"
+                :model-value="sub.spec || null"
+                :options="subSpecOptionsFor(fixedDialogItem, sub, si) ?? []"
+                placeholder="請選擇規格"
+                class="w-full"
+                @update:model-value="(v) => setFixedSpec(si, v)"
+              />
+              <span v-else class="text-sm text-slate-500">{{ sub.spec }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <Button
+            label="取消"
+            severity="secondary"
+            outlined
+            @click="closeFixedDialog()"
+          />
+          <Button label="確定" @click="confirmFixedDialog()" />
         </div>
       </template>
     </Dialog>
