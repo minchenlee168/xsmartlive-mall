@@ -100,7 +100,9 @@ body {
   height: 34px;
 }
 .qty-stepper .p-inputnumber-input {
-  width: 48px;
+  width: 56px;
+  padding-left: 6px;
+  padding-right: 6px;
   text-align: center;
 }
 .qty-stepper .p-inputnumber-button {
@@ -110,10 +112,9 @@ body {
   height: 26px;
 }
 .qty-stepper.is-sm .p-inputnumber-input {
-  width: 36px;
+  width: 40px;
   font-size: 11px;
-  padding-top: 0;
-  padding-bottom: 0;
+  padding: 0 2px;
 }
 .qty-stepper.is-sm .p-inputnumber-button {
   width: 26px;
