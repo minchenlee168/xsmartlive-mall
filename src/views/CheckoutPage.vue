@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+} from 'vue';
 import { useRouter } from 'vue-router';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
@@ -352,7 +359,9 @@ const CVS_LOGOS: Record<CvsChain, string> = {
   FamilyMart: `${import.meta.env.BASE_URL}member-icons/family.svg`,
 };
 /** 該組已選門市 + 依溫層算出的運費；未選 / 門市無鏈別 → null。 */
-const cvsPickOf = (g: CheckoutGroup): { store: Address; fee: number } | null => {
+const cvsPickOf = (
+  g: CheckoutGroup,
+): { store: Address; fee: number } | null => {
   const storeId = cvsStoreByGroup.value[g.id];
   if (storeId == null) return null;
   const store = cvsStoreList.value.find((s) => s.id === storeId);
@@ -488,7 +497,8 @@ const groupRecipient = (
       return null;
     return {
       name: pickupContactName.value,
-      phone: `${pickupContactPhoneCode.value} ${pickupContactPhone.value}`.trim(),
+      phone:
+        `${pickupContactPhoneCode.value} ${pickupContactPhone.value}`.trim(),
     };
   }
   if (m === 'store') {
@@ -1139,7 +1149,7 @@ const handlePlaceOrder = () => {
 
     <!-- Page header -->
     <div>
-      <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-5">
+      <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
         <Button
           icon="pi pi-arrow-left"
           severity="secondary"
@@ -1162,8 +1172,7 @@ const handlePlaceOrder = () => {
           <span class="font-medium text-slate-700">配送資訊</span>
           <i
             v-tooltip.bottom="{
-              value:
-                '此處設定會套用到所有訂單；也可於下方各訂單明細個別調整。',
+              value: '此處設定會套用到所有訂單；也可於下方各訂單明細個別調整。',
               event: 'focus',
             }"
             class="pi pi-question-circle cursor-pointer text-sm text-slate-400 transition-colors hover:text-slate-600"
@@ -1195,9 +1204,7 @@ const handlePlaceOrder = () => {
             />
           </div>
           <!-- 各訂單已選配送方式 / 地址 / 門市摘要 -->
-          <div
-            class="mt-1 flex flex-col gap-2 border-t border-slate-100 pt-3"
-          >
+          <div class="mt-1 flex flex-col gap-2 border-t border-slate-100 pt-3">
             <div
               v-for="g in checkoutGroups"
               :key="g.id"
@@ -1208,11 +1215,9 @@ const handlePlaceOrder = () => {
                 groupShipSummaryLabel(g)
               }}</span>
               <span v-else class="text-slate-400">尚未選擇配送方式</span>
-              <span
-                v-if="groupShipDetail(g)"
-                class="w-full text-slate-500"
-                >{{ groupShipDetail(g) }}</span
-              >
+              <span v-if="groupShipDetail(g)" class="w-full text-slate-500">{{
+                groupShipDetail(g)
+              }}</span>
             </div>
           </div>
         </div>
@@ -1555,10 +1560,7 @@ const handlePlaceOrder = () => {
               />
             </div>
           </template>
-          <div
-            v-else-if="invoiceType === 'mobile'"
-            class="flex flex-col gap-1"
-          >
+          <div v-else-if="invoiceType === 'mobile'" class="flex flex-col gap-1">
             <label class="text-sm text-slate-700">手機條碼</label>
             <InputText
               v-model="invoiceMobileBarcode"
@@ -1894,10 +1896,7 @@ const handlePlaceOrder = () => {
             class="absolute right-6 left-6 h-px bg-[var(--primary)] shadow-[0_0_12px_2px_var(--primary)]"
           ></span>
           <!-- 授權失敗 fallback -->
-          <i
-            v-if="cameraError"
-            class="pi pi-qrcode text-6xl text-white/40"
-          ></i>
+          <i v-if="cameraError" class="pi pi-qrcode text-6xl text-white/40"></i>
         </div>
         <p
           v-if="cameraError"
@@ -2134,7 +2133,8 @@ const handlePlaceOrder = () => {
                 <p
                   v-if="
                     shipDrawerGroupId == null &&
-                    supportedShippingMethods.length < SHIPPING_METHOD_ORDER.length
+                    supportedShippingMethods.length <
+                      SHIPPING_METHOD_ORDER.length
                   "
                   class="rounded bg-amber-50 px-3 py-2 text-xs text-amber-700"
                 >
@@ -2174,7 +2174,8 @@ const handlePlaceOrder = () => {
                   <!-- 宅配 / 郵局宅配：共用收件地址清單 -->
                   <div
                     v-if="
-                      drawerSelectedMethod === m && (m === 'home' || m === 'post')
+                      drawerSelectedMethod === m &&
+                      (m === 'home' || m === 'post')
                     "
                     class="flex flex-col gap-2"
                   >

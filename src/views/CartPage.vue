@@ -157,8 +157,7 @@ const lineDisplayTotal = (item: CartItem): number =>
   effectiveUnitPrice(item) * item.qty;
 
 /** 尚未套用買多優惠的價格（僅買多優惠達標時顯示、劃線用）：單價 × 數量。 */
-const preBulkDiscountTotal = (item: CartItem): number =>
-  item.price * item.qty;
+const preBulkDiscountTotal = (item: CartItem): number => item.price * item.qty;
 
 /** 金額顯示：為 1000 的整數倍 → 以 k 表示（如 19000 → 19k）；否則千分位。 */
 const formatMoney = (n: number): string =>
@@ -389,10 +388,17 @@ const isAxisOptionAvailable = (
   });
 };
 /** 給 Select 的選項（售完 → disable 並標「（售完）」）。 */
-const axisOptionsFor = (item: CartItem, axis: { name: string; options: string[] }) =>
+const axisOptionsFor = (
+  item: CartItem,
+  axis: { name: string; options: string[] },
+) =>
   axis.options.map((opt) => {
     const available = isAxisOptionAvailable(item, axis.name, opt);
-    return { label: available ? opt : `${opt}（售完）`, value: opt, disabled: !available };
+    return {
+      label: available ? opt : `${opt}（售完）`,
+      value: opt,
+      disabled: !available,
+    };
   });
 /** 選某軸 → 更新草稿並即時重驗：各軸選滿且該 SKU 有貨 → 寫回規格；否則退回待選、清掉已定規格（擋結帳）。 */
 const setPendingAxis = (item: CartItem, axisName: string, value: string) => {
@@ -401,7 +407,9 @@ const setPendingAxis = (item: CartItem, axisName: string, value: string) => {
   const axes = specAxesOf(item);
   const complete = axes.length > 0 && axes.every((a) => merged[a.name]);
   const matched = complete
-    ? skusOf(item).find((s) => axes.every((a) => s.spec[a.name] === merged[a.name]))
+    ? skusOf(item).find((s) =>
+        axes.every((a) => s.spec[a.name] === merged[a.name]),
+      )
     : undefined;
   if (matched && matched.stock > 0) {
     item.spec = axes.map((a) => merged[a.name]).join(' / ');
@@ -436,7 +444,9 @@ const BID_SUMMARY_LIMIT = 3;
 const bidRowsExpanded = ref<Record<string, boolean>>({});
 const visibleBidRows = (item: CartItem) => {
   const rows = bidAllocRows(item);
-  return bidRowsExpanded.value[item.id] ? rows : rows.slice(0, BID_SUMMARY_LIMIT);
+  return bidRowsExpanded.value[item.id]
+    ? rows
+    : rows.slice(0, BID_SUMMARY_LIMIT);
 };
 const toggleBidRows = (item: CartItem) => {
   bidRowsExpanded.value = {
@@ -534,7 +544,9 @@ const dlgSku = () => {
   const axes = specAxesOf(item);
   const d = bidRowDraft.value.spec;
   if (!axes.length || !axes.every((a) => d[a.name])) return undefined;
-  return skusOf(item).find((s) => axes.every((a) => s.spec[a.name] === d[a.name]));
+  return skusOf(item).find((s) =>
+    axes.every((a) => s.spec[a.name] === d[a.name]),
+  );
 };
 const dlgDraftMax = (): number => {
   const sku = dlgSku();
@@ -859,7 +871,7 @@ const handleGoProduct = (productId?: number) => {
 
     <!-- Page header -->
     <div>
-      <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-[22px]">
+      <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
         <Button
           icon="pi pi-arrow-left"
           severity="secondary"
@@ -982,11 +994,15 @@ const handleGoProduct = (productId?: number) => {
               </button>
             </div>
 
-            <!-- Info：左側商品資訊 + 右側價格/刪除 -->
-            <div class="flex min-w-0 flex-1 items-start gap-3 @7xl:gap-4">
-              <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+            <!-- 批次下標：全寬兩排（名稱↔金額 / 數量↔挑選規格），左右邊界一致 -->
+            <div
+              v-if="item.isBidBatch"
+              class="flex min-w-0 flex-1 flex-col gap-1.5"
+            >
+              <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
+              <div class="flex items-start justify-between gap-3">
                 <p
-                  class="line-clamp-2 text-base font-bold text-slate-950"
+                  class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
                   :class="
                     item.productId != null
                       ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
@@ -996,134 +1012,7 @@ const handleGoProduct = (productId?: number) => {
                 >
                   {{ item.name }}
                 </p>
-                <!-- 批次下標：已挑選規格摘要（規格 + 數量，太多列可展開）+ 挑選按鈕 -->
-                <div v-if="item.isBidBatch" class="flex flex-col gap-1.5">
-                  <div
-                    v-if="bidAllocRows(item).length"
-                    class="flex flex-col gap-0.5 text-sm text-slate-700"
-                  >
-                    <span
-                      v-for="row in visibleBidRows(item)"
-                      :key="row.skuId"
-                    >
-                      {{ row.label }} ×{{ row.qty }}
-                    </span>
-                    <button
-                      v-if="bidAllocRows(item).length > BID_SUMMARY_LIMIT"
-                      type="button"
-                      class="flex w-fit items-center gap-1 text-xs text-slate-500 hover:text-[color:var(--primary)]"
-                      @click="toggleBidRows(item)"
-                    >
-                      <span>{{
-                        bidRowsExpanded[item.id]
-                          ? '收合'
-                          : `查看更多（${bidAllocRows(item).length - BID_SUMMARY_LIMIT}）`
-                      }}</span>
-                      <i
-                        :class="[
-                          'pi text-[10px]',
-                          bidRowsExpanded[item.id]
-                            ? 'pi-chevron-up'
-                            : 'pi-chevron-down',
-                        ]"
-                      />
-                    </button>
-                  </div>
-                  <Button
-                    :label="committedTotal(item) > 0 ? '修改規格' : '挑選規格'"
-                    icon="pi pi-sliders-h"
-                    severity="secondary"
-                    outlined
-                    size="small"
-                    class="!min-h-8 w-fit"
-                    @click="openBidDialog(item)"
-                  />
-                </div>
-                <!-- 單品後選規格：SKU 規格下拉常駐可改；未選滿顯示「待選規格」 -->
-                <div
-                  v-else-if="specAxesOf(item).length"
-                  class="flex flex-col gap-2"
-                >
-                  <span
-                    v-if="item.specPending"
-                    class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
-                  >
-                    <i class="pi pi-exclamation-circle text-[10px]" />
-                    待選規格
-                  </span>
-                  <div
-                    v-for="axis in specAxesOf(item)"
-                    :key="axis.name"
-                    class="flex items-center gap-2 text-sm"
-                  >
-                    <span class="w-10 shrink-0 text-slate-600">{{
-                      axis.name
-                    }}</span>
-                    <Select
-                      :model-value="draftValueOf(item, axis.name)"
-                      :options="axisOptionsFor(item, axis)"
-                      option-label="label"
-                      option-value="value"
-                      option-disabled="disabled"
-                      placeholder="請選擇"
-                      class="min-w-0 flex-1"
-                      @update:model-value="
-                        (v) => setPendingAxis(item, axis.name, v)
-                      "
-                    />
-                  </div>
-                </div>
-                <div
-                  v-else-if="item.spec && item.spec !== '預設'"
-                  class="text-sm text-slate-600"
-                >
-                  {{ item.spec }}
-                </div>
-                <!-- 數量：全尺寸都與商品名同欄（對齊商品名稱）、刪除移至右側價格欄 -->
-                <div class="flex items-center gap-3 text-sm">
-                  <span class="text-slate-600">數量</span>
-                  <InputNumber
-                    v-model="item.qty"
-                    :min="1"
-                    :max-fraction-digits="0"
-                    :allow-empty="false"
-                    :disabled="isQtyLocked(group)"
-                    show-buttons
-                    button-layout="horizontal"
-                    increment-button-icon="pi pi-plus"
-                    decrement-button-icon="pi pi-minus"
-                    class="qty-stepper"
-                  />
-                </div>
-                <!-- 批次下標「待挑選規格」badge（緊接數量下方） -->
-                <span
-                  v-if="item.isBidBatch && item.specPending"
-                  class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
-                >
-                  <i class="pi pi-exclamation-circle text-[10px]" />
-                  待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
-                </span>
-                <!-- 買多優惠提示（緊接在數量下方） -->
-                <div
-                  v-if="item.bulkDiscount"
-                  class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
-                  :class="
-                    hasBulkDiscount(item)
-                      ? 'bg-green-50 text-green-700'
-                      : 'bg-amber-50 text-amber-700'
-                  "
-                >
-                  <i class="pi pi-tag text-[10px]" />
-                  <span>{{ item.bulkDiscount.note }}</span>
-                  <span v-if="hasBulkDiscount(item)" class="font-medium">
-                    · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Right column：NTD 價格（上）+ 刪除（下） -->
-              <div class="flex shrink-0 flex-col items-end gap-2">
-                <div class="flex flex-col items-end gap-0.5">
+                <div class="flex shrink-0 flex-col items-end gap-0.5">
                   <Tag
                     v-if="hasBulkDiscount(item)"
                     value="已達買多優惠"
@@ -1143,6 +1032,189 @@ const handleGoProduct = (productId?: number) => {
                     ${{ formatMoney(preBulkDiscountTotal(item)) }}
                   </span>
                 </div>
+              </div>
+
+              <!-- 已挑選規格摘要（規格 ×數量，太多列可展開） -->
+              <div
+                v-if="bidAllocRows(item).length"
+                class="flex flex-col gap-0.5 text-sm text-slate-700"
+              >
+                <span v-for="row in visibleBidRows(item)" :key="row.skuId">
+                  {{ row.label }} ×{{ row.qty }}
+                </span>
+                <button
+                  v-if="bidAllocRows(item).length > BID_SUMMARY_LIMIT"
+                  type="button"
+                  class="flex w-fit items-center gap-1 text-xs text-slate-500 hover:text-[color:var(--primary)]"
+                  @click="toggleBidRows(item)"
+                >
+                  <span>{{
+                    bidRowsExpanded[item.id]
+                      ? '收合'
+                      : `查看更多（${bidAllocRows(item).length - BID_SUMMARY_LIMIT}）`
+                  }}</span>
+                  <i
+                    :class="[
+                      'pi text-[10px]',
+                      bidRowsExpanded[item.id]
+                        ? 'pi-chevron-up'
+                        : 'pi-chevron-down',
+                    ]"
+                  />
+                </button>
+              </div>
+
+              <!-- 第 2 排：數量（左）… 挑選/修改規格（右，右緣對齊上方金額） -->
+              <div
+                class="flex flex-wrap items-center justify-between gap-3 text-sm"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="text-slate-600">數量</span>
+                  <InputNumber
+                    v-model="item.qty"
+                    :min="1"
+                    :max-fraction-digits="0"
+                    :allow-empty="false"
+                    :disabled="isQtyLocked(group)"
+                    show-buttons
+                    button-layout="horizontal"
+                    increment-button-icon="pi pi-plus"
+                    decrement-button-icon="pi pi-minus"
+                    class="qty-stepper"
+                  />
+                </div>
+                <Button
+                  :label="committedTotal(item) > 0 ? '修改規格' : '挑選規格'"
+                  icon="pi pi-sliders-h"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  class="!min-h-8"
+                  @click="openBidDialog(item)"
+                />
+              </div>
+
+              <!-- 待挑選規格 badge（緊接第 2 排下方） -->
+              <span
+                v-if="item.specPending"
+                class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
+              >
+                <i class="pi pi-exclamation-circle text-[10px]" />
+                待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
+              </span>
+
+              <!-- 買多優惠提示 -->
+              <div
+                v-if="item.bulkDiscount"
+                class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                :class="
+                  hasBulkDiscount(item)
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-amber-50 text-amber-700'
+                "
+              >
+                <i class="pi pi-tag text-[10px]" />
+                <span>{{ item.bulkDiscount.note }}</span>
+                <span v-if="hasBulkDiscount(item)" class="font-medium">
+                  · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 非批次下標：全寬兩排（名稱↔金額 / 數量↔刪除），左右邊界一致 -->
+            <div v-else class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
+              <div class="flex items-start justify-between gap-3">
+                <p
+                  class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
+                  :class="
+                    item.productId != null
+                      ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
+                      : ''
+                  "
+                  @click="handleGoProduct(item.productId)"
+                >
+                  {{ item.name }}
+                </p>
+                <div class="flex shrink-0 flex-col items-end gap-0.5">
+                  <Tag
+                    v-if="hasBulkDiscount(item)"
+                    value="已達買多優惠"
+                    severity="success"
+                    class="!py-0.5 !text-[10px]"
+                  />
+                  <span
+                    class="text-base font-bold whitespace-nowrap @7xl:text-lg"
+                    style="color: var(--primary)"
+                  >
+                    ${{ formatMoney(lineDisplayTotal(item)) }}
+                  </span>
+                  <span
+                    v-if="hasBulkDiscount(item)"
+                    class="text-xs whitespace-nowrap text-slate-500 line-through"
+                  >
+                    ${{ formatMoney(preBulkDiscountTotal(item)) }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 單品後選規格：SKU 規格下拉常駐可改；未選滿顯示「待選規格」 -->
+              <div v-if="specAxesOf(item).length" class="flex flex-col gap-2">
+                <span
+                  v-if="item.specPending"
+                  class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
+                >
+                  <i class="pi pi-exclamation-circle text-[10px]" />
+                  待選規格
+                </span>
+                <div
+                  v-for="axis in specAxesOf(item)"
+                  :key="axis.name"
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <span class="w-10 shrink-0 text-slate-600">{{
+                    axis.name
+                  }}</span>
+                  <Select
+                    :model-value="draftValueOf(item, axis.name)"
+                    :options="axisOptionsFor(item, axis)"
+                    option-label="label"
+                    option-value="value"
+                    option-disabled="disabled"
+                    placeholder="請選擇"
+                    class="min-w-0 flex-1"
+                    @update:model-value="
+                      (v) => setPendingAxis(item, axis.name, v)
+                    "
+                  />
+                </div>
+              </div>
+              <div
+                v-else-if="item.spec && item.spec !== '預設'"
+                class="text-sm text-slate-600"
+              >
+                {{ item.spec }}
+              </div>
+
+              <!-- 第 2 排：數量（左）… 刪除（右，右緣對齊上方金額） -->
+              <div
+                class="flex flex-wrap items-center justify-between gap-3 text-sm"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="text-slate-600">數量</span>
+                  <InputNumber
+                    v-model="item.qty"
+                    :min="1"
+                    :max-fraction-digits="0"
+                    :allow-empty="false"
+                    :disabled="isQtyLocked(group)"
+                    show-buttons
+                    button-layout="horizontal"
+                    increment-button-icon="pi pi-plus"
+                    decrement-button-icon="pi pi-minus"
+                    class="qty-stepper"
+                  />
+                </div>
                 <Button
                   v-if="!isDefaultMode(group)"
                   label="刪除"
@@ -1154,8 +1226,24 @@ const handleGoProduct = (productId?: number) => {
                   @click="removeItem(group, item.id)"
                 />
               </div>
-            </div>
 
+              <!-- 買多優惠提示（緊接在第 2 排下方） -->
+              <div
+                v-if="item.bulkDiscount"
+                class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                :class="
+                  hasBulkDiscount(item)
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-amber-50 text-amber-700'
+                "
+              >
+                <i class="pi pi-tag text-[10px]" />
+                <span>{{ item.bulkDiscount.note }}</span>
+                <span v-if="hasBulkDiscount(item)" class="font-medium">
+                  · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
+                </span>
+              </div>
+            </div>
           </div>
 
           <!-- 商品備註：跟在商品列下方，若有 note 才顯示 -->
@@ -1773,9 +1861,7 @@ const handleGoProduct = (productId?: number) => {
         </div>
 
         <!-- 新增分配列：各軸規格（最多 3）+ 數量 → 加入 -->
-        <div
-          class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3"
-        >
+        <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
           <div class="grid grid-cols-2 gap-2">
             <div
               v-for="axis in specAxesOf(bidDialogItem)"
@@ -1822,7 +1908,7 @@ const handleGoProduct = (productId?: number) => {
 
         <!-- 已挑選：黏在彈窗底部，可收合，預設收合（全站一致排版） -->
         <div
-          class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pb-4 pt-3"
+          class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
         >
           <button
             type="button"
@@ -1999,7 +2085,7 @@ const handleGoProduct = (productId?: number) => {
 
         <!-- 已選：黏在彈窗底部，可收合，預設收合（全站一致排版） -->
         <div
-          class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pb-4 pt-3"
+          class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
         >
           <button
             type="button"
