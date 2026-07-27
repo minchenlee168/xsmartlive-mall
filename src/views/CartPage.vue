@@ -866,6 +866,24 @@ const handleGoCheckout = () => {
     ui.toast(`「${pausedWithChecked.sellerName}」暫停結帳中，無法下單`, 'warn');
     return;
   }
+  // 批次下標未挑滿得標數量 → 軟提示（可堅持前往；結帳頁只帶已挑選規格的數量）
+  if (partialBidItems.value.length > 0) {
+    isPartialBidConfirmVisible.value = true;
+    return;
+  }
+  router.push('/checkout');
+};
+
+/** 已勾選但尚未挑滿得標數量規格的批次下標商品。 */
+const partialBidItems = computed(() =>
+  groups.value
+    .flatMap((g) => g.items)
+    .filter((i) => i.checked && i.isBidBatch && committedTotal(i) < i.qty),
+);
+const isPartialBidConfirmVisible = ref(false);
+/** 使用者堅持前往結帳：關閉提示並導向結帳頁。 */
+const confirmPartialBidCheckout = () => {
+  isPartialBidConfirmVisible.value = false;
   router.push('/checkout');
 };
 
@@ -1930,11 +1948,14 @@ const handleGoProduct = (productId?: number) => {
                     : 'text-amber-700'
               "
             >
-              已挑選 {{ dlgTotal() }}/{{ bidDialogItem.qty }}
+              請挑選並加入規格，已挑選 {{ dlgTotal() }} 件，剩餘
+              {{ dlgRemaining() }} 件。
             </span>
           </div>
           <div class="mt-2 flex flex-col gap-2">
-            <p class="text-xs font-medium text-slate-500">已選規格</p>
+            <p class="text-xs font-medium text-slate-500">
+              已選規格 {{ dlgTotal() }}/{{ bidDialogItem.qty }}
+            </p>
             <template v-if="dlgRows().length">
               <div
                 v-for="row in dlgRows()"
@@ -2214,6 +2235,53 @@ const handleGoProduct = (productId?: number) => {
             @click="closeFixedDialog()"
           />
           <Button label="確定" @click="confirmFixedDialog()" />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- 批次下標未挑滿得標數量：提示可否仍前往結帳（未挑選數量不帶入結帳）-->
+    <Dialog
+      v-model:visible="isPartialBidConfirmVisible"
+      modal
+      :draggable="false"
+      header="尚未挑選完規格"
+      :breakpoints="{ '768px': '90vw' }"
+      :style="{ width: '440px' }"
+    >
+      <div class="flex flex-col gap-3 text-sm text-slate-700">
+        <p>以下商品尚未挑選完得標數量的規格：</p>
+        <ul class="flex flex-col gap-1">
+          <li
+            v-for="i in partialBidItems"
+            :key="i.id"
+            class="flex items-start gap-1.5"
+          >
+            <i
+              class="pi pi-exclamation-circle mt-0.5 shrink-0 text-xs text-amber-500"
+            />
+            <span>
+              {{ i.name }}（已挑選 {{ committedTotal(i) }} / {{ i.qty }} 件）
+            </span>
+          </li>
+        </ul>
+        <p class="text-slate-500">
+          仍可前往結帳，但<span class="font-medium text-slate-700"
+            >未挑選規格的數量不會帶入結帳</span
+          >，結帳頁僅結算已挑選規格的數量。
+        </p>
+      </div>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <Button
+            label="返回挑選"
+            @click="isPartialBidConfirmVisible = false"
+          />
+          <Button
+            label="仍要前往結帳"
+            severity="secondary"
+            outlined
+            @click="confirmPartialBidCheckout()"
+          />
         </div>
       </template>
     </Dialog>

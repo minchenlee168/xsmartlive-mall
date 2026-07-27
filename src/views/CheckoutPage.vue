@@ -20,6 +20,7 @@ import {
   type PaymentMethodId,
 } from '../pinia/cart';
 import { useOrdersStore } from '../pinia/orders';
+import { products } from '../data/products';
 import { useAuthStore } from '../pinia/auth';
 import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
 import { useCountdown } from '../composables/useCountdown';
@@ -233,14 +234,42 @@ const tempOfTags = (tags: CartTag[]): TempLayer =>
   (tags.find((t) => TEMP_LABELS.includes(t.label as TempLayer))
     ?.label as TempLayer) ?? '常溫';
 
-/** 依購物車拆組的商品明細；每組只保留有勾選的商品（結帳頁只讀，不可改動）。 */
+/** 批次下標：已選規格分配的總數（結帳只計已挑選規格的數量）。 */
+const committedBidQty = (item: CartItem): number =>
+  Object.values(item.specAllocation ?? {}).reduce((a, b) => a + b, 0);
+
+/** 批次下標：把 specAllocation（SKU→數量）解析成「規格文字 ×數量」明細列。 */
+const bidAllocRows = (
+  item: CartItem,
+): { skuId: string; label: string; qty: number }[] => {
+  const cat = products.find((p) => p.id === item.productId);
+  const axes = cat?.specAxes ?? [];
+  const skus = cat?.skus ?? [];
+  return Object.entries(item.specAllocation ?? {}).map(([skuId, qty]) => {
+    const sku = skus.find((s) => s.id === skuId);
+    return {
+      skuId,
+      label: sku ? axes.map((a) => sku.spec[a.name]).join(' / ') : skuId,
+      qty,
+    };
+  });
+};
+
+/**
+ * 依購物車拆組的商品明細；每組只保留有勾選的商品（結帳頁只讀，不可改動）。
+ * 批次下標商品：數量只帶「已挑選規格的數量」（committedBidQty），未挑選的不帶入結帳；
+ * 完全未挑選（0 件）則不出現在結帳頁。
+ */
 const checkoutGroups = computed<CheckoutGroup[]>(() =>
   cartStore.groups
     .map((g) => ({
       id: g.id,
       sellerName: g.sellerName,
       tempLayer: tempOfTags(g.tags),
-      items: g.items.filter((i) => i.checked),
+      items: g.items
+        .filter((i) => i.checked)
+        .map((i) => (i.isBidBatch ? { ...i, qty: committedBidQty(i) } : i))
+        .filter((i) => i.qty > 0),
       shippingMethods: g.shippingMethods,
       paymentMethods: g.paymentMethods,
     }))
@@ -1262,6 +1291,15 @@ const handlePlaceOrder = () => {
                 class="flex gap-4 text-sm text-slate-700"
               >
                 <span class="truncate">{{ item.spec }}</span>
+              </div>
+              <!-- 批次下標：已挑選規格明細（規格 ×數量） -->
+              <div
+                v-if="item.isBidBatch && bidAllocRows(item).length"
+                class="flex flex-col gap-0.5 text-sm text-slate-700"
+              >
+                <span v-for="row in bidAllocRows(item)" :key="row.skuId">
+                  {{ row.label }} ×{{ row.qty }}
+                </span>
               </div>
               <!-- 組合商品內容（不可收合，直接列出） -->
               <p
