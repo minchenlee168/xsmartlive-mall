@@ -130,12 +130,13 @@ body {
 
 /* 手機尺寸（< 768px）：數量欄只顯示純輸入框，隱藏 +/- 按鈕；平板 / PC 才有加減 stepper。
    刻意用 @media 而非 @container：挑選內容等彈窗會 teleport 到 body、跑出裝置模擬 frame，
-   @container 無法涵蓋彈窗內的數量欄；改用視窗寬度（預覽時瀏覽器寬度即裝置寬度）統一涵蓋頁面內 + 彈窗內。 */
+   @container 無法涵蓋彈窗內的數量欄；改用視窗寬度（預覽時瀏覽器寬度即裝置寬度）統一涵蓋頁面內 + 彈窗內。
+   例外：`.qty-keep-stepper`（購物車頁主商品列數量欄）手機版仍保留 +/- 按鈕，與 PC 一致。 */
 @media (max-width: 767px) {
-  .qty-stepper .p-inputnumber-button {
+  .qty-stepper:not(.qty-keep-stepper) .p-inputnumber-button {
     display: none;
   }
-  .qty-stepper .p-inputnumber-input {
+  .qty-stepper:not(.qty-keep-stepper) .p-inputnumber-input {
     width: 58px;
     border-radius: 6px;
   }

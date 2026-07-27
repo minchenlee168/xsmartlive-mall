@@ -462,13 +462,10 @@ const bidRowDraft = ref<{ spec: Record<string, string>; qty: number | null }>({
   spec: {},
   qty: null,
 });
-/** 底部「已挑選」區塊收合狀態，預設收合。 */
-const isBidPickedExpanded = ref(false);
 const openBidDialog = (item: CartItem) => {
   bidDialogItem.value = item;
   bidDialogAlloc.value = { ...(item.specAllocation ?? {}) };
   bidRowDraft.value = { spec: {}, qty: null };
-  isBidPickedExpanded.value = false;
 };
 const closeBidDialog = () => {
   bidDialogItem.value = null;
@@ -1069,7 +1066,7 @@ const handleGoProduct = (productId?: number) => {
                 class="flex flex-wrap items-center justify-between gap-3 text-sm"
               >
                 <div class="flex items-center gap-3">
-                  <span class="text-slate-600">數量</span>
+                  <span class="text-slate-600 max-md:hidden">數量</span>
                   <InputNumber
                     v-model="item.qty"
                     :min="1"
@@ -1080,7 +1077,7 @@ const handleGoProduct = (productId?: number) => {
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"
                     decrement-button-icon="pi pi-minus"
-                    class="qty-stepper"
+                    class="qty-stepper qty-keep-stepper"
                   />
                 </div>
                 <Button
@@ -1201,7 +1198,7 @@ const handleGoProduct = (productId?: number) => {
                 class="flex flex-wrap items-center justify-between gap-3 text-sm"
               >
                 <div class="flex items-center gap-3">
-                  <span class="text-slate-600">數量</span>
+                  <span class="text-slate-600 max-md:hidden">數量</span>
                   <InputNumber
                     v-model="item.qty"
                     :min="1"
@@ -1212,7 +1209,7 @@ const handleGoProduct = (productId?: number) => {
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"
                     decrement-button-icon="pi pi-minus"
-                    class="qty-stepper"
+                    class="qty-stepper qty-keep-stepper"
                   />
                 </div>
                 <Button
@@ -1397,12 +1394,14 @@ const handleGoProduct = (productId?: number) => {
         <div
           class="cart-divider-top flex items-center justify-between gap-4 px-[var(--card-pad)] py-4"
         >
-          <span class="text-sm text-slate-700 @3xl:text-lg">訂單金額小計</span>
+          <span class="text-sm text-slate-700 @3xl:text-base"
+            >訂單金額小計</span
+          >
           <span
-            class="text-xl font-bold @3xl:text-3xl"
+            class="text-xl font-bold @3xl:text-2xl"
             style="color: var(--primary)"
           >
-            <span class="text-sm @3xl:text-lg">NT$</span
+            <span class="text-sm @3xl:text-base">NT$</span
             >{{ formatMoney(groupSubtotal(group)) }}
           </span>
         </div>
@@ -1890,7 +1889,11 @@ const handleGoProduct = (productId?: number) => {
                 :allow-empty="false"
                 placeholder="數量"
                 class="w-full"
-                :input-style="{ textAlign: 'center' }"
+                :input-style="{
+                  textAlign: 'center',
+                  height: '2.5rem',
+                  minHeight: '2.5rem',
+                }"
                 @update:model-value="(v) => setDlgQty(v)"
               />
             </div>
@@ -1906,15 +1909,11 @@ const handleGoProduct = (productId?: number) => {
           />
         </div>
 
-        <!-- 已挑選：黏在彈窗底部，可收合，預設收合（全站一致排版） -->
+        <!-- 已挑選：黏在彈窗底部，明細直接展開（不收合） -->
         <div
           class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
         >
-          <button
-            type="button"
-            class="flex w-full items-center justify-between text-sm"
-            @click="isBidPickedExpanded = !isBidPickedExpanded"
-          >
+          <div class="flex w-full items-center text-sm">
             <span
               :class="
                 dlgOver()
@@ -1926,17 +1925,8 @@ const handleGoProduct = (productId?: number) => {
             >
               已挑選 {{ dlgTotal() }}/{{ bidDialogItem.qty }}
             </span>
-            <span class="flex items-center gap-1 text-xs text-slate-400">
-              {{ isBidPickedExpanded ? '收合' : '展開' }}
-              <i
-                class="pi text-xs"
-                :class="
-                  isBidPickedExpanded ? 'pi-chevron-down' : 'pi-chevron-up'
-                "
-              />
-            </span>
-          </button>
-          <div v-show="isBidPickedExpanded" class="mt-2 flex flex-col gap-2">
+          </div>
+          <div class="mt-2 flex flex-col gap-2">
             <p class="text-xs font-medium text-slate-500">已選規格</p>
             <template v-if="dlgRows().length">
               <div
@@ -1954,7 +1944,12 @@ const handleGoProduct = (productId?: number) => {
                   :allow-empty="false"
                   size="small"
                   class="w-16 shrink-0"
-                  :input-style="{ width: '100%', textAlign: 'center' }"
+                  :input-style="{
+                    width: '100%',
+                    textAlign: 'center',
+                    height: '2.5rem',
+                    minHeight: '2.5rem',
+                  }"
                   @update:model-value="(v) => dlgSetQty(row.skuId, v)"
                 />
                 <button
