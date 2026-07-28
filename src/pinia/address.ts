@@ -60,7 +60,8 @@ export const useAddressStore = defineStore('address', () => {
 
   /** 預設宅配地址（無 isDefault 時退回第一筆）。 */
   const defaultHomeAddr = computed(
-    () => homeAddrs.value.find((a) => a.isDefault) ?? homeAddrs.value[0] ?? null,
+    () =>
+      homeAddrs.value.find((a) => a.isDefault) ?? homeAddrs.value[0] ?? null,
   );
   /** 預設超商門市（結帳頁超商取貨初始帶入用）。 */
   const defaultStoreAddr = computed(

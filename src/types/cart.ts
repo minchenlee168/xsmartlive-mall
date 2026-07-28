@@ -84,7 +84,8 @@ export interface CartGroup {
 
 /** 分派規則條件：目前支援分類、單一商品 id 兩種。 */
 export type RoutingCondition =
-  { type: 'category'; value: string } | { type: 'productId'; value: number };
+  | { type: 'category'; value: string }
+  | { type: 'productId'; value: number };
 
 /** 分派規則：加入商品時第一條命中的規則決定進哪台購物車。 */
 export interface RoutingRule {

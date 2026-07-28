@@ -321,7 +321,9 @@ const handleNextThumb = () => {
                           : 'opacity-70 hover:opacity-100'
                       "
                       :style="
-                        activeThumb === i ? 'outline: 2px solid var(--primary)' : ''
+                        activeThumb === i
+                          ? 'outline: 2px solid var(--primary)'
+                          : ''
                       "
                       @click="activeThumb = i"
                     >

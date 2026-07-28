@@ -13,11 +13,7 @@ import { parseDashDate, formatDashDate } from '../utils/date';
 import { useCountdown } from '../composables/useCountdown';
 import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
 import { storeToRefs } from 'pinia';
-import {
-  useAddressStore,
-  type Address,
-  type CvsChain,
-} from '../pinia/address';
+import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
 
 interface SocialAccount {
   key: string;

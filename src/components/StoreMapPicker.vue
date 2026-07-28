@@ -65,8 +65,7 @@ const MAP_STORES: MapStore[] = [
 const chainIcon = (chain: CvsChain) =>
   chain === '7-11' ? sevenIcon : familyIcon;
 
-const chainLabel = (chain: CvsChain) =>
-  chain === '7-11' ? '7-11' : '全家';
+const chainLabel = (chain: CvsChain) => (chain === '7-11' ? '7-11' : '全家');
 
 // 只顯示所選超商的門市
 const visibleStores = computed(() =>
