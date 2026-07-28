@@ -205,23 +205,73 @@ const buildTimeDisplay = (() => {
 </script>
 
 <template>
-  <div
-    v-if="!isHidden"
-    class="fixed right-6 bottom-24 z-[9999] flex flex-col items-end gap-2"
-  >
-    <!-- Panel -->
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      enter-from-class="opacity-0 translate-y-2 scale-95"
-      enter-to-class="opacity-100 translate-y-0 scale-100"
-      leave-active-class="transition-all duration-150 ease-in"
-      leave-from-class="opacity-100 translate-y-0 scale-100"
-      leave-to-class="opacity-0 translate-y-2 scale-95"
-    >
-      <div
-        v-if="isOpen"
-        class="flex w-60 flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_32px_rgba(0,0,0,0.15)]"
+  <!-- FAB（收合狀態；展開時隱藏避免與抽屜重疊） -->
+  <div v-if="!isHidden && !isOpen" class="fixed right-6 bottom-24 z-[9999]">
+    <div class="relative">
+      <button
+        class="flex h-12 w-12 items-center justify-center rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:scale-110 active:scale-95"
+        style="background: var(--primary-bg)"
+        @click="isOpen = true"
       >
+        <i class="pi pi-cog text-lg text-white" />
+      </button>
+      <!-- 暫時隱藏（重整後恢復） -->
+      <button
+        class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow transition-colors hover:bg-slate-100 hover:text-slate-700"
+        aria-label="暫時隱藏（重整後恢復）"
+        title="暫時隱藏（重整後恢復）"
+        @click.stop="isHidden = true"
+      >
+        <i class="pi pi-times text-[10px]" />
+      </button>
+    </div>
+  </div>
+
+  <!-- 遮罩：點擊收合 -->
+  <Transition
+    enter-active-class="transition-opacity duration-200 ease-out"
+    enter-from-class="opacity-0"
+    enter-to-class="opacity-100"
+    leave-active-class="transition-opacity duration-150 ease-in"
+    leave-from-class="opacity-100"
+    leave-to-class="opacity-0"
+  >
+    <div
+      v-if="isOpen"
+      class="fixed inset-0 z-[9998] bg-black/40"
+      @click="isOpen = false"
+    />
+  </Transition>
+
+  <!-- Bottom sheet：由下往上滑出 -->
+  <Transition
+    enter-active-class="transition-transform duration-300 ease-out"
+    enter-from-class="translate-y-full"
+    enter-to-class="translate-y-0"
+    leave-active-class="transition-transform duration-200 ease-in"
+    leave-from-class="translate-y-0"
+    leave-to-class="translate-y-full"
+  >
+    <div
+      v-if="isOpen"
+      class="fixed inset-x-0 bottom-0 z-[9999] mx-auto flex max-h-[85vh] max-w-md flex-col rounded-t-2xl bg-white shadow-[0_-8px_32px_rgba(0,0,0,0.15)]"
+    >
+      <!-- Header（sticky 於抽屜頂端） -->
+      <div
+        class="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3"
+      >
+        <span class="text-base font-bold text-slate-950">顯示設定</span>
+        <button
+          class="flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          aria-label="關閉"
+          @click="isOpen = false"
+        >
+          <i class="pi pi-times text-lg" />
+        </button>
+      </div>
+
+      <!-- Body（可捲動） -->
+      <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <!-- 外觀 -->
         <div>
           <p
@@ -392,36 +442,8 @@ const buildTimeDisplay = (() => {
           此為 prototype 展示<br />更新時間：{{ buildTimeDisplay }}
         </p>
       </div>
-    </Transition>
-
-    <!-- FAB -->
-    <div class="relative">
-      <button
-        class="flex h-12 w-12 items-center justify-center rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:scale-110 active:scale-95"
-        style="background: var(--primary-bg)"
-        @click="isOpen = !isOpen"
-      >
-        <i
-          class="pi text-lg text-white"
-          :class="isOpen ? 'pi-times' : 'pi-cog'"
-          :style="{
-            transition: 'transform 0.2s',
-            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-          }"
-        />
-      </button>
-      <!-- 暫時隱藏（重整後恢復） -->
-      <button
-        v-show="!isOpen"
-        class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow transition-colors hover:bg-slate-100 hover:text-slate-700"
-        aria-label="暫時隱藏（重整後恢復）"
-        title="暫時隱藏（重整後恢復）"
-        @click.stop="isHidden = true"
-      >
-        <i class="pi pi-times text-[10px]" />
-      </button>
     </div>
-  </div>
+  </Transition>
 
   <!-- ============== 購物車設定 Dialog ============== -->
   <Dialog
