@@ -626,7 +626,7 @@ const handlePickKeyword = (kw: string) => {
 
           <!-- Hot search — shown together with the expanded search bar -->
           <div class="mt-3 flex flex-col gap-[8px] px-1">
-            <span class="text-sm font-medium text-slate-600">熱門搜尋</span>
+            <span class="text-xs font-medium text-slate-400">熱門關鍵字：</span>
             <div class="flex flex-wrap gap-[8px]">
               <button
                 v-for="kw in hotKeywords"

@@ -97,7 +97,12 @@ const addPickOption = (opt: {
   );
   if (exist) exist.qty += addQty;
   else
-    pickedList.value.push({ name: opt.name, image: opt.image, spec, qty: addQty });
+    pickedList.value.push({
+      name: opt.name,
+      image: opt.image,
+      spec,
+      qty: addQty,
+    });
   optQtyDraft.value = { ...optQtyDraft.value, [opt.id]: 1 };
   // 不限制數量；超過限購 / 總數只提醒，不阻擋。
   // 僅有設定 maxQty 的選項才有 per-option 限購，否則只受總數約束（避免謊報限購）。
@@ -348,7 +353,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
               button-layout="horizontal"
               increment-button-icon="pi pi-plus"
               decrement-button-icon="pi pi-minus"
-              class="qty-stepper"
+              class="qty-stepper qty-keep-stepper"
               :class="{ 'is-sm': !isPC }"
             />
           </div>
@@ -544,7 +549,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
           button-layout="horizontal"
           increment-button-icon="pi pi-plus"
           decrement-button-icon="pi pi-minus"
-          class="qty-stepper"
+          class="qty-stepper qty-keep-stepper"
         />
         <span class="text-sm text-slate-500">組</span>
       </div>
@@ -613,7 +618,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
                 button-layout="horizontal"
                 increment-button-icon="pi pi-plus"
                 decrement-button-icon="pi pi-minus"
-                class="qty-stepper min-w-0 flex-1"
+                class="qty-stepper qty-keep-stepper min-w-0 flex-1"
                 @update:model-value="(v) => setOptQty(opt.id, v)"
               />
             </div>
@@ -670,7 +675,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
       <!-- 已選 + 已選內容：黏在彈窗底部，選項清單捲動時固定顯示 -->
       <div
         v-if="product?.isPickBundle && product.pickOptions?.length"
-        class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pb-4 pt-3"
+        class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
       >
         <button
           type="button"
@@ -687,7 +692,9 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
             {{ isPickedListExpanded ? '收合' : '展開' }}
             <i
               class="pi text-xs"
-              :class="isPickedListExpanded ? 'pi-chevron-down' : 'pi-chevron-up'"
+              :class="
+                isPickedListExpanded ? 'pi-chevron-down' : 'pi-chevron-up'
+              "
             />
           </span>
         </button>
@@ -711,9 +718,11 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
               <InputNumber
                 :model-value="row.qty"
                 :min="1"
-                size="small"
-                class="w-16 shrink-0"
-                :input-style="{ width: '100%', textAlign: 'center' }"
+                show-buttons
+                button-layout="horizontal"
+                increment-button-icon="pi pi-plus"
+                decrement-button-icon="pi pi-minus"
+                class="qty-stepper qty-keep-stepper shrink-0"
                 @update:model-value="(v) => setPickedRowQty(idx, v)"
               />
               <button
