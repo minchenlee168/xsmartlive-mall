@@ -341,69 +341,6 @@ const specAxesOf = (item: CartItem) =>
   products.find((p) => p.id === item.productId)?.specAxes ?? [];
 const skusOf = (item: CartItem) =>
   products.find((p) => p.id === item.productId)?.skus ?? [];
-/** 使用者當前的後選規格草稿：item.id → { 軸名: 選值 }。 */
-const pendingSpecDraft = ref<Record<string, Record<string, string>>>({});
-/** 有效選值：以已選定 SKU 的規格為底、疊上使用者當前草稿（供常駐下拉顯示現值 + 售完判斷）。 */
-const effectiveDraft = (item: CartItem): Record<string, string> => {
-  const base: Record<string, string> = {};
-  if (item.selectedSkuId) {
-    const sku = skusOf(item).find((s) => s.id === item.selectedSkuId);
-    if (sku) Object.assign(base, sku.spec);
-  }
-  return { ...base, ...(pendingSpecDraft.value[item.id] ?? {}) };
-};
-/** 讀某軸目前選值（供 template model-value 用）。 */
-const draftValueOf = (item: CartItem, axisName: string): string | null =>
-  effectiveDraft(item)[axisName] ?? null;
-/** 某軸的某選值是否還有可選 SKU（依已選其他軸 + 庫存判斷）。 */
-const isAxisOptionAvailable = (
-  item: CartItem,
-  axisName: string,
-  optionValue: string,
-): boolean => {
-  const draft = effectiveDraft(item);
-  return skusOf(item).some((s) => {
-    if (s.spec[axisName] !== optionValue) return false;
-    for (const [k, v] of Object.entries(draft)) {
-      if (k !== axisName && v && s.spec[k] !== v) return false;
-    }
-    return s.stock > 0;
-  });
-};
-/** 給 Select 的選項（售完 → disable 並標「（售完）」）。 */
-const axisOptionsFor = (
-  item: CartItem,
-  axis: { name: string; options: string[] },
-) =>
-  axis.options.map((opt) => {
-    const available = isAxisOptionAvailable(item, axis.name, opt);
-    return {
-      label: available ? opt : `${opt}（售完）`,
-      value: opt,
-      disabled: !available,
-    };
-  });
-/** 選某軸 → 更新草稿並即時重驗：各軸選滿且該 SKU 有貨 → 寫回規格；否則退回待選、清掉已定規格（擋結帳）。 */
-const setPendingAxis = (item: CartItem, axisName: string, value: string) => {
-  const merged = { ...effectiveDraft(item), [axisName]: value };
-  pendingSpecDraft.value = { ...pendingSpecDraft.value, [item.id]: merged };
-  const axes = specAxesOf(item);
-  const complete = axes.length > 0 && axes.every((a) => merged[a.name]);
-  const matched = complete
-    ? skusOf(item).find((s) =>
-        axes.every((a) => s.spec[a.name] === merged[a.name]),
-      )
-    : undefined;
-  if (matched && matched.stock > 0) {
-    item.spec = axes.map((a) => merged[a.name]).join(' / ');
-    item.selectedSkuId = matched.id;
-    item.specPending = false;
-  } else {
-    item.spec = '';
-    item.selectedSkuId = undefined;
-    item.specPending = true;
-  }
-};
 
 // ── 批次下標：規格分配（購物車列一顆按鈕 → 彈窗分配 → 確定寫回）──
 /** 某商品目前已確定分配的總數 / 明細（購物車列摘要用，讀 item.specAllocation）。 */
@@ -866,6 +803,50 @@ const handleGoCheckout = () => {
     ui.toast(`「${pausedWithChecked.sellerName}」暫停結帳中，無法下單`, 'warn');
     return;
   }
+  // 一起結帳的購物車需在「付款方式」與「運送方式」各有交集；任一為空 → 擋下（各車設定不相容）。
+  // 判定範圍對齊結帳頁 checkoutGroups：批次下標未挑規格（committedTotal=0）的商品不會帶入結帳，故排除。
+  const activeGroups = groups.value.filter((g) =>
+    g.items.some((i) => i.checked && (!i.isBidBatch || committedTotal(i) > 0)),
+  );
+  if (activeGroups.length >= 2) {
+    const intersect = <T,>(pick: (g: CartGroup) => T[]): T[] =>
+      activeGroups.reduce<T[]>(
+        (acc, g) => acc.filter((m) => pick(g).includes(m)),
+        [...pick(activeGroups[0])],
+      );
+    const commonShipping = intersect((g) => g.shippingMethods);
+    let commonPayment = intersect((g) => g.paymentMethods);
+    // 現金付款（限自取）需所有車都支援自取物流才算有效（對齊結帳頁 supportedPaymentMethods）
+    if (!commonShipping.includes('pickup')) {
+      commonPayment = commonPayment.filter((m) => m !== 'self-pickup');
+    }
+    if (commonShipping.length === 0 || commonPayment.length === 0) {
+      // 兩台車能否合併：付款與運送皆需有交集（現金付款需所有車支援自取）
+      const pairCanMerge = (a: CartGroup, b: CartGroup): boolean => {
+        const ship = a.shippingMethods.filter((m) =>
+          b.shippingMethods.includes(m),
+        );
+        let pay = a.paymentMethods.filter((m) => b.paymentMethods.includes(m));
+        if (!ship.includes('pickup'))
+          pay = pay.filter((m) => m !== 'self-pickup');
+        return ship.length > 0 && pay.length > 0;
+      };
+      // 找出第一對無法合併的購物車來命名；找不到（多車遞移不相容）→ 列出全部
+      const findConflictPair = (): [string, string] | null => {
+        for (let i = 0; i < activeGroups.length; i++) {
+          for (let j = i + 1; j < activeGroups.length; j++) {
+            if (!pairCanMerge(activeGroups[i], activeGroups[j])) {
+              return [activeGroups[i].sellerName, activeGroups[j].sellerName];
+            }
+          }
+        }
+        return null;
+      };
+      const names = findConflictPair() ?? activeGroups.map((g) => g.sellerName);
+      ui.toast(`${names.join('和')}無法合併結帳，請進行個別結帳`, 'warn');
+      return;
+    }
+  }
   // 批次下標未挑滿得標數量 → 軟提示（可堅持前往；結帳頁只帶已挑選規格的數量）
   if (partialBidItems.value.length > 0) {
     isPartialBidConfirmVisible.value = true;
@@ -1186,39 +1167,10 @@ const handleGoProduct = (productId?: number) => {
                 </div>
               </div>
 
-              <!-- 單品後選規格：SKU 規格下拉常駐可改；未選滿顯示「待選規格」 -->
-              <div v-if="specAxesOf(item).length" class="flex flex-col gap-2">
-                <span
-                  v-if="item.specPending"
-                  class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
-                >
-                  <i class="pi pi-exclamation-circle text-[10px]" />
-                  待選規格
-                </span>
-                <div
-                  v-for="axis in specAxesOf(item)"
-                  :key="axis.name"
-                  class="flex items-center gap-2 text-sm"
-                >
-                  <span class="w-10 shrink-0 text-slate-600">{{
-                    axis.name
-                  }}</span>
-                  <Select
-                    :model-value="draftValueOf(item, axis.name)"
-                    :options="axisOptionsFor(item, axis)"
-                    option-label="label"
-                    option-value="value"
-                    option-disabled="disabled"
-                    placeholder="請選擇"
-                    class="min-w-0 flex-1"
-                    @update:model-value="
-                      (v) => setPendingAxis(item, axis.name, v)
-                    "
-                  />
-                </div>
-              </div>
+              <!-- 規格：加入購物車前已選定，車內僅顯示文字。
+                   後選規（標單必結 / 批次下標）走上方 isBidBatch 分支的「挑選規格」按鈕，不在此處 -->
               <div
-                v-else-if="item.spec && item.spec !== '預設'"
+                v-if="item.spec && item.spec !== '預設'"
                 class="text-sm text-slate-600"
               >
                 {{ item.spec }}
@@ -1818,7 +1770,7 @@ const handleGoProduct = (productId?: number) => {
             button-layout="horizontal"
             increment-button-icon="pi pi-plus"
             decrement-button-icon="pi pi-minus"
-            class="qty-stepper"
+            class="qty-stepper qty-keep-stepper"
           />
         </div>
       </div>

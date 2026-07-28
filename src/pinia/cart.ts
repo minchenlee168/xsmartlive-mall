@@ -423,6 +423,8 @@ export const useCartStore = defineStore('cart', () => {
       prepend?: boolean;
       /** 直播下標：未選規格加入，強制各自成列（不合併），車內再後選 SKU */
       specPending?: boolean;
+      /** 多軸規格商品：已選定的 SKU id（讓購物車單品規格下拉顯示 / 可改） */
+      selectedSkuId?: string;
     },
   ) {
     // targetCartId 指定 → 直接找那台；否則走分派規則 / fallback / 新建
@@ -480,6 +482,7 @@ export const useCartStore = defineStore('cart', () => {
       specPending: options?.specPending,
       isBidBatch: options?.specPending || undefined,
       specAllocation: options?.specPending ? {} : undefined,
+      selectedSkuId: options?.selectedSkuId,
     };
     if (options?.prepend) {
       target.items.unshift(newItem);

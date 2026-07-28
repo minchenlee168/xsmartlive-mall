@@ -43,8 +43,13 @@ export interface CartTag {
   type: 'info' | 'danger' | 'secondary' | 'success';
 }
 
-/** 運送方式 id — 對應結帳頁的物流選單（home 宅配 / store 超商取貨 / pickup 自取 / post 郵局宅配） */
-export type ShippingMethodId = 'home' | 'store' | 'pickup' | 'post';
+/** 運送方式 id — 對應結帳頁的物流選單（home 宅配 / store 超商取貨 / pickup 自取 / post 郵局宅配 / cross-border 跨境） */
+export type ShippingMethodId =
+  | 'home'
+  | 'store'
+  | 'pickup'
+  | 'post'
+  | 'cross-border';
 /** 付款方式 id — 對應結帳頁的金流選單 */
 export type PaymentMethodId =
   | 'credit'

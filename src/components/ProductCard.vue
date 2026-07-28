@@ -34,6 +34,8 @@ const product = computed(() => products.find((p) => p.id === props.id));
 
 // 規格選項取自商品目錄
 const sizes = computed(() => product.value?.sizes ?? []);
+/** 規格選項數超過此值 → 改用下拉（Select），否則用並排 chip。 */
+const SPEC_INLINE_MAX = 3;
 
 // 選擇規格彈窗狀態
 const isSpecDialogVisible = ref(false);
@@ -444,7 +446,15 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
       <!-- 規格 -->
       <div v-if="sizes.length" class="flex flex-col gap-2">
         <span class="text-sm font-medium text-slate-700">規格</span>
-        <div class="flex flex-wrap gap-2">
+        <!-- 選項超過三個 → 下拉；否則並排 chip -->
+        <Select
+          v-if="sizes.length > SPEC_INLINE_MAX"
+          v-model="dialogSize"
+          :options="sizes"
+          placeholder="請選擇規格"
+          class="w-full"
+        />
+        <div v-else class="flex flex-wrap gap-2">
           <button
             v-for="s in sizes"
             :key="s"

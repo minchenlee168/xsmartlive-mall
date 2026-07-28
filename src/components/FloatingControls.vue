@@ -36,25 +36,37 @@ const TEMP_OPTIONS: {
   { label: '冷藏', value: '冷藏', tagType: 'success' },
   { label: '冷凍', value: '冷凍', tagType: 'info' },
 ];
+// 物流方式：對齊後台「物流方式設定」複選項（含跨境；自取不計運費、post 為商家自建）。
 const SHIPPING_OPTS: { label: string; value: ShippingMethodId }[] = [
   { label: '宅配', value: 'home' },
-  { label: '超商', value: 'store' },
+  { label: '超商配送', value: 'store' },
+  { label: '跨境', value: 'cross-border' },
+  { label: '自取（不計運費）', value: 'pickup' },
+  { label: '商家自建（如郵局）', value: 'post' },
 ];
+// 支付方式：對齊後台「支付方式設定」複選項（10 種）與結帳頁 PAYMENT_METHODS label 一致。
 const PAYMENT_OPTS: { label: string; value: PaymentMethodId }[] = [
-  { label: '信用卡', value: 'credit' },
-  { label: 'ATM', value: 'atm' },
+  { label: '線上信用卡（藍新）', value: 'credit' },
+  { label: '線上信用卡（數位鑑）', value: 'credit-digital' },
+  { label: 'Apple Pay', value: 'apple-pay' },
+  { label: 'ATM 繳費帳號', value: 'atm' },
+  { label: '超商代碼繳費', value: 'cvs-code' },
+  { label: '轉帳匯款', value: 'transfer' },
+  { label: 'LINE Pay', value: 'line-pay' },
+  { label: 'iPASS MONEY', value: 'ipass' },
   { label: '貨到付款', value: 'cod' },
+  { label: '現金付款（限自取）', value: 'self-pickup' },
 ];
-/** 結帳模式：對應 CheckoutMode，顯示用 label + 一句話說明。 */
+/** 結帳模式：對應 CheckoutMode，顯示用 label（對齊後台）+ 一句話說明。 */
 const CHECKOUT_MODES: {
   label: string;
   value: CheckoutMode;
   desc: string;
 }[] = [
-  { label: '預設', value: 'default', desc: '一次結清整台購物車' },
-  { label: '自選', value: 'pickable', desc: '可勾選要結帳的品項' },
-  { label: '棄標', value: 'abandon', desc: '允許放棄先前喊下的商品' },
-  { label: '暫停', value: 'paused', desc: '僅供瀏覽，暫停結帳' },
+  { label: '標單必結', value: 'default', desc: '一次結清整台購物車' },
+  { label: '自選結帳', value: 'pickable', desc: '可勾選要結帳的品項' },
+  { label: '棄標結帳', value: 'abandon', desc: '允許放棄先前喊下的商品' },
+  { label: '暫停結帳', value: 'paused', desc: '僅供瀏覽，暫停結帳' },
 ];
 
 /** 從 group.tags 抓目前的溫層 label；沒有 → null（其他非溫層 tag 保留）。 */

@@ -93,7 +93,7 @@ const PAYMENT_METHODS: { label: string; value: PaymentMethodId }[] = [
   { label: 'LINE Pay', value: 'line-pay' },
   { label: 'iPASS MONEY', value: 'ipass' },
   { label: '貨到付款', value: 'cod' },
-  { label: '自取', value: 'self-pickup' },
+  { label: '現金付款（限自取）', value: 'self-pickup' },
 ];
 const BANK_TRANSFER_INFO = ['銀行：台新008', '分行：13456-111333'];
 const DRAWER_COUNTRY_CODES = ['+886', '+852'];
@@ -122,6 +122,7 @@ const SHIPPING_METHOD_LABELS: Record<ShippingMethodId, string> = {
   pickup: '自取',
   store: '超商取貨',
   post: '郵局宅配',
+  'cross-border': '跨境',
 };
 /** 運送方式在選單中的固定順序。 */
 const SHIPPING_METHOD_ORDER: ShippingMethodId[] = [
@@ -129,11 +130,18 @@ const SHIPPING_METHOD_ORDER: ShippingMethodId[] = [
   'pickup',
   'store',
   'post',
+  'cross-border',
 ];
 /** 宅配運費：依訂單溫層計價。 */
 const HOME_FEES: Record<TempLayer, number> = { 冷凍: 150, 冷藏: 150, 常溫: 80 };
 /** 郵局宅配運費：依訂單溫層計價。 */
 const POST_FEES: Record<TempLayer, number> = { 冷凍: 100, 冷藏: 100, 常溫: 70 };
+/** 跨境運費：依訂單溫層計價（原型佔位費率，實際請依關務 / 物流商調整）。 */
+const CROSS_BORDER_FEES: Record<TempLayer, number> = {
+  冷凍: 350,
+  冷藏: 350,
+  常溫: 250,
+};
 /** 超商取貨運費：依鏈別 × 溫層。門市身分由會員預設門市決定，這裡只管費率。 */
 const CVS_FEES: Record<CvsChain, Record<TempLayer, number>> = {
   '7-11': { 常溫: 60, 冷藏: 120, 冷凍: 120 },
@@ -276,20 +284,32 @@ const checkoutGroups = computed<CheckoutGroup[]>(() =>
     .filter((g) => g.items.length > 0),
 );
 
-/** 各購物車支援的運送方式取交集 → 合併結帳可用的運送方式（固定順序）。 */
+// 付款方式（此處先宣告，供下方運送方式交集 / 支援清單依「現金付款（限自取）」過濾用；
+// 選項 / watcher 等其餘付款邏輯仍在下方「付款方式 / 發票」區塊）
+const paymentMethod = ref<PaymentMethodId>('credit');
+
+/** 各購物車支援的運送方式取交集 → 合併結帳可用的運送方式（固定順序）。現金付款（限自取）→ 只留自取。 */
 const supportedShippingMethods = computed<ShippingMethodId[]>(() => {
   const groups = checkoutGroups.value;
   if (groups.length === 0) return [];
-  return SHIPPING_METHOD_ORDER.filter((m) =>
+  const base = SHIPPING_METHOD_ORDER.filter((m) =>
     groups.every((g) => g.shippingMethods.includes(m)),
   );
+  return paymentMethod.value === 'self-pickup'
+    ? base.filter((m) => m === 'pickup')
+    : base;
 });
-/** 各購物車支援的付款方式取交集。 */
+/** 各購物車支援的付款方式取交集。現金付款（限自取）僅在所有車皆支援自取物流時可選。 */
 const supportedPaymentMethods = computed<PaymentMethodId[]>(() => {
   const groups = checkoutGroups.value;
   if (groups.length === 0) return [];
-  return groups[0].paymentMethods.filter((m) =>
-    groups.every((g) => g.paymentMethods.includes(m)),
+  const allSupportPickup = groups.every((g) =>
+    g.shippingMethods.includes('pickup'),
+  );
+  return groups[0].paymentMethods.filter(
+    (m) =>
+      groups.every((g) => g.paymentMethods.includes(m)) &&
+      (m !== 'self-pickup' || allSupportPickup),
   );
 });
 
@@ -333,9 +353,15 @@ const shipMethodByGroup = ref<Record<number, ShippingMethodId | null>>({});
 /** 讀某訂單目前選的運送方式。 */
 const groupShipMethod = (g: CheckoutGroup): ShippingMethodId | null =>
   shipMethodByGroup.value[g.id] ?? null;
-/** 單一訂單支援的運送方式（固定順序）。 */
-const groupSupportedMethods = (g: CheckoutGroup): ShippingMethodId[] =>
-  SHIPPING_METHOD_ORDER.filter((m) => g.shippingMethods.includes(m));
+/** 單一訂單支援的運送方式（固定順序）。現金付款（限自取）→ 只留自取。 */
+const groupSupportedMethods = (g: CheckoutGroup): ShippingMethodId[] => {
+  const base = SHIPPING_METHOD_ORDER.filter((m) =>
+    g.shippingMethods.includes(m),
+  );
+  return paymentMethod.value === 'self-pickup'
+    ? base.filter((m) => m === 'pickup')
+    : base;
+};
 /** 所有訂單是否都選同一種方式；是 → 該方式，否（含未全選）→ null。 */
 const sharedShipMethod = computed<ShippingMethodId | null>(() => {
   const groups = checkoutGroups.value;
@@ -430,6 +456,8 @@ const groupShippingFee = (g: CheckoutGroup): number | null => {
       return HOME_FEES[g.tempLayer];
     case 'post':
       return POST_FEES[g.tempLayer];
+    case 'cross-border':
+      return CROSS_BORDER_FEES[g.tempLayer];
     case 'pickup':
       return 0;
     case 'store':
@@ -458,6 +486,8 @@ const groupShippingLabel = (g: CheckoutGroup): string => {
       return `${g.tempLayer}宅配`;
     case 'post':
       return `${g.tempLayer}郵局宅配`;
+    case 'cross-border':
+      return `${g.tempLayer}跨境`;
     case 'pickup':
       return `自取 · ${selectedPickup.value.name}`;
     case 'store': {
@@ -478,6 +508,7 @@ const groupShipSummaryLabel = (g: CheckoutGroup): string => {
   switch (m) {
     case 'home':
     case 'post':
+    case 'cross-border':
       return SHIPPING_METHOD_LABELS[m];
     case 'pickup':
       return `自取 · ${selectedPickup.value.name}`;
@@ -494,7 +525,7 @@ const groupShipSummaryLabel = (g: CheckoutGroup): string => {
 /** 頂部摘要用：某訂單已選方式的地址 / 門市明細（label 之外的補充行）。 */
 const groupShipDetail = (g: CheckoutGroup): string => {
   const m = groupShipMethod(g);
-  if (m === 'home' || m === 'post') {
+  if (m === 'home' || m === 'post' || m === 'cross-border') {
     return selectedHome.value
       ? `${selectedHome.value.name} ${selectedHome.value.phone} ${selectedHome.value.address}`
       : '尚未選擇配送地址';
@@ -516,7 +547,7 @@ const groupRecipient = (
   g: CheckoutGroup,
 ): { name: string; phone: string } | null => {
   const m = groupShipMethod(g);
-  if (m === 'home' || m === 'post') {
+  if (m === 'home' || m === 'post' || m === 'cross-border') {
     return selectedHome.value
       ? { name: selectedHome.value.name, phone: selectedHome.value.phone }
       : null;
@@ -545,6 +576,7 @@ const shippingMethodFeeHint = (
   const fees = groups.map((g) => {
     if (m === 'home') return HOME_FEES[g.tempLayer];
     if (m === 'post') return POST_FEES[g.tempLayer];
+    if (m === 'cross-border') return CROSS_BORDER_FEES[g.tempLayer];
     return Math.min(...Object.values(CVS_FEES).map((f) => f[g.tempLayer]));
   });
   return fees.length ? `$${Math.min(...fees)} 起` : '';
@@ -1007,7 +1039,6 @@ const groupDisplayTotal = (g: CheckoutGroup): number =>
   Math.max(0, groupSubtotalBeforeRewards(g) - rewardPointsOfGroup(g));
 
 // ---- 付款方式 / 發票 ---------------------------------------------------------
-const paymentMethod = ref<PaymentMethodId>('credit');
 /** 依交集過濾的付款方式選項 → 直接餵給 Select。 */
 const availablePaymentMethods = computed(() =>
   PAYMENT_METHODS.filter((m) =>
@@ -1022,6 +1053,17 @@ watch(
     if (!methods.includes(paymentMethod.value)) {
       paymentMethod.value = methods[0];
     }
+  },
+  { immediate: true },
+);
+// 現金付款（限自取）：選了現金付款 → 各訂單運送方式一律鎖定為自取
+watch(
+  paymentMethod,
+  (m) => {
+    if (m !== 'self-pickup') return;
+    const next = { ...shipMethodByGroup.value };
+    for (const g of checkoutGroups.value) next[g.id] = 'pickup';
+    shipMethodByGroup.value = next;
   },
   { immediate: true },
 );
@@ -1091,7 +1133,10 @@ const handlePlaceOrder = () => {
   }
   if (
     checkoutGroups.value.some(
-      (g) => groupShipMethod(g) === 'home' || groupShipMethod(g) === 'post',
+      (g) =>
+        groupShipMethod(g) === 'home' ||
+        groupShipMethod(g) === 'post' ||
+        groupShipMethod(g) === 'cross-border',
     ) &&
     !selectedHome.value
   ) {
@@ -1150,7 +1195,9 @@ const handlePlaceOrder = () => {
     ? `${pickupContactPhoneCode.value} ${pickupContactPhone.value}`.trim()
     : (selectedHome.value?.phone ?? '');
   const deliveryAddress =
-    sharedShipMethod.value === 'home' || sharedShipMethod.value === 'post'
+    sharedShipMethod.value === 'home' ||
+    sharedShipMethod.value === 'post' ||
+    sharedShipMethod.value === 'cross-border'
       ? (selectedHome.value?.address ?? '')
       : sharedShipMethod.value === 'pickup'
         ? `自取 ${selectedPickup.value.name}（${selectedPickup.value.address}）`
@@ -2213,11 +2260,11 @@ const handlePlaceOrder = () => {
                     </span>
                   </Button>
 
-                  <!-- 宅配 / 郵局宅配：共用收件地址清單 -->
+                  <!-- 宅配 / 郵局宅配 / 跨境：共用收件地址清單 -->
                   <div
                     v-if="
                       drawerSelectedMethod === m &&
-                      (m === 'home' || m === 'post')
+                      (m === 'home' || m === 'post' || m === 'cross-border')
                     "
                     class="flex flex-col gap-2"
                   >

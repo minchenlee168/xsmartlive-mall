@@ -44,6 +44,50 @@ const selectedSize = ref(firstAvailableSize());
 const qty = ref(1);
 const activeThumb = ref(0);
 
+// ── 多軸規格（specAxes / SKU）：與購物車「挑選規格」彈窗一致的選擇 / 售完判斷 ──
+const specAxes = computed(() => product.value.specAxes ?? []);
+const skus = computed(() => product.value.skus ?? []);
+const hasSpecAxes = computed(() => specAxes.value.length > 0);
+/** 規格選項數超過此值 → 改用下拉（Select），否則用並排 chip（SelectButton）。 */
+const SPEC_INLINE_MAX = 3;
+/** 各軸目前選值；初始帶「第一個有庫存 SKU」的規格組合。 */
+const firstInStockSku = () =>
+  skus.value.find((s) => s.stock > 0) ?? skus.value[0];
+const selectedAxisSpec = ref<Record<string, string>>({
+  ...(firstInStockSku()?.spec ?? {}),
+});
+/** 某軸的某選值是否可選：需有 SKU 符合（含已選其他軸）且尚有庫存。 */
+const axisAvailable = (axisName: string, value: string): boolean =>
+  skus.value.some((s) => {
+    if (s.spec[axisName] !== value) return false;
+    for (const [k, v] of Object.entries(selectedAxisSpec.value)) {
+      if (k !== axisName && v && s.spec[k] !== v) return false;
+    }
+    return s.stock > 0;
+  });
+/** 某軸的選項清單（售完 → 標註且 disable），格式同 sizeOptions。 */
+const axisOptionsOf = (axis: { name: string; options: string[] }) =>
+  axis.options.map((opt) => {
+    const ok = axisAvailable(axis.name, opt);
+    return { label: ok ? opt : `${opt}（售完）`, value: opt, disabled: !ok };
+  });
+/** 目前選定的 SKU（各軸都命中）。 */
+const selectedSku = computed(() =>
+  skus.value.find((s) =>
+    specAxes.value.every(
+      (a) => s.spec[a.name] === selectedAxisSpec.value[a.name],
+    ),
+  ),
+);
+const selectedSkuStock = computed(() => selectedSku.value?.stock ?? 0);
+/** 數量上限 / 還剩件數：有多軸規格 → 依選定 SKU；否則沿用 product.stock。 */
+const maxQty = computed(() =>
+  hasSpecAxes.value ? selectedSkuStock.value : (product.value.stock ?? 10),
+);
+const stockLeft = computed(() =>
+  hasSpecAxes.value ? selectedSkuStock.value : (product.value.stock ?? 1),
+);
+
 /** 組合商品：每個子品的目前選用規格；初始用該子品 spec 預設值。 */
 const bundleSelections = ref<string[]>(
   product.value.bundleItems?.map((i) => i.spec) ?? [],
@@ -152,7 +196,19 @@ const handleAddToCart = (e: MouseEvent) => {
       return;
     }
   }
-  let specLabel = selectedSize.value || '預設';
+  // 多軸規格：售完的組合擋下（比照購物車彈窗以 SKU 庫存判斷）
+  if (
+    hasSpecAxes.value &&
+    !product.value.isBundle &&
+    selectedSkuStock.value <= 0
+  ) {
+    ui.toast('此規格組合已售完，請改選其他規格', 'warn');
+    return;
+  }
+  let specLabel =
+    hasSpecAxes.value && !product.value.isBundle
+      ? specAxes.value.map((a) => selectedAxisSpec.value[a.name]).join(' / ')
+      : selectedSize.value || '預設';
   let customBundle:
     | { name: string; image?: string; spec: string; qty: number }[]
     | undefined;
@@ -186,7 +242,13 @@ const handleAddToCart = (e: MouseEvent) => {
     },
     specLabel,
     qty.value,
-    { customBundleItems: customBundle },
+    {
+      customBundleItems: customBundle,
+      selectedSkuId:
+        hasSpecAxes.value && !product.value.isBundle
+          ? selectedSku.value?.id
+          : undefined,
+    },
   );
   burstAddToCartFromEvent(e);
   ui.showAddedToCart(product.value.name);
@@ -398,9 +460,50 @@ const handleNextThumb = () => {
                   </p>
                 </div>
 
-                <!-- Size -->
+                <!-- 多軸規格（specAxes）：與購物車挑選規格彈窗一致，逐軸選擇、售完 disable -->
                 <div
-                  v-if="
+                  v-if="!product.isBundle && hasSpecAxes"
+                  class="flex flex-col gap-4"
+                >
+                  <div
+                    v-for="axis in specAxes"
+                    :key="axis.name"
+                    class="flex items-center gap-6"
+                  >
+                    <span class="w-20 shrink-0 text-sm text-slate-700">
+                      {{ axis.name }}
+                    </span>
+                    <!-- 選項超過三個 → 下拉；否則並排 chip -->
+                    <Select
+                      v-if="axis.options.length > SPEC_INLINE_MAX"
+                      :model-value="selectedAxisSpec[axis.name]"
+                      :options="axisOptionsOf(axis)"
+                      option-label="label"
+                      option-value="value"
+                      option-disabled="disabled"
+                      class="w-full max-w-[240px] min-w-0"
+                      @update:model-value="
+                        (v) => (selectedAxisSpec[axis.name] = v)
+                      "
+                    />
+                    <SelectButton
+                      v-else
+                      :model-value="selectedAxisSpec[axis.name]"
+                      :options="axisOptionsOf(axis)"
+                      option-label="label"
+                      option-value="value"
+                      option-disabled="disabled"
+                      :allow-empty="false"
+                      @update:model-value="
+                        (v) => (selectedAxisSpec[axis.name] = v)
+                      "
+                    />
+                  </div>
+                </div>
+
+                <!-- Size（單軸；無 specAxes 時） -->
+                <div
+                  v-else-if="
                     !product.isBundle &&
                     product.hasVariant &&
                     product.sizes?.length
@@ -408,7 +511,18 @@ const handleNextThumb = () => {
                   class="flex items-center gap-6"
                 >
                   <span class="w-20 shrink-0 text-sm text-slate-700">尺碼</span>
+                  <!-- 選項超過三個 → 下拉；否則並排 chip -->
+                  <Select
+                    v-if="sizeOptions.length > SPEC_INLINE_MAX"
+                    v-model="selectedSize"
+                    :options="sizeOptions"
+                    option-label="label"
+                    option-value="value"
+                    option-disabled="disabled"
+                    class="w-full max-w-[240px] min-w-0"
+                  />
                   <SelectButton
+                    v-else
                     v-model="selectedSize"
                     :options="sizeOptions"
                     option-label="label"
@@ -425,7 +539,7 @@ const handleNextThumb = () => {
                     <InputNumber
                       v-model="qty"
                       :min="1"
-                      :max="product.stock ?? 10"
+                      :max="maxQty"
                       show-buttons
                       button-layout="horizontal"
                       increment-button-icon="pi pi-plus"
@@ -433,8 +547,7 @@ const handleNextThumb = () => {
                       class="qty-stepper qty-keep-stepper"
                     />
                     <span class="text-sm text-slate-700">
-                      還剩{{ product.stock ?? 1
-                      }}{{ product.isBundle ? '組' : '件' }}
+                      還剩{{ stockLeft }}{{ product.isBundle ? '組' : '件' }}
                     </span>
                   </div>
                 </div>
