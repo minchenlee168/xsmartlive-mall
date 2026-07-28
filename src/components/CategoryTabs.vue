@@ -109,7 +109,7 @@ watch(isMobile, () => {
        Aurora shell 走全站樣式、直播主未用商城模式下皆不顯示分類 tabs。 -->
   <div
     v-if="!isAurora && !appMode.noShopMode"
-    class="sticky top-0 z-40 w-full"
+    class="sticky top-[69px] z-40 w-full @4xl:top-[89px]"
     style="background: var(--tabs-bg)"
   >
     <div class="mx-auto max-w-7xl">

@@ -1885,7 +1885,7 @@ const handleGoProduct = (productId?: number) => {
         </div>
 
         <!-- 新增分配列：各軸規格（最多 3）+ 數量 → 加入 -->
-        <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
+        <div class="flex flex-col gap-2">
           <div class="grid grid-cols-2 gap-2">
             <div
               v-for="axis in specAxesOf(bidDialogItem)"
@@ -1927,7 +1927,7 @@ const handleGoProduct = (productId?: number) => {
             label="加入"
             icon="pi pi-plus"
             size="small"
-            class="w-fit"
+            class="w-fit self-end"
             :severity="dlgCanAdd() ? undefined : 'secondary'"
             :disabled="!dlgCanAdd()"
             @click="dlgAdd()"

@@ -94,32 +94,79 @@ body {
   box-shadow: var(--card-shadow);
 }
 
-/* 數量選擇器（InputNumber showButtons / horizontal）尺寸統一 —
-   PC 標準、.is-sm 為行動裝置商品卡用 */
+/* 數量選擇器（InputNumber showButtons / horizontal）— 圓角幽靈按鈕風格。
+   PC 標準、.is-sm 為行動裝置商品卡用。
+   容器透明無外框；中間輸入框為白底細邊框圓角欄位、數字置中；左右 −/+ 為主色線框的圓角矩形鈕。
+   `!important`：PrimeVue 元件樣式進了 primevue cascade layer，一般規則權重不夠，需壓過去。 */
 .qty-stepper.p-inputnumber {
   height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
+/* 中間輸入框：可見細邊框 + 白底 + 圓角，數字置中（要看得出是輸入框） */
 .qty-stepper .p-inputnumber-input {
   width: 56px;
+  height: 32px !important;
   padding-left: 6px;
   padding-right: 6px;
   text-align: center;
+  background: #fff !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
 }
+/* 左右 −/+：圓角矩形幽靈鈕（主色線框 + 主色圖示、透明底） */
 .qty-stepper .p-inputnumber-button {
-  width: 35px;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px !important;
+  border: 1px solid var(--primary) !important;
+  background: transparent !important;
+  color: var(--primary) !important;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
 }
+.qty-stepper .p-inputnumber-button:not(:disabled):hover {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #fff !important;
+}
+.qty-stepper .p-inputnumber-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  background: transparent !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-muted) !important;
+}
+/* is-sm：行動商品卡用，圓鈕小一號 */
 .qty-stepper.is-sm.p-inputnumber {
   height: 26px;
+  gap: 4px;
 }
 .qty-stepper.is-sm .p-inputnumber-input {
   width: 40px;
+  height: 24px !important;
   font-size: 11px;
   padding: 0 2px;
+  border-radius: 6px !important;
 }
 .qty-stepper.is-sm .p-inputnumber-button {
-  width: 26px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px !important;
 }
-/* .is-fluid：讓 stepper 撐滿容器寬度（按鈕保持固定寬，input 吸收剩餘空間） */
+.qty-stepper.is-sm .p-inputnumber-button .p-inputnumber-button-icon,
+.qty-stepper.is-sm .p-inputnumber-button .p-button-icon {
+  font-size: 10px;
+}
+/* .is-fluid：讓 stepper 撐滿容器寬度（圓鈕保持固定尺寸，input 吸收剩餘空間） */
 .qty-stepper.is-fluid.p-inputnumber {
   width: 100%;
 }
@@ -138,8 +185,8 @@ body {
     display: none;
   }
   .qty-stepper:not(.qty-keep-stepper) .p-inputnumber-input {
+    /* 手機版只剩純輸入框（圓鈕已隱藏）；邊框 / 白底 / 圓角沿用預設，只微調寬度 */
     width: 58px;
-    border-radius: 6px;
   }
   .qty-stepper.is-sm .p-inputnumber-input {
     width: 44px;

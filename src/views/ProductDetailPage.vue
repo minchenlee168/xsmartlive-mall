@@ -430,7 +430,7 @@ const handleNextThumb = () => {
                       button-layout="horizontal"
                       increment-button-icon="pi pi-plus"
                       decrement-button-icon="pi pi-minus"
-                      class="qty-stepper"
+                      class="qty-stepper qty-keep-stepper"
                     />
                     <span class="text-sm text-slate-700">
                       還剩{{ product.stock ?? 1
@@ -594,7 +594,7 @@ const handleNextThumb = () => {
                           button-layout="horizontal"
                           increment-button-icon="pi pi-plus"
                           decrement-button-icon="pi pi-minus"
-                          class="qty-stepper min-w-0 flex-1"
+                          class="qty-stepper qty-keep-stepper min-w-0 flex-1"
                           @update:model-value="(v) => setPickQty(opt, v)"
                         />
                       </div>
