@@ -68,6 +68,21 @@ export const useCartStore = defineStore('cart', () => {
           isBidBatch: true,
           specAllocation: {},
         },
+        {
+          // 第三個得標商品：三軸規格（尺寸 × 顏色 × 袖長），測後選規最大情境
+          id: 'i_bid3',
+          productId: 5,
+          name: '女童蕾絲公主裙 春夏薄款蓬蓬裙禮服',
+          image: products.find((p) => p.id === 5)?.image,
+          spec: '',
+          qty: 50,
+          price: 450,
+          original: 680,
+          checked: true,
+          specPending: true,
+          isBidBatch: true,
+          specAllocation: {},
+        },
       ],
     },
     {
