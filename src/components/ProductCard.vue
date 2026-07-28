@@ -54,8 +54,6 @@ const isBundleDialogVisible = ref(false);
 /** 任選組合：已選清單（確定時直接作為 customBundleItems）。 */
 type PickedRow = { name: string; image?: string; spec: string; qty: number };
 const pickedList = ref<PickedRow[]>([]);
-/** 底部「已選」區塊收合狀態，預設收合。 */
-const isPickedListExpanded = ref(false);
 /** 各選項「加入前」的規格下拉暫存值。 */
 const optSpecDraft = ref<Record<number, string>>({});
 const bundleSelections = ref<string[]>([]);
@@ -64,6 +62,10 @@ const pickedTotal = computed(() =>
 );
 const totalPickCount = computed(
   () => (product.value?.pickCount ?? 0) * qty.value,
+);
+/** 尚需挑選的件數（比照後選規彈窗：need − 已選，未 clamp）。 */
+const pickedRemaining = computed(
+  () => totalPickCount.value - pickedTotal.value,
 );
 /** 單一選項的限購上限：opt.maxQty × 購買組數（qty）。 */
 const optMaxQtyCard = (opt: { maxQty?: number }): number =>
@@ -165,7 +167,6 @@ const handlePrimaryAction = (e: MouseEvent) => {
   e.stopPropagation();
   if (needsBundlePicker.value) {
     pickedList.value = [];
-    isPickedListExpanded.value = false;
     optSpecDraft.value = {};
     optQtyDraft.value = {};
     bundleSelections.value =
@@ -672,34 +673,29 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
         </div>
       </div>
 
-      <!-- 已選 + 已選內容：黏在彈窗底部，選項清單捲動時固定顯示 -->
+      <!-- 已選 + 已選內容：黏在彈窗底部，明細直接展開（不收合，比照購物車挑選內容彈窗） -->
       <div
         v-if="product?.isPickBundle && product.pickOptions?.length"
         class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
       >
-        <button
-          type="button"
-          class="flex w-full items-center justify-between text-sm"
-          @click="isPickedListExpanded = !isPickedListExpanded"
-        >
+        <div class="flex w-full items-center text-sm">
           <span
-            :class="isPickOverCard ? 'text-red-500' : ''"
-            :style="isPickOverCard ? '' : 'color: var(--primary)'"
+            :class="
+              isPickOverCard
+                ? 'font-medium text-red-500'
+                : pickedTotal === totalPickCount
+                  ? 'font-medium text-green-700'
+                  : 'text-amber-700'
+            "
           >
-            已選 {{ pickedTotal }} / {{ totalPickCount }}
+            請挑選並加入規格，已挑選 {{ pickedTotal }} 件，剩餘
+            {{ pickedRemaining }} 件。
           </span>
-          <span class="flex items-center gap-1 text-xs text-slate-400">
-            {{ isPickedListExpanded ? '收合' : '展開' }}
-            <i
-              class="pi text-xs"
-              :class="
-                isPickedListExpanded ? 'pi-chevron-down' : 'pi-chevron-up'
-              "
-            />
-          </span>
-        </button>
-        <div v-show="isPickedListExpanded" class="mt-2 flex flex-col gap-2">
-          <p class="text-xs font-medium text-slate-500">已選內容</p>
+        </div>
+        <div class="mt-2 flex flex-col gap-2">
+          <p class="text-xs font-medium text-slate-500">
+            已選內容 {{ pickedTotal }}/{{ totalPickCount }}
+          </p>
           <template v-if="pickedList.length">
             <div
               v-for="(row, idx) in pickedList"
@@ -735,7 +731,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
               </button>
             </div>
           </template>
-          <p v-else class="text-sm text-slate-400">尚未選擇</p>
+          <p v-else class="text-sm text-slate-400">尚未挑選任何內容</p>
         </div>
       </div>
     </div>

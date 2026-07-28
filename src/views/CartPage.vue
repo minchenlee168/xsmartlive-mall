@@ -2120,11 +2120,14 @@ const handleGoProduct = (productId?: number) => {
                     : 'text-amber-700'
               "
             >
-              已選 {{ pdTotal() }}/{{ pdNeed() }}
+              請挑選並加入規格，已挑選 {{ pdTotal() }} 件，剩餘
+              {{ pdNeed() - pdTotal() }} 件。
             </span>
           </div>
           <div class="mt-2 flex flex-col gap-2">
-            <p class="text-xs font-medium text-slate-500">已選內容</p>
+            <p class="text-xs font-medium text-slate-500">
+              已選內容 {{ pdTotal() }}/{{ pdNeed() }}
+            </p>
             <template v-if="pickDialogList.length">
               <div
                 v-for="(row, idx) in pickDialogList"
@@ -2145,9 +2148,11 @@ const handleGoProduct = (productId?: number) => {
                   :min="1"
                   :max-fraction-digits="0"
                   :allow-empty="false"
-                  size="small"
-                  class="w-16 shrink-0"
-                  :input-style="{ width: '100%', textAlign: 'center' }"
+                  show-buttons
+                  button-layout="horizontal"
+                  increment-button-icon="pi pi-plus"
+                  decrement-button-icon="pi pi-minus"
+                  class="qty-stepper qty-keep-stepper shrink-0"
                   @update:model-value="(v) => setPdRowQty(idx, v)"
                 />
                 <button
