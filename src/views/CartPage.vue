@@ -1870,6 +1870,10 @@ const handleGoProduct = (productId?: number) => {
                 :input-style="{ textAlign: 'center' }"
                 @update:model-value="(v) => setDlgQty(v)"
               />
+              <!-- 各軸選滿(命中 SKU) → 顯示該規格剩餘庫存 -->
+              <span v-if="dlgSku()" class="text-xs text-slate-500">
+                剩餘庫存 {{ dlgDraftMax() }} 件
+              </span>
             </div>
           </div>
           <Button

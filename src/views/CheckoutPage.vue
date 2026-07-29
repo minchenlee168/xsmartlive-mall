@@ -1860,10 +1860,12 @@ const handlePlaceOrder = () => {
       :breakpoints="{ '768px': '92vw' }"
     >
       <template #header>
-        <span class="text-base font-bold text-slate-950">驗證手機號碼</span>
+        <span class="text-base font-bold text-slate-950">綁定手機</span>
       </template>
       <div class="flex flex-col gap-4 py-1">
-        <p class="text-sm text-slate-600">尚未完成手機號碼驗證</p>
+        <p class="text-sm text-slate-600">
+          請完成綁定手機保障交易安全與物流通知
+        </p>
         <div class="flex flex-col gap-1.5">
           <label class="text-sm font-medium text-slate-700">手機號碼</label>
           <div class="flex gap-2">
