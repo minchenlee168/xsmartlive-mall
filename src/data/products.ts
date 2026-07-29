@@ -600,21 +600,12 @@ export const products: Product[] = [
     hasVariant: true,
     stock: 10,
     sizes: ['100cm', '110cm', '120cm'],
-    // 多軸 SKU（尺寸 × 顏色）+ 庫存；供直播得標後挑選規格使用
-    specAxes: [
-      { name: '尺寸', options: ['100cm', '110cm', '120cm'] },
-      { name: '顏色', options: ['淺藍', '深藍', '水洗灰'] },
-    ],
+    // 單一規格軸（只有「尺寸」一個規格選項）+ 庫存；供直播得標後挑選規格使用
+    specAxes: [{ name: '尺寸', options: ['100cm', '110cm', '120cm'] }],
     skus: [
-      { id: 's8-100-01', spec: { 尺寸: '100cm', 顏色: '淺藍' }, stock: 150 },
-      { id: 's8-100-02', spec: { 尺寸: '100cm', 顏色: '深藍' }, stock: 150 },
-      { id: 's8-100-03', spec: { 尺寸: '100cm', 顏色: '水洗灰' }, stock: 0 },
-      { id: 's8-110-01', spec: { 尺寸: '110cm', 顏色: '淺藍' }, stock: 150 },
-      { id: 's8-110-02', spec: { 尺寸: '110cm', 顏色: '深藍' }, stock: 150 },
-      { id: 's8-110-03', spec: { 尺寸: '110cm', 顏色: '水洗灰' }, stock: 150 },
-      { id: 's8-120-01', spec: { 尺寸: '120cm', 顏色: '淺藍' }, stock: 0 },
-      { id: 's8-120-02', spec: { 尺寸: '120cm', 顏色: '深藍' }, stock: 150 },
-      { id: 's8-120-03', spec: { 尺寸: '120cm', 顏色: '水洗灰' }, stock: 150 },
+      { id: 's8-100', spec: { 尺寸: '100cm' }, stock: 150 },
+      { id: 's8-110', spec: { 尺寸: '110cm' }, stock: 150 },
+      { id: 's8-120', spec: { 尺寸: '120cm' }, stock: 0 },
     ],
     category: '小童童裝',
     image:
