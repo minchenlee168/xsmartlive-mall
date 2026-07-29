@@ -17,7 +17,7 @@ import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
  */
 
 type Provider = 'facebook' | 'google' | 'line' | 'tiktok' | 'whatsapp';
-type Step = 'review' | 'verify' | 'success';
+type Step = 'review' | 'bound' | 'verify' | 'success';
 
 interface ProviderProfile {
   name: string;
@@ -99,16 +99,26 @@ const profile = computed<ProviderProfile>(() => {
   return route.query.phone === 'true' ? { ...base, phone: PRESET_PHONE } : base;
 });
 
+/** 由電話註冊來綁定社群（已有驗證手機）→ 跳過「建議綁定手機」流程。 */
+const isPhoneVerified = computed(() => route.query.phoneVerified === 'true');
+
 const step = ref<Step>('review');
 
 // --- step: review ---
 const isAgreed = ref(false);
 /**
- * 按主按鈕：不強制驗證手機，直接綁定並登入。
- * 需要驗證的使用者可透過「驗證手機」連結進入 verify step（安全驗證頁）。
+ * 按主按鈕：綁定帳號並登入 → 進入「綁定成功」step。
+ * 手機驗證屬選填，入口移到綁定完成後的 bound step（先綁帳號、才知道手機要綁哪個帳號）。
  */
 const handleConfirmReview = () => {
-  handleEnterShop();
+  auth.login(profile.value.name);
+  ui.toast(`已使用 ${profile.value.badgeLabel} 綁定並登入`);
+  // 電話註冊來綁定社群（已有驗證手機）→ 跳過「建議綁定手機」直接進商城
+  if (isPhoneVerified.value) {
+    router.push('/shop');
+    return;
+  }
+  step.value = 'bound';
 };
 const handleGoVerify = () => {
   step.value = 'verify';
@@ -141,17 +151,15 @@ const handleSubmitVerify = () => {
   if (!canSubmitVerify.value) return;
   step.value = 'success';
 };
-const handleBackToReview = () => {
+const handleBackToBound = () => {
   resetResendCountdown();
   verifyCode.value = '';
   hasSentCode.value = false;
-  step.value = 'review';
+  step.value = 'bound';
 };
 
-// --- step: success ---
+// --- 進入商城（帳號已於 handleConfirmReview 綁定並登入，這裡只需導頁）---
 const handleEnterShop = () => {
-  auth.login(profile.value.name);
-  ui.toast(`已使用 ${profile.value.badgeLabel} 註冊並登入`);
   router.push('/shop');
 };
 
@@ -166,7 +174,11 @@ const handleBackToLogin = () => {
     style="background: var(--surface-100)"
   >
     <!-- Decorative background blob (沿用 LoginPage 紫色 blob)；success step 不顯示 -->
-    <div v-if="step !== 'success'" class="login-bg" aria-hidden="true"></div>
+    <div
+      v-if="step === 'review' || step === 'verify'"
+      class="login-bg"
+      aria-hidden="true"
+    ></div>
 
     <!-- Top bar -->
     <header
@@ -206,7 +218,7 @@ const handleBackToLogin = () => {
     <main class="relative z-10 px-4 py-12">
       <!-- review / verify：左右排版 -->
       <div
-        v-if="step !== 'success'"
+        v-if="step === 'review' || step === 'verify'"
         class="mx-auto flex max-w-7xl flex-col items-center justify-center gap-12 @3xl:flex-row @4xl:gap-28"
       >
         <!-- Left: welcome + illustration -->
@@ -285,20 +297,13 @@ const handleBackToLogin = () => {
                     class="ml-1 text-green-600"
                     >(已驗證)</span
                   >
-                  <span v-else class="ml-1 text-red-500">(未驗證)</span>
+                  <span v-else class="ml-1 text-amber-600">(未驗證)</span>
                 </span>
-                <span v-else class="text-red-500">未提供</span>
+                <span v-else-if="isPhoneVerified" class="text-green-600"
+                  >已綁定手機（已驗證）</span
+                >
+                <span v-else class="text-slate-500">未提供（尚未驗證）</span>
               </div>
-              <!-- 驗證手機：靠右灰色 outline 按鈕，右緣與主按鈕齊 -->
-              <Button
-                v-if="!profile.phone"
-                label="驗證手機"
-                severity="secondary"
-                outlined
-                size="small"
-                class="shrink-0"
-                @click="handleGoVerify"
-              />
             </div>
           </div>
 
@@ -333,7 +338,7 @@ const handleBackToLogin = () => {
           </div>
 
           <Button
-            label="確定綁定並登入"
+            label="立即登入"
             class="!min-h-12 w-full"
             :disabled="!isAgreed"
             @click="handleConfirmReview"
@@ -365,18 +370,14 @@ const handleBackToLogin = () => {
               <i class="pi pi-exclamation-circle text-2xl text-amber-500" />
             </div>
             <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
-              安全驗證
+              綁定手機
             </h2>
             <p
               class="text-center text-sm leading-relaxed"
               style="color: var(--text-muted)"
             >
-              為了保障交易安全與物流通知，<br />
-              首次登入註冊需先<span
-                class="font-medium"
-                style="color: var(--surface-950)"
-                >綁定手機號碼</span
-              >。
+              綁定手機可保障交易安全與物流通知，<br />
+              也可稍後於會員中心完成綁定。
             </p>
           </div>
 
@@ -464,12 +465,60 @@ const handleBackToLogin = () => {
             @click="handleSubmitVerify"
           />
 
+          <div class="flex items-center gap-5">
+            <a
+              class="cursor-pointer text-sm underline"
+              style="color: var(--text-muted)"
+              @click="handleBackToBound"
+            >
+              返回
+            </a>
+            <!-- 手機為選填 → 可略過，直接進入商城 -->
+            <a
+              class="cursor-pointer text-sm underline"
+              style="color: var(--primary)"
+              @click="handleEnterShop"
+            >
+              略過，進入商城
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Step: 綁定成功（帳號已綁定；手機驗證入口在此，選填）===== -->
+      <div
+        v-else-if="step === 'bound'"
+        class="mx-auto flex max-w-7xl items-center justify-center"
+      >
+        <div
+          class="flex w-full max-w-[440px] flex-col items-center gap-5 rounded-2xl bg-white p-8"
+          style="box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15)"
+        >
+          <div
+            class="flex h-14 w-14 items-center justify-center rounded-full bg-green-100"
+          >
+            <i class="pi pi-check-circle text-3xl text-green-600" />
+          </div>
+          <div class="flex flex-col items-center gap-1.5 text-center">
+            <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
+              帳號綁定成功！
+            </h2>
+            <p class="text-sm" style="color: var(--text-muted)">
+              建議<span class="font-bold text-amber-600">綁定手機</span
+              >，保障交易安全與物流通知。
+            </p>
+          </div>
+          <Button
+            label="綁定手機"
+            class="!min-h-12 w-full"
+            @click="handleGoVerify"
+          />
           <a
             class="cursor-pointer text-sm underline"
-            style="color: var(--text-muted)"
-            @click="handleBackToReview"
+            style="color: var(--primary)"
+            @click="handleEnterShop"
           >
-            返回
+            略過，進入商城
           </a>
         </div>
       </div>

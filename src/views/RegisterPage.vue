@@ -5,6 +5,7 @@ import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
 import { useThemeStore } from '../pinia/theme';
 import { useCountdown } from '../composables/useCountdown';
+import { SOCIAL_BRAND_COLORS, GOOGLE_LOGO_COLORS } from '../utils/brand-colors';
 
 type Step = 'form' | 'password' | 'success';
 
@@ -36,6 +37,8 @@ const password = ref('');
 const confirm = ref('');
 const isAgreed = ref(false);
 const isSubmitted = ref(false);
+/** 是否已按過「發送驗證碼」→ 決定顯示發送按鈕 or 驗證碼輸入區（與綁定手機頁一致）。 */
+const hasSentCode = ref(false);
 
 const { remaining: resendCountdown, start: startResendCountdown } =
   useCountdown();
@@ -64,6 +67,7 @@ const canSubmit = computed(
 
 const handleSendSmsCode = () => {
   if (!canSendSms.value) return;
+  hasSentCode.value = true;
   startResendCountdown(RESEND_COOLDOWN_SEC);
   ui.toast('驗證碼已發送（示意）');
 };
@@ -84,10 +88,29 @@ const handleSubmit = () => {
   step.value = 'success';
 };
 
-/** 「立即登入」：完成註冊成功 → 自動登入並前往商城。 */
+/** 「暫時跳過，進入商城」：完成註冊 → 自動登入並前往商城。 */
 const handleGoToShop = () => {
   auth.login(name.value);
   router.push('/shop');
+};
+
+/** Google logo 四色漸層（品牌色取自 brand-colors，避免寫死於 CSS）。 */
+const googleGradient = `conic-gradient(from -45deg, ${GOOGLE_LOGO_COLORS.red} 0deg 90deg, ${GOOGLE_LOGO_COLORS.yellow} 90deg 180deg, ${GOOGLE_LOGO_COLORS.green} 180deg 270deg, ${GOOGLE_LOGO_COLORS.blue} 270deg 360deg)`;
+
+/** 綁定社群帳號：走與登入頁社群登入一致的流程
+ *  （Google 模擬回頭客直接登入；其餘 provider 走 /social-signup 首次綁定流程）。 */
+const handleBindSocial = (provider: string) => {
+  if (provider.toLowerCase() === 'google') {
+    auth.login(name.value);
+    ui.toast(`已使用 ${provider} 登入`);
+    router.push('/shop');
+    return;
+  }
+  // 電話註冊來綁定社群 → 已有驗證手機，帶旗標讓 social-signup 跳過「建議綁定手機」流程
+  router.push({
+    path: '/social-signup',
+    query: { provider: provider.toLowerCase(), phoneVerified: 'true' },
+  });
 };
 </script>
 
@@ -210,26 +233,40 @@ const handleGoToShop = () => {
             </div>
           </div>
 
-          <!-- 簡訊驗證碼 + 獲得驗證碼 -->
+          <!-- 簡訊驗證碼：先發送、送出後再輸入驗證碼（與綁定手機頁一致） -->
           <div class="flex flex-col gap-1.5">
             <label>簡訊驗證碼</label>
-            <div class="flex gap-2">
+            <!-- 尚未發送過：只顯示「發送驗證碼」按鈕 -->
+            <Button
+              v-if="!hasSentCode"
+              :disabled="!canSendSms"
+              label="發送驗證碼"
+              class="!min-h-11 w-full"
+              @click="handleSendSmsCode"
+            />
+            <!-- 已發送過：顯示驗證碼輸入框 + 底下「重新發送驗證碼」連結 -->
+            <template v-else>
               <InputText
                 v-model="smsCode"
                 :maxlength="SMS_CODE_LENGTH"
                 placeholder="請輸入六位數驗證碼"
-                class="min-w-0 flex-1"
+                class="w-full"
               />
-              <Button
-                :label="
-                  resendCountdown > 0 ? `${resendCountdown}s` : '獲得驗證碼'
-                "
+              <button
+                type="button"
+                class="mt-1 cursor-pointer self-start text-sm underline disabled:cursor-not-allowed disabled:no-underline"
+                :class="canSendSms ? '' : 'text-slate-400'"
+                :style="canSendSms ? { color: 'var(--primary)' } : {}"
                 :disabled="!canSendSms"
-                :severity="canSendSms ? 'primary' : 'secondary'"
-                class="!min-h-11 shrink-0 whitespace-nowrap"
                 @click="handleSendSmsCode"
-              />
-            </div>
+              >
+                {{
+                  resendCountdown > 0
+                    ? `${resendCountdown} 秒後可重新發送`
+                    : '重新發送驗證碼'
+                }}
+              </button>
+            </template>
           </div>
 
           <!-- 同意條款 + 提醒 -->
@@ -345,21 +382,85 @@ const handleGoToShop = () => {
           </div>
         </form>
 
-        <!-- 註冊成功畫面 -->
+        <!-- 註冊成功畫面：綠勾 + 標題 + 建議綁定社群 + 四個社群綁定 + 暫時跳過 -->
         <template v-else>
-          <div class="flex flex-col gap-2 text-center">
+          <div class="flex flex-col items-center gap-3 text-center">
+            <!-- 綠色勾選圓圈 -->
+            <span
+              class="flex h-16 w-16 items-center justify-center rounded-full bg-green-50"
+            >
+              <i class="pi pi-check text-3xl text-green-600" />
+            </span>
             <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
               註冊成功！
             </h2>
-            <p class="text-base" style="color: var(--text-muted)">
-              您的帳號已建立完成，現在可以使用新帳號登入直播管家。
+            <p class="text-base" style="color: var(--surface-700)">
+              建議您<span class="font-bold text-amber-600">綁定社群帳號</span
+              >，下次登入更方便。
             </p>
           </div>
-          <Button
-            label="立即登入"
-            class="!min-h-13 w-full"
+
+          <!-- 綁定社群帳號（樣式與登入頁社群按鈕一致） -->
+          <div class="flex w-full flex-col gap-2">
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleBindSocial('Facebook')"
+            >
+              <i
+                class="pi pi-facebook text-xl"
+                :style="{ color: SOCIAL_BRAND_COLORS.facebook }"
+              />
+              <span>Facebook</span>
+            </Button>
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleBindSocial('Google')"
+            >
+              <span
+                class="google-icon"
+                aria-hidden="true"
+                :style="{ background: googleGradient }"
+                >G</span
+              >
+              <span>Google</span>
+            </Button>
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleBindSocial('Line')"
+            >
+              <span
+                class="line-icon"
+                aria-hidden="true"
+                :style="{ background: SOCIAL_BRAND_COLORS.line }"
+                >LINE</span
+              >
+              <span>Line</span>
+            </Button>
+            <Button
+              outlined
+              severity="secondary"
+              :pt="{ root: { class: 'social-btn' } }"
+              @click="handleBindSocial('Tiktok')"
+            >
+              <i class="pi pi-tiktok text-xl" />
+              <span>Tiktok</span>
+            </Button>
+          </div>
+
+          <!-- 暫時跳過，進入商城 -->
+          <a
+            class="cursor-pointer text-center text-base underline"
+            style="color: var(--primary)"
             @click="handleGoToShop"
-          />
+          >
+            暫時跳過，進入商城
+          </a>
         </template>
       </div>
     </main>
@@ -400,5 +501,53 @@ const handleGoToShop = () => {
       rgba(108, 212, 208, 0) 42%
     );
   filter: blur(10px);
+}
+
+/* 社群綁定按鈕（與登入頁社群按鈕同一套樣式）。 */
+.social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  border-radius: 6px;
+  border: 1px solid var(--surface-700);
+  background: white;
+  color: var(--surface-700);
+  font-weight: 700;
+  font-size: 16px;
+  transition: background-color 0.15s;
+}
+.social-btn:hover {
+  background: var(--surface-50);
+}
+
+/* Google logo 重繪（四色漸層背景由 inline style 從 GOOGLE_LOGO_COLORS 提供）。 */
+.google-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* LINE 標誌（綠底由 inline style 從 SOCIAL_BRAND_COLORS.line 提供）。 */
+.line-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  color: white;
+  font-weight: 800;
+  font-size: 8px;
+  line-height: 1;
 }
 </style>
