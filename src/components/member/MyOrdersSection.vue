@@ -13,6 +13,9 @@ import type {
 } from '../../types/order';
 import { parseSlashDate, formatDateRange } from '../../utils/date';
 import ChangeAddressDialog from './ChangeAddressDialog.vue';
+import { useMoney } from '../../composables/useMoney';
+
+const { money } = useMoney();
 
 /**
  * 我的訂單 section（會員中心右側內容）。
@@ -391,6 +394,12 @@ const itemCanReturnOrExchange = (item: OrderItem): boolean =>
   item.packages.some(
     (p) => canRefundStep(p.currentStep) || canExchangeStep(p.currentStep),
   );
+/** 目前退換貨對象是否可「換貨」：僅「已送達」可換貨（任一包裹 currentStep 為 delivered）。 */
+const returnTargetCanExchange = computed<boolean>(() =>
+  (returnTargetItem.value?.packages ?? []).some((p) =>
+    canExchangeStep(p.currentStep),
+  ),
+);
 
 const handleOpenReturnDialog = (item: OrderItem): void => {
   returnTargetItem.value = item;
@@ -731,7 +740,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <div>
             <p class="text-xs text-slate-500">訂單總額</p>
             <p class="font-bold" style="color: var(--danger)">
-              ${{ order.total }}
+              {{ money(order.total) }}
             </p>
           </div>
           <div>
@@ -821,7 +830,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <td class="px-3 py-3 text-slate-700">{{ order.orderNo }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.qty }}</td>
               <td class="px-3 py-3 font-bold" style="color: var(--danger)">
-                ${{ order.total }}
+                {{ money(order.total) }}
               </td>
               <td class="px-3 py-3 text-slate-700">{{ order.payment }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
@@ -1025,7 +1034,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               </div>
               <div class="flex shrink-0 flex-col items-end gap-2">
                 <p class="text-sm font-bold text-slate-950">
-                  ${{ item.price.toLocaleString() }} / {{ item.qty }}件
+                  {{ money(item.price) }} / {{ item.qty }}件
                 </p>
                 <!-- 退換貨 tab + 商品可退換貨 → 顯示按鈕；申請後依 returnStatus 顯示 申請中 / 通過 / 駁回 -->
                 <!-- 駁回可再點按查看原因；申請中 / 通過為 disabled 唯讀 -->
@@ -1315,9 +1324,24 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 v-model="returnType"
                 :value="opt.value"
                 :input-id="`return-type-${opt.value}`"
+                :disabled="opt.value === 'exchange' && !returnTargetCanExchange"
               />
-              <label :for="`return-type-${opt.value}`" class="cursor-pointer">
+              <label
+                :for="`return-type-${opt.value}`"
+                class="cursor-pointer"
+                :class="
+                  opt.value === 'exchange' && !returnTargetCanExchange
+                    ? 'cursor-not-allowed text-slate-400'
+                    : ''
+                "
+              >
                 {{ opt.label }}
+                <span
+                  v-if="opt.value === 'exchange' && !returnTargetCanExchange"
+                  class="text-xs text-slate-400"
+                >
+                  （僅已送達可換貨）
+                </span>
               </label>
             </div>
           </div>
@@ -1633,9 +1657,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           >
             <span class="truncate" :title="it.name">{{ it.name }}</span>
             <span class="text-right">{{ it.qty }}</span>
-            <span class="text-right"> ${{ it.price.toLocaleString() }} </span>
+            <span class="text-right"> {{ money(it.price) }} </span>
             <span class="text-right">
-              ${{ (it.price * it.qty).toLocaleString() }}
+              {{ money(it.price * it.qty) }}
             </span>
           </div>
         </div>
@@ -1649,20 +1673,18 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
           <div class="text-right text-slate-700">
             <p>
-              ${{
-                Math.round(invoicePreviewOrder.total / 1.05).toLocaleString()
-              }}
+              {{ money(Math.round(invoicePreviewOrder.total / 1.05)) }}
             </p>
             <p>
-              ${{
-                (
+              {{
+                money(
                   invoicePreviewOrder.total -
-                  Math.round(invoicePreviewOrder.total / 1.05)
-                ).toLocaleString()
+                    Math.round(invoicePreviewOrder.total / 1.05),
+                )
               }}
             </p>
             <p class="font-bold" style="color: var(--primary)">
-              ${{ invoicePreviewOrder.total.toLocaleString() }}
+              {{ money(invoicePreviewOrder.total) }}
             </p>
           </div>
         </div>

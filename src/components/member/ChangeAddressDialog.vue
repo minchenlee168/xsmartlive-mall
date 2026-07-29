@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import StoreMapPicker from '../StoreMapPicker.vue';
+import type { CvsChain } from '../../pinia/address';
 
 /**
  * 更換配送地址 / 更換門市彈窗。
@@ -62,8 +64,26 @@ const recipient = ref('');
 const phoneCode = ref('+886');
 const phone = ref('');
 const address = ref('');
-const newChain = ref<'7-11' | 'FamilyMart'>('7-11');
+const newChain = ref<CvsChain>('7-11');
 const newStoreName = ref('');
+/** 由電子地圖挑選帶回的門市地址（比照收件地址門市，免手填）。 */
+const newStoreAddress = ref('');
+const isStoreMapVisible = ref(false);
+/** 點超商 logo → 開該超商電子地圖選門市。 */
+const handleOpenStoreMap = (chain: CvsChain): void => {
+  newChain.value = chain;
+  isStoreMapVisible.value = true;
+};
+/** 電子地圖點選門市後帶回：自動填門市名 + 地址。 */
+const handleSelectStore = (store: {
+  chain: CvsChain;
+  storeName: string;
+  address: string;
+}): void => {
+  newChain.value = store.chain;
+  newStoreName.value = store.storeName;
+  newStoreAddress.value = store.address;
+};
 
 const headerText = computed(() =>
   props.mode === 'store' ? '更換門市' : '更換配送地址',
@@ -80,6 +100,7 @@ watch(
       phoneCode.value = '+886';
       newChain.value = '7-11';
       newStoreName.value = '';
+      newStoreAddress.value = '';
     }
   },
 );
@@ -93,7 +114,7 @@ const handleConfirm = (): void => {
     recipient: recipient.value,
     phoneCode: phoneCode.value,
     phone: phone.value,
-    address: address.value,
+    address: props.mode === 'store' ? newStoreAddress.value : address.value,
   };
   if (props.mode === 'store') {
     payload.chain = newChain.value;
@@ -135,15 +156,17 @@ const handleConfirm = (): void => {
         </div>
       </section>
 
-      <!-- 選擇超商 -->
+      <!-- 選擇超商（點 logo 開該超商電子地圖選門市，免手填，比照收件地址門市） -->
       <div class="flex flex-col gap-2">
-        <label class="text-sm font-medium text-slate-700">選擇超商</label>
+        <label class="text-sm font-medium text-slate-700"
+          >選擇超商<span class="text-red-500"> *</span></label
+        >
         <div class="flex gap-3">
           <button
             class="flex h-12 w-16 items-center justify-center rounded-md border-2 bg-white transition-all"
             :class="newChain === '7-11' ? '' : 'border-slate-200'"
             :style="newChain === '7-11' ? 'border-color: var(--primary)' : ''"
-            @click="newChain = '7-11'"
+            @click="handleOpenStoreMap('7-11')"
           >
             <img :src="sevenIcon" alt="7-11" class="h-7 w-7 object-contain" />
           </button>
@@ -153,7 +176,7 @@ const handleConfirm = (): void => {
             :style="
               newChain === 'FamilyMart' ? 'border-color: var(--primary)' : ''
             "
-            @click="newChain = 'FamilyMart'"
+            @click="handleOpenStoreMap('FamilyMart')"
           >
             <img
               :src="familyIcon"
@@ -162,18 +185,17 @@ const handleConfirm = (): void => {
             />
           </button>
         </div>
-      </div>
-
-      <!-- 新門市名稱 -->
-      <div class="flex flex-col gap-1.5">
-        <label class="text-sm font-medium text-slate-700"
-          >新門市名稱<span class="text-red-500"> *</span></label
+        <!-- 已選門市：只讀卡（門市名 + 地址，由電子地圖帶回） -->
+        <div
+          v-if="newStoreName && newStoreAddress"
+          class="flex min-w-0 flex-col rounded-md border border-slate-200 bg-slate-50 p-3"
         >
-        <InputText
-          v-model="newStoreName"
-          placeholder="例：鑫工門市"
-          class="w-full"
-        />
+          <span class="font-bold text-slate-950">{{ newStoreName }}</span>
+          <span class="truncate text-xs text-slate-500">{{
+            newStoreAddress
+          }}</span>
+        </div>
+        <p v-else class="text-sm text-slate-400">尚未選擇門市</p>
       </div>
 
       <!-- 新收件人 + 新聯絡電話 -->
@@ -197,16 +219,6 @@ const handleConfirm = (): void => {
             />
           </div>
         </div>
-      </div>
-
-      <!-- 新門市地址 -->
-      <div class="flex flex-col gap-1.5">
-        <label class="text-sm font-medium text-slate-700">新門市地址</label>
-        <InputText
-          v-model="address"
-          placeholder="門市完整地址"
-          class="w-full"
-        />
       </div>
     </div>
 
@@ -259,6 +271,13 @@ const handleConfirm = (): void => {
         <InputText v-model="address" class="w-full" />
       </div>
     </div>
+
+    <!-- 超商電子地圖選門市（比照收件地址門市選擇器） -->
+    <StoreMapPicker
+      v-model:visible="isStoreMapVisible"
+      :chain="newChain"
+      @select="handleSelectStore"
+    />
 
     <template #footer>
       <div class="flex w-full justify-end gap-2">
