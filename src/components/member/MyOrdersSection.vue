@@ -86,10 +86,9 @@ const handleApplyQuery = (): void => {
 };
 
 // 商品列子 tab
+// 取消訂單 / 退換貨改由私訊聯絡、後台手動改狀態，前台不提供操作（保留「取消」訂單狀態顯示）
 const detailTabs: Array<{ key: DetailTab; label: string }> = [
   { key: 'progress', label: '配送進度/明細' },
-  { key: 'cancel', label: '取消訂單' },
-  { key: 'return', label: '退換貨' },
   { key: 'inquiry', label: '訂單提問' },
   { key: 'address', label: '更換地址' },
   { key: 'payment', label: '訂購/付款資訊' },
@@ -133,6 +132,12 @@ const invoiceLabelOf = (order: OrderRecord): string =>
   INVOICE_STATUS_LABEL[
     order.invoiceStatus as Exclude<OrderRecord['invoiceStatus'], 'issued'>
   ] ?? '';
+/** 是否為紙本發票（紙本無電子證明聯，開立後只顯示「已開立」文字，不提供線上列印）。 */
+const isPaperInvoice = (order: OrderRecord): boolean =>
+  order.invoice.includes('紙本');
+/** 發票狀態顯示文字：issued → 已開立；其餘依 INVOICE_STATUS_LABEL。 */
+const invoiceLabelDisplay = (order: OrderRecord): string =>
+  order.invoiceStatus === 'issued' ? '已開立' : invoiceLabelOf(order);
 /** 依訂單編號 hash 出一個看起來像發票號碼的字串（AB-12345678）。 */
 const mockInvoiceNoOf = (order: OrderRecord): string => {
   const letters = 'ABCDEFGHJKLMNPRSTUV';
@@ -294,11 +299,11 @@ const orderCanCancel = (order: OrderRecord): boolean => {
   return steps.length > 0 && steps.every(canCancelStep);
 };
 
-/** 更換配送地址階段：備貨中（to_receive）以前才允許（unpaid / to_ship / to_receive）。 */
+/** 更換配送地址階段：進入備貨中（to_receive）就不能改（已在備貨），僅待付款 / 待出貨可改。 */
 const canChangeAddressStep = (step: TimelineStep['key']): boolean => {
-  return step === 'unpaid' || step === 'to_ship' || step === 'to_receive';
+  return step === 'unpaid' || step === 'to_ship';
 };
-/** 整筆訂單是否可更換地址：已取消 / 已退貨 → false；否則所有包裹都要在 to_receive 以前。 */
+/** 整筆訂單是否可更換地址：已取消 / 已退貨 → false；否則所有包裹都要在備貨中以前。 */
 const orderCanChangeAddress = (order: OrderRecord): boolean => {
   if (order.status === 'cancelled' || order.status === 'returned') return false;
   const steps = allPackageSteps(order);
@@ -751,10 +756,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             <p class="text-xs text-slate-500">配送方式</p>
             <p class="font-medium text-slate-700">{{ order.delivery }}</p>
           </div>
-          <div>
+          <div v-if="order.invoiceStatus !== 'none'">
             <p class="text-xs text-slate-500">發票</p>
             <Button
-              v-if="order.invoiceStatus === 'issued'"
+              v-if="order.invoiceStatus === 'issued' && !isPaperInvoice(order)"
               label="線上列印"
               outlined
               size="small"
@@ -762,7 +767,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               @click="handleOpenInvoice(order)"
             />
             <p v-else class="font-medium text-slate-500">
-              {{ invoiceLabelOf(order) }}
+              {{ invoiceLabelDisplay(order) }}
             </p>
           </div>
           <div>
@@ -836,15 +841,21 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
               <td class="px-3 py-3">
                 <Button
-                  v-if="order.invoiceStatus === 'issued'"
+                  v-if="
+                    order.invoiceStatus === 'issued' && !isPaperInvoice(order)
+                  "
                   label="線上列印"
                   outlined
                   size="small"
                   class="!py-1"
                   @click="handleOpenInvoice(order)"
                 />
-                <span v-else class="text-slate-500">
-                  {{ invoiceLabelOf(order) }}
+                <!-- 不開立(none) 直接不顯示；紙本 issued 顯示「已開立」；其餘顯示狀態文字 -->
+                <span
+                  v-else-if="order.invoiceStatus !== 'none'"
+                  class="text-slate-500"
+                >
+                  {{ invoiceLabelDisplay(order) }}
                 </span>
               </td>
               <td
@@ -930,7 +941,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <!-- 更換地址 tab：全寬「更換配送地址」按鈕；備貨中之後不可改 -->
               <Button
                 v-if="order.detailTab === 'address'"
-                :label="isStoreDelivery(order) ? '更換門市' : '更換配送地址'"
+                label="更換配送地址"
                 outlined
                 class="w-full"
                 :disabled="!orderCanChangeAddress(order)"
@@ -968,11 +979,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                   "
                   @click="handleSelectDetailTab(order, dt.key)"
                 >
-                  {{
-                    dt.key === 'address' && isStoreDelivery(order)
-                      ? '更換門市'
-                      : dt.label
-                  }}
+                  {{ dt.label }}
                 </button>
               </div>
             </div>
@@ -990,7 +997,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             <!-- 更換地址 tab：右側「更換配送地址」按鈕；備貨中之後不可改 -->
             <Button
               v-if="order.detailTab === 'address'"
-              :label="isStoreDelivery(order) ? '更換門市' : '更換配送地址'"
+              label="更換配送地址"
               outlined
               size="small"
               class="shrink-0"

@@ -479,7 +479,7 @@ export const useOrdersStore = defineStore('orders', () => {
       invoice: '自然人憑證',
       invoiceStatus: 'issued',
       status: 'completed',
-      detailTab: 'return',
+      detailTab: 'progress',
       expanded: true,
       items: [
         {
@@ -511,7 +511,7 @@ export const useOrdersStore = defineStore('orders', () => {
       invoice: '個人發票（紙本）',
       invoiceStatus: 'issued',
       status: 'completed',
-      detailTab: 'return',
+      detailTab: 'progress',
       expanded: true,
       items: [
         {
