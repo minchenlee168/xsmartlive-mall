@@ -24,6 +24,9 @@ import { products } from '../data/products';
 import { useAuthStore } from '../pinia/auth';
 import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
 import { useCountdown } from '../composables/useCountdown';
+import { useMoney } from '../composables/useMoney';
+
+const { money } = useMoney();
 
 type TempLayer = '常溫' | '冷藏' | '冷凍';
 
@@ -1371,7 +1374,7 @@ const handlePlaceOrder = () => {
                 <i class="pi pi-tag text-[10px]" />
                 <span>{{ item.bulkDiscount!.note }}</span>
                 <span class="font-medium">
-                  · 已折抵 -${{ bulkDiscountAmount(item).toLocaleString() }}
+                  · 已折抵 -{{ money(bulkDiscountAmount(item)) }}
                 </span>
               </div>
               <!-- 數量列固定放最後 -->
@@ -1387,24 +1390,24 @@ const handlePlaceOrder = () => {
                   class="!py-0.5 !text-xs"
                 />
                 <span class="text-sm text-slate-400 line-through">
-                  ${{ lineTotal(item).toLocaleString() }}
+                  {{ money(lineTotal(item)) }}
                 </span>
                 <span
                   v-if="hasBulkDiscount(item)"
                   class="text-xs text-slate-500"
                 >
-                  買多優惠後 ${{ lineTotalAfterBulk(item).toLocaleString() }}
+                  買多優惠後 {{ money(lineTotalAfterBulk(item)) }}
                 </span>
                 <span class="text-base font-bold" style="color: var(--primary)">
-                  ${{ discountedLineTotal(group, item)?.toLocaleString() }}
+                  {{ money(discountedLineTotal(group, item)!) }}
                 </span>
               </template>
               <template v-else-if="hasBulkDiscount(item)">
                 <span class="text-sm text-slate-400 line-through">
-                  ${{ lineTotal(item).toLocaleString() }}
+                  {{ money(lineTotal(item)) }}
                 </span>
                 <span class="text-base font-bold" style="color: var(--primary)">
-                  ${{ lineTotalAfterBulk(item).toLocaleString() }}
+                  {{ money(lineTotalAfterBulk(item)) }}
                 </span>
               </template>
               <template v-else>
@@ -1417,7 +1420,7 @@ const handlePlaceOrder = () => {
                   class="!bg-slate-100 !py-0.5 !text-xs !text-slate-400"
                 />
                 <span class="font-medium text-slate-700">
-                  ${{ lineTotal(item).toLocaleString() }}
+                  {{ money(lineTotal(item)) }}
                 </span>
               </template>
             </div>
@@ -1431,16 +1434,16 @@ const handlePlaceOrder = () => {
           <!-- 商品金額 -->
           <div :class="RECEIPT_ROW_CLASS">
             <span class="text-sm text-slate-700">商品金額</span>
-            <span :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'"
-              >$ {{ groupGoodsTotal(group).toLocaleString() }}</span
-            >
+            <span :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'">{{
+              money(groupGoodsTotal(group))
+            }}</span>
           </div>
 
           <!-- 多件優惠折抵 -->
           <div v-if="groupBulkDiscount(group) > 0" :class="RECEIPT_ROW_CLASS">
             <span class="text-sm text-slate-700">多件優惠折抵</span>
             <span :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
-              >- $ {{ groupBulkDiscount(group).toLocaleString() }}</span
+              >- {{ money(groupBulkDiscount(group)) }}</span
             >
           </div>
 
@@ -1477,9 +1480,9 @@ const handlePlaceOrder = () => {
               :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'"
               >免運</span
             >
-            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'"
-              >$ {{ groupShippingFee(group)!.toLocaleString() }}</span
-            >
+            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-700'">{{
+              money(groupShippingFee(group)!)
+            }}</span>
           </div>
 
           <!-- 收件人資訊：選完運送方式後顯示姓名 + 手機號碼 -->
@@ -1523,11 +1526,11 @@ const handlePlaceOrder = () => {
             <span
               v-if="isGroupFreeShipping(group)"
               :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
-              >- $ {{ groupShippingDiscount(group).toLocaleString() }}</span
+              >- {{ money(groupShippingDiscount(group)) }}</span
             >
-            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'"
-              >$ 0</span
-            >
+            <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'">{{
+              money(0)
+            }}</span>
           </div>
 
           <!-- 優惠券：操作欄放按鈕，說明欄放券名 -->
@@ -1551,7 +1554,7 @@ const handlePlaceOrder = () => {
             <span
               v-if="groupCouponDiscount(group) > 0"
               :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
-              >- $ {{ groupCouponDiscount(group).toLocaleString() }}</span
+              >- {{ money(groupCouponDiscount(group)) }}</span
             >
             <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'"
               >—</span
@@ -1592,7 +1595,7 @@ const handlePlaceOrder = () => {
             <span
               v-if="rewardPointsOfGroup(group) > 0"
               :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
-              >- $ {{ rewardPointsOfGroup(group).toLocaleString() }}</span
+              >- {{ money(rewardPointsOfGroup(group)) }}</span
             >
             <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'"
               >—</span
@@ -1608,8 +1611,7 @@ const handlePlaceOrder = () => {
           <span
             class="text-xl font-bold @3xl:text-3xl"
             style="color: var(--primary)"
-            ><span class="text-sm @3xl:text-lg">NT$</span
-            >{{ groupDisplayTotal(group).toLocaleString() }}</span
+            >{{ money(groupDisplayTotal(group)) }}</span
           >
         </div>
       </section>
@@ -1755,15 +1757,11 @@ const handlePlaceOrder = () => {
           <div class="flex flex-col gap-1 text-sm">
             <div class="flex justify-between py-0.5">
               <span class="text-slate-500">商品總金額</span>
-              <span class="text-slate-700"
-                >$ {{ productTotal.toLocaleString() }}</span
-              >
+              <span class="text-slate-700">{{ money(productTotal) }}</span>
             </div>
             <div v-if="hasAnyShipMethod" class="flex justify-between py-0.5">
               <span class="text-slate-500">運費總金額</span>
-              <span class="text-slate-700"
-                >$ {{ shippingTotal.toLocaleString() }}</span
-              >
+              <span class="text-slate-700">{{ money(shippingTotal) }}</span>
             </div>
             <div
               v-if="bulkDiscountTotal > 0"
@@ -1771,7 +1769,7 @@ const handlePlaceOrder = () => {
             >
               <span class="text-slate-500">多件優惠折抵</span>
               <span class="font-medium text-red-500"
-                >- $ {{ bulkDiscountTotal.toLocaleString() }}</span
+                >- {{ money(bulkDiscountTotal) }}</span
               >
             </div>
             <div
@@ -1783,7 +1781,7 @@ const handlePlaceOrder = () => {
                 運費折抵（滿千免運）
               </span>
               <span class="font-medium text-red-500"
-                >- $ {{ shippingDiscountTotal.toLocaleString() }}</span
+                >- {{ money(shippingDiscountTotal) }}</span
               >
             </div>
             <div
@@ -1795,7 +1793,7 @@ const handlePlaceOrder = () => {
                 優惠券折扣
               </span>
               <span class="font-medium text-red-500"
-                >- $ {{ couponDiscountTotal.toLocaleString() }}</span
+                >- {{ money(couponDiscountTotal) }}</span
               >
             </div>
             <div
@@ -1804,16 +1802,16 @@ const handlePlaceOrder = () => {
             >
               <span class="text-slate-500">紅利點數折抵</span>
               <span class="font-medium text-red-500"
-                >- $ {{ rewardPointsUsedTotal.toLocaleString() }}</span
+                >- {{ money(rewardPointsUsedTotal) }}</span
               >
             </div>
             <div
               class="mt-1 flex justify-between border-t border-slate-200 pt-2"
             >
               <span class="font-bold text-slate-950">總付款金額</span>
-              <span class="font-bold" style="color: var(--primary)"
-                >$ {{ finalTotal.toLocaleString() }}</span
-              >
+              <span class="font-bold" style="color: var(--primary)">{{
+                money(finalTotal)
+              }}</span>
             </div>
           </div>
         </div>
@@ -1833,8 +1831,7 @@ const handlePlaceOrder = () => {
             <span
               class="truncate text-2xl font-bold @3xl:text-3xl"
               style="color: var(--primary)"
-              ><span class="text-base @3xl:text-lg">NT$</span
-              >{{ finalTotal.toLocaleString() }}</span
+              >{{ money(finalTotal) }}</span
             >
             <i
               class="pi text-sm"
@@ -1843,7 +1840,7 @@ const handlePlaceOrder = () => {
             />
           </div>
           <span v-if="totalSaved > 0" class="text-sm text-red-500"
-            >共省下 -${{ totalSaved.toLocaleString() }}</span
+            >共省下 -{{ money(totalSaved) }}</span
           >
         </button>
         <Button
@@ -2492,9 +2489,9 @@ const handlePlaceOrder = () => {
                               class="h-5 w-5 shrink-0 object-contain"
                             />
                             <span>{{ s.storeName }}</span>
-                            <span v-if="s.chain"
-                              >${{ CVS_FEES[s.chain][g.tempLayer] }}</span
-                            >
+                            <span v-if="s.chain">{{
+                              money(CVS_FEES[s.chain][g.tempLayer])
+                            }}</span>
                           </span>
                         </button>
                       </div>

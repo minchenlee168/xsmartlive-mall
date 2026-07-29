@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useMoney } from '../composables/useMoney';
 const router = useRouter();
+const { money } = useMoney();
 
 const hours = ref(2);
 const minutes = ref(34);
@@ -112,12 +114,12 @@ const items = [
             {{ item.name }}
           </p>
           <div class="flex items-baseline gap-1">
-            <span class="text-sm font-bold text-red-500"
-              >${{ item.price }}</span
-            >
-            <span class="text-xs text-gray-400 line-through"
-              >${{ item.original }}</span
-            >
+            <span class="text-sm font-bold text-red-500">{{
+              money(item.price)
+            }}</span>
+            <span class="text-xs text-gray-400 line-through">{{
+              money(item.original)
+            }}</span>
           </div>
           <!-- sold progress -->
           <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">

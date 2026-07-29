@@ -6,6 +6,9 @@ import { useCartStore } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { products } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
+import { useMoney } from '../composables/useMoney';
+
+const { money } = useMoney();
 
 const props = defineProps<{
   id: number;
@@ -327,13 +330,13 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
         <span
           class="text-slate-500 line-through"
           :class="isPC ? 'text-base' : 'text-xs'"
-          >NTD ${{ original }}</span
+          >{{ money(original) }}</span
         >
         <span
           class="font-semibold text-rose-500"
           :class="isPC ? 'text-2xl' : 'text-base'"
         >
-          <span class="text-xs font-normal">NTD</span> ${{ price }}
+          {{ money(price) }}
         </span>
       </div>
 
@@ -437,9 +440,9 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
           <p class="line-clamp-2 text-base font-semibold text-slate-700">
             {{ name }}
           </p>
-          <span class="text-lg font-bold" style="color: var(--primary)"
-            >${{ price }}</span
-          >
+          <span class="text-lg font-bold" style="color: var(--primary)">{{
+            money(price)
+          }}</span>
         </div>
       </div>
 
@@ -544,9 +547,9 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
           <p class="line-clamp-2 text-base font-semibold text-slate-700">
             {{ name }}
           </p>
-          <span class="text-lg font-bold" style="color: var(--primary)"
-            >${{ price }}</span
-          >
+          <span class="text-lg font-bold" style="color: var(--primary)">{{
+            money(price)
+          }}</span>
         </div>
       </div>
 

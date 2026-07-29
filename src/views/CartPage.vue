@@ -13,6 +13,9 @@ import { useUiStore } from '../pinia/ui';
 import { useViewportStore } from '../pinia/viewport';
 import { products, type PickOption } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
+import { useMoney } from '../composables/useMoney';
+
+const { money } = useMoney();
 
 /** 單一規格維度（顏色 / 尺寸 / 口味 之類）。 */
 interface AddOnSpec {
@@ -158,10 +161,6 @@ const lineDisplayTotal = (item: CartItem): number =>
 
 /** 尚未套用買多優惠的價格（僅買多優惠達標時顯示、劃線用）：單價 × 數量。 */
 const preBulkDiscountTotal = (item: CartItem): number => item.price * item.qty;
-
-/** 金額顯示：為 1000 的整數倍 → 以 k 表示（如 19000 → 19k）；否則千分位。 */
-const formatMoney = (n: number): string =>
-  n !== 0 && n % 1000 === 0 ? `${n / 1000}k` : n.toLocaleString();
 
 const isGroupAllChecked = (group: CartGroup) =>
   group.items.length > 0 && group.items.every((i) => i.checked);
@@ -1032,13 +1031,13 @@ const handleGoProduct = (productId?: number) => {
                     class="text-base font-bold whitespace-nowrap @7xl:text-lg"
                     style="color: var(--primary)"
                   >
-                    ${{ formatMoney(lineDisplayTotal(item)) }}
+                    {{ money(lineDisplayTotal(item)) }}
                   </span>
                   <span
                     v-if="hasBulkDiscount(item)"
                     class="text-xs whitespace-nowrap text-slate-500 line-through"
                   >
-                    ${{ formatMoney(preBulkDiscountTotal(item)) }}
+                    {{ money(preBulkDiscountTotal(item)) }}
                   </span>
                 </div>
               </div>
@@ -1125,7 +1124,7 @@ const handleGoProduct = (productId?: number) => {
                 <i class="pi pi-tag text-[10px]" />
                 <span>{{ item.bulkDiscount.note }}</span>
                 <span v-if="hasBulkDiscount(item)" class="font-medium">
-                  · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
+                  · 已折抵 -{{ money(bulkDiscountAmount(item)) }}
                 </span>
               </div>
             </div>
@@ -1156,13 +1155,13 @@ const handleGoProduct = (productId?: number) => {
                     class="text-base font-bold whitespace-nowrap @7xl:text-lg"
                     style="color: var(--primary)"
                   >
-                    ${{ formatMoney(lineDisplayTotal(item)) }}
+                    {{ money(lineDisplayTotal(item)) }}
                   </span>
                   <span
                     v-if="hasBulkDiscount(item)"
                     class="text-xs whitespace-nowrap text-slate-500 line-through"
                   >
-                    ${{ formatMoney(preBulkDiscountTotal(item)) }}
+                    {{ money(preBulkDiscountTotal(item)) }}
                   </span>
                 </div>
               </div>
@@ -1220,7 +1219,7 @@ const handleGoProduct = (productId?: number) => {
                 <i class="pi pi-tag text-[10px]" />
                 <span>{{ item.bulkDiscount.note }}</span>
                 <span v-if="hasBulkDiscount(item)" class="font-medium">
-                  · 已折抵 -${{ formatMoney(bulkDiscountAmount(item)) }}
+                  · 已折抵 -{{ money(bulkDiscountAmount(item)) }}
                 </span>
               </div>
             </div>
@@ -1378,8 +1377,7 @@ const handleGoProduct = (productId?: number) => {
             class="text-xl font-bold @3xl:text-2xl"
             style="color: var(--primary)"
           >
-            <span class="text-sm @3xl:text-base">NT$</span
-            >{{ formatMoney(groupSubtotal(group)) }}
+            {{ money(groupSubtotal(group)) }}
           </span>
         </div>
       </div>
@@ -1471,7 +1469,7 @@ const handleGoProduct = (productId?: number) => {
                 class="text-base font-bold @7xl:text-lg"
                 style="color: var(--primary)"
               >
-                ${{ p.price }}
+                {{ money(p.price) }}
               </span>
 
               <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
@@ -1655,8 +1653,7 @@ const handleGoProduct = (productId?: number) => {
               class="truncate text-xl font-bold @7xl:text-2xl"
               style="color: var(--primary)"
             >
-              <span class="text-sm @7xl:text-base">NT$</span
-              >{{ formatMoney(globalTotal) }}
+              {{ money(globalTotal) }}
             </span>
           </div>
           <Button
@@ -1736,7 +1733,7 @@ const handleGoProduct = (productId?: number) => {
               {{ addOnDialog.name }}
             </p>
             <span class="text-lg font-bold" style="color: var(--primary)">
-              ${{ addOnDialog.price }}
+              {{ money(addOnDialog.price) }}
             </span>
           </div>
         </div>

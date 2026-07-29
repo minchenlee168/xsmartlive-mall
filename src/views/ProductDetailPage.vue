@@ -13,6 +13,9 @@ import { burstAddToCartFromEvent } from '../utils/cart-burst';
 import lineIcon from '../assets/line.svg';
 import instagramIcon from '../assets/instagram.svg';
 import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
+import { useMoney } from '../composables/useMoney';
+
+const { money } = useMoney();
 
 type SharePlatform = 'facebook' | 'line' | 'instagram' | 'link';
 
@@ -418,12 +421,12 @@ const handleNextThumb = () => {
                     class="text-2xl leading-none font-bold @7xl:text-3xl"
                     style="color: var(--primary)"
                   >
-                    ${{ product.price }}
+                    {{ money(product.price) }}
                   </span>
                   <span
                     class="text-base font-medium text-slate-500 line-through @7xl:text-xl"
                   >
-                    ${{ product.original }}
+                    {{ money(product.original) }}
                   </span>
                 </div>
 
@@ -900,11 +903,11 @@ const handleNextThumb = () => {
       style="padding-bottom: max(12px, env(safe-area-inset-bottom))"
     >
       <div class="flex shrink-0 flex-col leading-tight">
-        <span class="text-xs text-slate-500 line-through"
-          >${{ product.original }}</span
-        >
+        <span class="text-xs text-slate-500 line-through">{{
+          money(product.original)
+        }}</span>
         <span class="text-xl font-bold" style="color: var(--primary)">
-          ${{ product.price }}
+          {{ money(product.price) }}
         </span>
       </div>
       <Button
