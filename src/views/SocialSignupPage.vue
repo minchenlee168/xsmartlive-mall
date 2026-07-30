@@ -504,8 +504,8 @@ const handleBackToLogin = () => {
               帳號綁定成功！
             </h2>
             <p class="text-sm" style="color: var(--text-muted)">
-              建議<span class="font-bold text-amber-600">綁定手機</span
-              >，保障交易安全與物流通知。
+              立即<span class="font-bold text-amber-600">綁定手機</span
+              >，訂單通知不延誤，購物快人一步！
             </p>
           </div>
           <Button
