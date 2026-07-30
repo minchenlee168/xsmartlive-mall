@@ -2029,7 +2029,7 @@ const handlePlaceOrder = () => {
           <div class="mx-auto max-w-[680px] px-4 pt-5 pb-5">
             <!-- Header -->
             <div class="mb-1 flex items-center justify-between">
-              <h3 class="text-lg font-bold text-slate-950">可使用優惠券</h3>
+              <h3 class="text-lg font-bold text-slate-950">選擇優惠券</h3>
               <Button
                 icon="pi pi-times"
                 severity="secondary"
@@ -2082,7 +2082,7 @@ const handlePlaceOrder = () => {
                     ? 'cursor-not-allowed border border-slate-200'
                     : couponDrawerSelected === c.id
                       ? 'cursor-pointer border border-[var(--primary)]'
-                      : 'cursor-pointer border border-slate-200 hover:-translate-y-0.5 hover:border-2 hover:border-[var(--primary-400)] hover:shadow-sm'
+                      : 'cursor-pointer border border-slate-200 hover:-translate-y-0.5 hover:border-[var(--primary-400)] hover:shadow-sm'
                 "
                 @click="
                   isCouponUsableFor(couponDrawerGroup, c) &&
