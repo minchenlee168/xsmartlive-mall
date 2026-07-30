@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { OrderRecord, Transaction } from '../types/order';
+import type { OrderRecord, OrderItem, Transaction } from '../types/order';
 
 // 型別 re-export，方便 store 使用者只 import 一處
 export type {
@@ -400,68 +400,6 @@ export const useOrdersStore = defineStore('orders', () => {
               no: 'F2026012502',
               qty: 1,
               currentStep: 'to_receive',
-              stepTimes: SAMPLE_TIMES,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: '7',
-      date: '2026/01/20 14:42',
-      orderNo: '1000000001',
-      qty: 1,
-      total: 320,
-      payment: '線上信用卡（藍新）',
-      delivery: '宅配',
-      invoice: '公司統編',
-      invoiceStatus: 'pending',
-      status: 'cancelled',
-      detailTab: 'progress',
-      expanded: true,
-      items: [
-        {
-          image: IMG_BIB,
-          name: '寶寶可愛印花圍兜',
-          spec: '藍',
-          price: 320,
-          qty: 1,
-          packages: [
-            {
-              no: 'F2026012001',
-              qty: 1,
-              currentStep: 'unpaid',
-              stepTimes: SAMPLE_TIMES,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: '8',
-      date: '2026/01/15 09:21',
-      orderNo: '1000000000',
-      qty: 1,
-      total: 450,
-      payment: '線上信用卡（藍新）',
-      delivery: '宅配',
-      invoice: '捐贈',
-      invoiceStatus: 'voided',
-      status: 'returned',
-      detailTab: 'progress',
-      expanded: true,
-      items: [
-        {
-          image: IMG_PJ,
-          name: '寶寶長袖包屁衣親子裝',
-          spec: '白，66cm',
-          price: 450,
-          qty: 1,
-          packages: [
-            {
-              no: 'F2026011501',
-              qty: 1,
-              currentStep: 'delivered',
               stepTimes: SAMPLE_TIMES,
             },
           ],

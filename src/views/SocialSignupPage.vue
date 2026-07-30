@@ -501,7 +501,7 @@ const handleBackToLogin = () => {
           </div>
           <div class="flex flex-col items-center gap-1.5 text-center">
             <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
-              帳號綁定成功！
+              註冊成功！
             </h2>
             <p class="text-sm" style="color: var(--text-muted)">
               立即<span class="font-bold text-amber-600">綁定手機</span

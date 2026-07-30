@@ -50,14 +50,12 @@ const statusTabs: Array<{ key: StatusTab; label: string }> = [
   { key: 'shipped', label: '已出貨' },
   { key: 'delivered', label: '已送達' },
   { key: 'completed', label: '已完成' },
-  { key: 'cancelled', label: '取消' },
 ];
 const activeTab = ref<StatusTab>('all');
 /**
  * 進度狀態 tab 全部用包裹 currentStep 過濾，不再依賴 order.status
  * （避免 mock 資料 status 與包裹階段不一致時跑錯 tab）。
  * 只要訂單有任一包裹 currentStep 命中即列入。
- * 註：cancelled 仍走 order.status，因為取消是訂單層級事件，不在 timeline 流程中。
  */
 const TIMELINE_TABS: Record<string, TimelineStepKey> = {
   unpaid: 'unpaid',
@@ -86,7 +84,7 @@ const handleApplyQuery = (): void => {
 };
 
 // 商品列子 tab
-// 取消訂單 / 退換貨改由私訊聯絡、後台手動改狀態，前台不提供操作（保留「取消」訂單狀態顯示）
+// 取消訂單 / 退換貨改由私訊聯絡、後台手動處理，前台不提供操作，也不再有「取消 / 已退貨」訂單狀態
 const detailTabs: Array<{ key: DetailTab; label: string }> = [
   { key: 'progress', label: '配送進度/明細' },
   { key: 'inquiry', label: '訂單提問' },
@@ -203,14 +201,10 @@ const ordersForTab = (key: StatusTab) => {
   if (key === 'all') return list;
   const timelineStep = TIMELINE_TABS[key];
   if (timelineStep) {
-    // 已取消 / 已退貨屬訂單層級狀態，只出現在自己的 tab，不進 timeline 進度 tab
-    return list.filter(
-      (o) =>
-        o.status !== 'cancelled' &&
-        o.status !== 'returned' &&
-        o.items.some((it) =>
-          it.packages.some((p) => p.currentStep === timelineStep),
-        ),
+    return list.filter((o) =>
+      o.items.some((it) =>
+        it.packages.some((p) => p.currentStep === timelineStep),
+      ),
     );
   }
   return list.filter((o) => o.status === key);
@@ -241,10 +235,8 @@ const allPackageSteps = (order: OrderRecord): TimelineStep['key'][] => {
   return steps;
 };
 
-/** 訂單狀態：訂單級狀態（取消 / 已退貨）優先；其餘看包裹 currentStep。 */
+/** 訂單狀態：看包裹 currentStep（不同階段 → 處理中）。 */
 const orderDisplayStatus = (order: OrderRecord): string => {
-  if (order.status === 'cancelled') return '已取消';
-  if (order.status === 'returned') return '已退貨';
   const steps = allPackageSteps(order);
   const uniq = new Set(steps);
   if (uniq.size === 0) return '—';
@@ -265,14 +257,10 @@ const itemDisplayStatus = (item: OrderItem): string => {
 
 /**
  * 動作可否：依包裹階段判斷
- * - unpaid / to_ship：僅可取消（待收貨前）
- * - shipped：可退貨
+ * - shipped / to_receive：可退貨
  * - delivered：可換貨、可退貨
- * - completed / cancelled：皆不可
+ * - completed：皆不可
  */
-const canCancelStep = (step: TimelineStep['key']): boolean => {
-  return step === 'unpaid' || step === 'to_ship';
-};
 const canRefundStep = (step: TimelineStep['key']): boolean => {
   return step === 'shipped' || step === 'to_receive' || step === 'delivered';
 };
@@ -293,19 +281,12 @@ const returnReasonText = (order: OrderRecord): string => {
   return `${orderDisplayStatus(order)}訂單，無法退換貨`;
 };
 
-/** 整筆訂單是否可取消：所有包裹都還在可取消階段（unpaid / to_ship，即待收貨前） */
-const orderCanCancel = (order: OrderRecord): boolean => {
-  const steps = allPackageSteps(order);
-  return steps.length > 0 && steps.every(canCancelStep);
-};
-
 /** 更換配送地址階段：進入備貨中（to_receive）就不能改（已在備貨），僅待付款 / 待出貨可改。 */
 const canChangeAddressStep = (step: TimelineStep['key']): boolean => {
   return step === 'unpaid' || step === 'to_ship';
 };
-/** 整筆訂單是否可更換地址：已取消 / 已退貨 → false；否則所有包裹都要在備貨中以前。 */
+/** 整筆訂單是否可更換地址：所有包裹都要在備貨中以前。 */
 const orderCanChangeAddress = (order: OrderRecord): boolean => {
-  if (order.status === 'cancelled' || order.status === 'returned') return false;
   const steps = allPackageSteps(order);
   return steps.length > 0 && steps.every(canChangeAddressStep);
 };
@@ -452,12 +433,6 @@ const handleSubmitReturn = (): void => {
     `${returnType.value === 'return' ? '退貨' : '換貨'}申請已送出（示意）`,
   );
   isReturnDialogVisible.value = false;
-};
-
-const handleCancelOrder = (order: OrderRecord): void => {
-  if (!orderCanCancel(order)) return;
-  order.status = 'cancelled';
-  ui.toast('訂單已取消（示意）');
 };
 
 /** 已送達訂單：買家確認完成 → 包裹推進 completed、狀態轉已完成。 */
@@ -928,16 +903,6 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 class="w-full"
                 @update:model-value="(key) => handleSelectDetailTab(order, key)"
               />
-              <!-- 取消訂單 tab：全寬「取消訂單」按鈕 -->
-              <Button
-                v-if="order.detailTab === 'cancel'"
-                label="取消訂單"
-                outlined
-                severity="danger"
-                :disabled="!orderCanCancel(order)"
-                class="w-full"
-                @click="handleCancelOrder(order)"
-              />
               <!-- 更換地址 tab：全寬「更換配送地址」按鈕；備貨中之後不可改 -->
               <Button
                 v-if="order.detailTab === 'address'"
@@ -983,17 +948,6 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 </button>
               </div>
             </div>
-            <!-- 取消訂單 tab：右側「取消訂單」按鈕（只能取消整筆） -->
-            <Button
-              v-if="order.detailTab === 'cancel'"
-              label="取消訂單"
-              outlined
-              size="small"
-              severity="danger"
-              :disabled="!orderCanCancel(order)"
-              class="shrink-0"
-              @click="handleCancelOrder(order)"
-            />
             <!-- 更換地址 tab：右側「更換配送地址」按鈕；備貨中之後不可改 -->
             <Button
               v-if="order.detailTab === 'address'"
