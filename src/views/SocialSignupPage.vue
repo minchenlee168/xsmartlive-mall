@@ -167,6 +167,11 @@ const handleEnterShop = () => {
 const handleBackToLogin = () => {
   router.push('/login');
 };
+
+/** 綁定模式(電話註冊來綁定社群)想改綁其他帳號 → 回註冊成功頁重選社群。 */
+const handlePickOtherSocial = () => {
+  router.push({ path: '/register', query: { step: 'success' } });
+};
 </script>
 
 <template>
@@ -350,15 +355,26 @@ const handleBackToLogin = () => {
             @click="handleConfirmReview"
           />
 
+          <!-- 綁定模式：想改綁其他社群 → 回註冊成功頁重選；一般社群註冊 → 返回登入 -->
           <p class="text-sm" style="color: var(--text-muted)">
-            使用其他方式？
             <a
-              class="ml-1 cursor-pointer underline"
+              v-if="isPhoneVerified"
+              class="cursor-pointer underline"
               style="color: var(--primary)"
-              @click="handleBackToLogin"
+              @click="handlePickOtherSocial"
             >
-              返回登入
+              選擇其他社群帳號
             </a>
+            <template v-else>
+              使用其他方式？
+              <a
+                class="ml-1 cursor-pointer underline"
+                style="color: var(--primary)"
+                @click="handleBackToLogin"
+              >
+                返回登入
+              </a>
+            </template>
           </p>
         </div>
 

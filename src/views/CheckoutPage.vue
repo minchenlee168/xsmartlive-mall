@@ -2076,16 +2076,22 @@ const handlePlaceOrder = () => {
               <label
                 v-for="c in drawerSortedCoupons"
                 :key="c.id"
-                class="flex rounded-[10px] border border-slate-200"
+                class="flex rounded-[10px] transition-all duration-200"
                 :class="
                   !isCouponUsableFor(couponDrawerGroup, c)
-                    ? 'cursor-not-allowed'
-                    : 'cursor-pointer hover:border-[var(--primary)]'
+                    ? 'cursor-not-allowed border border-slate-200'
+                    : couponDrawerSelected === c.id
+                      ? 'cursor-pointer border border-[var(--primary)]'
+                      : 'cursor-pointer border border-slate-200 hover:-translate-y-0.5 hover:border-2 hover:border-[var(--primary-400)] hover:shadow-sm'
+                "
+                @click="
+                  isCouponUsableFor(couponDrawerGroup, c) &&
+                    (couponDrawerSelected = c.id)
                 "
               >
                 <!-- Amount block -->
                 <div
-                  class="flex w-24 shrink-0 items-center justify-center gap-1 rounded-l-[10px] px-2 py-3 @3xl:w-[140px] @3xl:gap-2 @3xl:px-3 @3xl:py-4"
+                  class="flex w-24 shrink-0 items-center justify-center gap-1 rounded-l-[9px] px-2 py-3 @3xl:w-[140px] @3xl:gap-2 @3xl:px-3 @3xl:py-4"
                   :class="
                     isCouponUsableFor(couponDrawerGroup, c)
                       ? ''
@@ -2144,13 +2150,13 @@ const handlePlaceOrder = () => {
                   >
                   <p class="mt-1 text-xs text-slate-500">{{ c.expiry }}</p>
                 </div>
-                <!-- Right side: radio / disabled note；手機版未達門檻則只在名稱上方顯示，這欄改用 hidden -->
+                <!-- Right side: 整卡可點,不用 radio；選中 → 實心主色圓打勾,未選 → 空白；停用顯示原因 -->
                 <div
-                  class="flex w-[60px] shrink-0 items-center justify-center py-2 text-center @3xl:w-24"
+                  class="w-[60px] shrink-0 items-center justify-center py-2 text-center @3xl:w-24"
                   :class="
                     !isCouponUsableFor(couponDrawerGroup, c)
                       ? 'hidden @3xl:flex'
-                      : ''
+                      : 'flex'
                   "
                 >
                   <span
@@ -2158,11 +2164,13 @@ const handlePlaceOrder = () => {
                     class="text-sm text-red-500"
                     >{{ couponUnusableReasonFor(couponDrawerGroup, c) }}</span
                   >
-                  <RadioButton
-                    v-else
-                    v-model="couponDrawerSelected"
-                    :value="c.id"
-                  />
+                  <span
+                    v-else-if="couponDrawerSelected === c.id"
+                    class="flex h-6 w-6 items-center justify-center rounded-full shadow-sm"
+                    style="background: var(--primary)"
+                  >
+                    <i class="pi pi-check text-xs text-white" />
+                  </span>
                 </div>
               </label>
             </div>

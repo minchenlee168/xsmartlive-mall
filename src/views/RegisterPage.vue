@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
 import { useThemeStore } from '../pinia/theme';
@@ -16,6 +16,7 @@ const SMS_CODE_LENGTH = 6;
 const PASSWORD_RULE = /^[A-Za-z0-9]{8,20}$/;
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
 const ui = useUiStore();
 const themeStore = useThemeStore();
@@ -28,7 +29,8 @@ const authBgSrc = computed(() =>
     : `${import.meta.env.BASE_URL}auth-bg-mobile.png`,
 );
 
-const step = ref<Step>('form');
+// ?step=success → 直接顯示註冊成功頁（供社群綁定頁「選擇其他社群帳號」導回重選）
+const step = ref<Step>(route.query.step === 'success' ? 'success' : 'form');
 const countryCode = ref('+886');
 const phone = ref('');
 const name = ref('');

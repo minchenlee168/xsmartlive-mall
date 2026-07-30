@@ -1736,13 +1736,15 @@ const handleGoProduct = (productId?: number) => {
           "
           @click="handlePickAddOnCart(g.id)"
         >
-          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-base font-medium break-words text-slate-950">
+          <div class="flex min-w-0 flex-1 items-center gap-2">
+            <span class="min-w-0 break-words text-base font-medium text-slate-950">
               {{ g.sellerName }}
             </span>
-            <span class="text-xs text-slate-500">
-              {{ g.items.length }} 件商品 ·
-              {{ g.addOnProductIds?.length ?? 0 }} 件加購商品可選
+            <span
+              class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+              style="background: var(--primary-surface); color: var(--primary)"
+            >
+              {{ g.addOnProductIds?.length ?? 0 }}
             </span>
           </div>
           <i class="pi pi-chevron-right text-sm text-slate-400" />
