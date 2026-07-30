@@ -558,7 +558,6 @@ const filteredCoupons = computed(() =>
     : ownedCoupons.value.filter((c) => c.status === couponTab.value),
 );
 const handleUseCoupon = () => {
-  ui.toast('已套用優惠券，前往購物車結帳');
   router.push('/cart');
 };
 const handleClaimCoupon = (c: ClaimableCoupon) => {
