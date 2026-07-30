@@ -275,7 +275,7 @@ export const useCartStore = defineStore('cart', () => {
           // 任選 4 件動態組合：規格用彈窗挑選（選項＋規格→加入→已選 X/4），bundleItems 空＝待挑選
           id: 'i_pick4',
           productId: 16,
-          name: '任選 4 件 寶寶配件超值組合（部分限購）',
+          name: '任選 4 件 寶寶配件超值組合',
           image: products.find((p) => p.id === 16)?.image,
           spec: '預設',
           qty: 1,

@@ -1860,14 +1860,25 @@ const handleGoProduct = (productId?: number) => {
       @update:visible="(v) => !v && closeBidDialog()"
     >
       <div v-if="bidDialogItem" class="flex flex-col gap-4">
-        <div class="flex flex-col gap-0.5">
-          <p class="text-sm font-medium text-slate-700">
-            {{ bidDialogItem.name }}
-          </p>
-          <p class="text-sm text-slate-500">得標 {{ bidDialogItem.qty }} 件</p>
+        <div class="flex items-center gap-3">
+          <div
+            class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100"
+          >
+            <ProductImage
+              :src="bidDialogItem.image"
+              :alt="bidDialogItem.name"
+              size="sm"
+            />
+          </div>
+          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <p class="line-clamp-2 text-sm font-medium text-slate-700">
+              {{ bidDialogItem.name }}
+            </p>
+            <p class="text-sm text-slate-500">得標 {{ bidDialogItem.qty }} 件</p>
+          </div>
         </div>
 
-        <!-- 新增分配列：各軸規格（最多 3）+ 數量 → 加入 -->
+        <!-- 新增分配列：各軸規格（最多 3）；數量與「加入」同一行 -->
         <div class="flex flex-col gap-2">
           <div class="grid grid-cols-2 gap-2">
             <div
@@ -1887,8 +1898,11 @@ const handleGoProduct = (productId?: number) => {
                 @update:model-value="(v) => setDlgAxis(axis.name, v)"
               />
             </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs text-slate-500">數量</label>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">數量</label>
+            <!-- 數量 stepper（滿第一欄，寬度同上方下拉）＋ 加入（原本寬度）同一行 -->
+            <div class="grid grid-cols-2 items-center gap-2">
               <InputNumber
                 :model-value="bidRowDraft.qty"
                 :min="1"
@@ -1904,37 +1918,47 @@ const handleGoProduct = (productId?: number) => {
                 :input-style="{ textAlign: 'center' }"
                 @update:model-value="(v) => setDlgQty(v)"
               />
-              <!-- 各軸選滿(命中 SKU) → 顯示該規格剩餘庫存 -->
-              <span v-if="dlgSku()" class="text-xs text-slate-500">
-                剩餘庫存 {{ dlgDraftMax() }} 件
-              </span>
+              <Button
+                label="加入"
+                icon="pi pi-plus"
+                class="w-fit"
+                :severity="dlgCanAdd() ? undefined : 'secondary'"
+                :disabled="!dlgCanAdd()"
+                @click="dlgAdd()"
+              />
             </div>
+            <!-- 各軸選滿(命中 SKU) → 顯示該規格剩餘庫存 -->
+            <span v-if="dlgSku()" class="text-xs text-slate-500">
+              剩餘庫存 {{ dlgDraftMax() }} 件
+            </span>
           </div>
-          <Button
-            label="加入"
-            icon="pi pi-plus"
-            size="small"
-            class="w-fit self-end"
-            :severity="dlgCanAdd() ? undefined : 'secondary'"
-            :disabled="!dlgCanAdd()"
-            @click="dlgAdd()"
-          />
         </div>
 
         <!-- 已挑選：黏在彈窗底部，明細直接展開（不收合） -->
         <div
           class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
         >
-          <div class="flex w-full items-center text-sm">
-            <span
+          <!-- 狀態提示：比照「買多優惠」tag 樣式（藥丸底色 + 小 icon），保留超量紅/完成綠/未滿琥珀三態 -->
+          <div
+            class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+            :class="
+              dlgOver()
+                ? 'bg-red-50 text-red-700'
+                : dlgRemaining() === 0
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-amber-50 text-amber-700'
+            "
+          >
+            <!-- 挑滿(綠) → 打勾；未滿(黃)/超過(紅) → info -->
+            <i
+              class="text-[10px]"
               :class="
-                dlgOver()
-                  ? 'font-medium text-red-500'
-                  : dlgRemaining() === 0
-                    ? 'font-medium text-green-700'
-                    : 'text-amber-700'
+                !dlgOver() && dlgRemaining() === 0
+                  ? 'pi pi-check-circle'
+                  : 'pi pi-info-circle'
               "
-            >
+            />
+            <span>
               請挑選並加入規格，已挑選 {{ dlgTotal() }} 件，剩餘
               {{ dlgRemaining() }} 件。
             </span>
@@ -1958,14 +1982,11 @@ const handleGoProduct = (productId?: number) => {
                   :max="dlgRowMax(row.skuId)"
                   :max-fraction-digits="0"
                   :allow-empty="false"
-                  size="small"
-                  class="w-16 shrink-0"
-                  :input-style="{
-                    width: '100%',
-                    textAlign: 'center',
-                    height: '2.5rem',
-                    minHeight: '2.5rem',
-                  }"
+                  show-buttons
+                  button-layout="horizontal"
+                  increment-button-icon="pi pi-plus"
+                  decrement-button-icon="pi pi-minus"
+                  class="qty-stepper qty-keep-stepper shrink-0"
                   @update:model-value="(v) => dlgSetQty(row.skuId, v)"
                 />
                 <button
@@ -2098,16 +2119,27 @@ const handleGoProduct = (productId?: number) => {
         <div
           class="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white px-5 pt-3 pb-4"
         >
-          <div class="flex w-full items-center text-sm">
-            <span
+          <!-- 狀態提示：比照「買多優惠」tag 樣式（藥丸底色 + 小 icon），保留超量紅/完成綠/未滿琥珀三態 -->
+          <div
+            class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+            :class="
+              pdOver()
+                ? 'bg-red-50 text-red-700'
+                : pdTotal() === pdNeed()
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-amber-50 text-amber-700'
+            "
+          >
+            <!-- 挑滿(綠) → 打勾；未滿(黃)/超過(紅) → info -->
+            <i
+              class="text-[10px]"
               :class="
-                pdOver()
-                  ? 'font-medium text-red-500'
-                  : pdTotal() === pdNeed()
-                    ? 'font-medium text-green-700'
-                    : 'text-amber-700'
+                !pdOver() && pdTotal() === pdNeed()
+                  ? 'pi pi-check-circle'
+                  : 'pi pi-info-circle'
               "
-            >
+            />
+            <span>
               請挑選並加入規格，已挑選 {{ pdTotal() }} 件，剩餘
               {{ pdNeed() - pdTotal() }} 件。
             </span>

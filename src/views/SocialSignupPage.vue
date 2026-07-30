@@ -112,12 +112,13 @@ const isAgreed = ref(false);
  */
 const handleConfirmReview = () => {
   auth.login(profile.value.name);
-  ui.toast(`已使用 ${profile.value.badgeLabel} 綁定並登入`);
-  // 電話註冊來綁定社群（已有驗證手機）→ 跳過「建議綁定手機」直接進商城
+  // 電話註冊來綁定社群（已有驗證手機）→ 已登入,只是綁定；否則為社群首次註冊
   if (isPhoneVerified.value) {
+    ui.toast(`已綁定 ${profile.value.badgeLabel} 帳號`);
     router.push('/shop');
     return;
   }
+  ui.toast(`已使用 ${profile.value.badgeLabel} 綁定並登入`);
   step.value = 'bound';
 };
 const handleGoVerify = () => {
@@ -244,11 +245,12 @@ const handleBackToLogin = () => {
           style="box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15)"
         >
           <div class="flex flex-col items-center gap-1.5">
+            <!-- 電話註冊來綁定社群(isPhoneVerified) → 綁定用語；一般社群首次登入 → 註冊用語 -->
             <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
-              即將完成註冊
+              {{ isPhoneVerified ? '即將完成綁定' : '即將完成註冊' }}
             </h2>
             <p class="text-sm" style="color: var(--text-muted)">
-              您已透過以下帳號登入
+              {{ isPhoneVerified ? '您選擇綁定以下社群帳號' : '您已透過以下帳號登入' }}
             </p>
           </div>
 
@@ -276,7 +278,11 @@ const handleBackToLogin = () => {
           <!-- Account info -->
           <div class="flex w-full flex-col gap-3">
             <p class="text-sm font-medium text-slate-700">
-              將使用以下資訊建立您的帳號：
+              {{
+                isPhoneVerified
+                  ? '以下為您綁定的社群帳號資訊：'
+                  : '將使用以下資訊建立您的帳號：'
+              }}
             </p>
             <div class="flex items-start gap-3 text-sm text-slate-700">
               <i class="pi pi-envelope mt-0.5 text-slate-400" />
@@ -307,8 +313,8 @@ const handleBackToLogin = () => {
             </div>
           </div>
 
-          <!-- Terms agreement -->
-          <div class="flex w-full items-start gap-2">
+          <!-- Terms agreement（電話註冊來綁定社群時已同意過條款 → 隱藏） -->
+          <div v-if="!isPhoneVerified" class="flex w-full items-start gap-2">
             <Checkbox
               v-model="isAgreed"
               binary
@@ -338,9 +344,9 @@ const handleBackToLogin = () => {
           </div>
 
           <Button
-            label="完成註冊"
+            :label="isPhoneVerified ? '完成綁定' : '完成註冊'"
             class="!min-h-12 w-full"
-            :disabled="!isAgreed"
+            :disabled="!isPhoneVerified && !isAgreed"
             @click="handleConfirmReview"
           />
 

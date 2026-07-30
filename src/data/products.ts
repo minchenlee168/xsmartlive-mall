@@ -190,7 +190,7 @@ export const products: Product[] = [
   },
   {
     id: 16,
-    name: '任選 4 件 寶寶配件超值組合（部分限購）',
+    name: '任選 4 件 寶寶配件超值組合',
     price: 599,
     original: 980,
     stock: 10,
@@ -204,7 +204,7 @@ export const products: Product[] = [
     pickOptions: [
       {
         id: 201,
-        name: '寶寶安撫奶嘴（限購 1）',
+        name: '寶寶安撫奶嘴',
         image:
           'https://images.unsplash.com/photo-1517242810446-cc8951b2be40?w=400&fit=crop',
         spec: '粉色',
@@ -213,7 +213,7 @@ export const products: Product[] = [
       },
       {
         id: 202,
-        name: '嬰兒抗 UV 遮陽帽（限購 1）',
+        name: '嬰兒抗 UV 遮陽帽',
         image:
           'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
         spec: '黃-F',
@@ -222,7 +222,7 @@ export const products: Product[] = [
       },
       {
         id: 203,
-        name: '寶寶嬰兒紗布手帕 5 入組（最多 2）',
+        name: '寶寶嬰兒紗布手帕 5 入組',
         image:
           'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
         spec: '白',
