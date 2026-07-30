@@ -100,6 +100,101 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     stock: 60,
     specs: [{ label: '顏色', options: ['珍珠白', '玫瑰粉', '午夜藍'] }],
   },
+  {
+    id: 9007,
+    name: '嬰兒防踢被 純棉睡袋',
+    price: 359,
+    original: 590,
+    image:
+      'https://images.unsplash.com/photo-1522771930-4b7d5c46f6b7?w=400&fit=crop',
+    stock: 24,
+    specs: [{ label: '尺寸', options: ['S', 'M', 'L'] }],
+  },
+  {
+    id: 9008,
+    name: '寶寶學步防滑襪 3 雙組',
+    price: 129,
+    original: 220,
+    image:
+      'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=400&fit=crop',
+    stock: 80,
+    specs: [{ label: '顏色', options: ['米白', '灰藍', '粉橘'] }],
+  },
+  {
+    id: 9009,
+    name: '矽膠學習餐具組（碗＋湯匙）',
+    price: 199,
+    original: 320,
+    image:
+      'https://images.unsplash.com/photo-1607453998774-d533f65dac99?w=400&fit=crop',
+    stock: 15,
+    specs: [{ label: '顏色', options: ['蜜桃粉', '薄荷綠', '奶油黃'] }],
+  },
+  {
+    id: 9010,
+    name: '嬰兒推車防蚊網',
+    price: 149,
+    original: 260,
+    image:
+      'https://images.unsplash.com/photo-1591147834626-3b8b0f6f5c3a?w=400&fit=crop',
+    stock: 42,
+  },
+  {
+    id: 9011,
+    name: '寶寶洗澡玩具戲水組',
+    price: 169,
+    original: 300,
+    image:
+      'https://images.unsplash.com/photo-1519689373023-dd07c7988603?w=400&fit=crop',
+    stock: 33,
+  },
+  {
+    id: 9012,
+    name: '嬰兒口腔清潔紗布巾',
+    price: 79,
+    original: 130,
+    image:
+      'https://images.unsplash.com/photo-1584839404042-8f6f0f0f0f0f?w=400&fit=crop',
+    stock: 96,
+  },
+  {
+    id: 9013,
+    name: '寶寶防水吸盤圍兜',
+    price: 99,
+    original: 180,
+    image:
+      'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=400&fit=crop',
+    stock: 7,
+    specs: [{ label: '顏色', options: ['天空藍', '櫻花粉', '檸檬黃'] }],
+  },
+  {
+    id: 9014,
+    name: '嬰兒安撫巾玩偶',
+    price: 159,
+    original: 280,
+    image:
+      'https://images.unsplash.com/photo-1560582861-45078880e48e?w=400&fit=crop',
+    stock: 28,
+  },
+  {
+    id: 9015,
+    name: '寶寶固齒器牙膠',
+    price: 89,
+    original: 150,
+    image:
+      'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400&fit=crop',
+    stock: 55,
+    specs: [{ label: '款式', options: ['小花', '小熊', '彩虹'] }],
+  },
+  {
+    id: 9016,
+    name: '嬰兒保暖防抓手套',
+    price: 69,
+    original: 120,
+    image:
+      'https://images.unsplash.com/photo-1607453998774-d533f65dac99?w=400&fit=crop',
+    stock: 64,
+  },
 ];
 
 // Livebuy 直播回放：第一張為「最新場次」大卡（有日期 + 時間），其餘為過往回放縮圖 + 時長
@@ -713,7 +808,7 @@ const addOnsOfCart = (c: CartGroup): AddOnProduct[] =>
   (c.addOnProductIds ?? [])
     .map((id) => ADD_ON_PRODUCTS.find((p) => p.id === id))
     .filter((p): p is AddOnProduct => p != null);
-/** 全部購物車的加購商品（跨車去重）— 給 header 顯示件數用。 */
+/** 全部購物車的加購商品（各加購品只屬一台車、不跨車重複，故此即各台加總）— 給 header 顯示件數用。 */
 const allAddOns = computed<AddOnProduct[]>(() =>
   [...new Set(allCarts.value.flatMap((g) => g.addOnProductIds ?? []))]
     .map((id) => ADD_ON_PRODUCTS.find((p) => p.id === id))

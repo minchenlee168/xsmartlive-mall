@@ -103,7 +103,7 @@ export const useCartStore = defineStore('cart', () => {
       ],
       checkoutMode: 'pickable',
       // 直播商品加購區：這台推薦的加購商品 id（對應 CartPage 的 ADD_ON_PRODUCTS）
-      addOnProductIds: [9001, 9002, 9006],
+      addOnProductIds: [9001, 9002, 9003],
       items: [
         {
           id: 'i1',
@@ -195,7 +195,7 @@ export const useCartStore = defineStore('cart', () => {
         'self-pickup',
       ],
       checkoutMode: 'default',
-      addOnProductIds: [9003, 9004, 9005, 9006],
+      addOnProductIds: [9004, 9005, 9006, 9007],
       items: [
         {
           // 固定組合：子品固定，規格用彈窗選擇（收合摘要 + 選擇規格按鈕）；spec 留空＝待選規格
@@ -246,7 +246,7 @@ export const useCartStore = defineStore('cart', () => {
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
       checkoutMode: 'pickable',
-      addOnProductIds: [9001, 9005],
+      addOnProductIds: [9008, 9009],
       items: [
         {
           id: 'i6',
@@ -295,7 +295,7 @@ export const useCartStore = defineStore('cart', () => {
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm'],
       checkoutMode: 'paused',
-      addOnProductIds: [9002, 9004, 9006],
+      addOnProductIds: [9010, 9011, 9012],
       items: [
         {
           id: 'i7',
@@ -318,7 +318,7 @@ export const useCartStore = defineStore('cart', () => {
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
       checkoutMode: 'pickable',
-      addOnProductIds: [9001, 9002, 9003, 9006],
+      addOnProductIds: [9013, 9014, 9015, 9016],
       items: [
         {
           id: 'i8',
