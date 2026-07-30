@@ -1466,7 +1466,7 @@ const handlePlaceOrder = () => {
                 severity="secondary"
                 outlined
                 size="small"
-                class="shrink-0"
+                :class="[RECEIPT_BUTTON_CLASS, 'shrink-0']"
                 @click="handleOpenShipDrawer(group.id)"
               />
             </div>
