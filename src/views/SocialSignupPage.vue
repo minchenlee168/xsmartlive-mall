@@ -338,7 +338,7 @@ const handleBackToLogin = () => {
           </div>
 
           <Button
-            label="立即登入"
+            label="完成註冊"
             class="!min-h-12 w-full"
             :disabled="!isAgreed"
             @click="handleConfirmReview"
@@ -365,9 +365,13 @@ const handleBackToLogin = () => {
           <!-- Warning icon + title -->
           <div class="flex flex-col items-center gap-2">
             <div
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100"
+              class="flex h-12 w-12 items-center justify-center rounded-full"
+              style="background: var(--primary-surface)"
             >
-              <i class="pi pi-exclamation-circle text-2xl text-amber-500" />
+              <i
+                class="pi pi-exclamation-circle text-2xl"
+                style="color: var(--primary)"
+              />
             </div>
             <h2 class="text-3xl font-bold" style="color: var(--surface-950)">
               綁定手機
@@ -460,7 +464,7 @@ const handleBackToLogin = () => {
 
           <Button
             :disabled="!canSubmitVerify"
-            label="確定綁定並登入"
+            label="完成綁定"
             class="!min-h-12 w-full"
             @click="handleSubmitVerify"
           />
