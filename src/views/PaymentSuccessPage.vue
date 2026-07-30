@@ -24,9 +24,6 @@ const summary = computed(() => ordersStore.lastPaymentSummary);
  * - 一般模式 → 返回商城主頁
  */
 const homePath = computed(() => (appMode.noShopMode ? '/cart' : '/shop'));
-const homeLabel = computed(() =>
-  appMode.noShopMode ? '返回購物車' : '返回商城主頁',
-);
 
 onMounted(() => {
   if (!summary.value) {
@@ -34,9 +31,9 @@ onMounted(() => {
   }
 });
 
-const handleGoHome = () => {
+const handleGoOrders = () => {
   ordersStore.setLastPaymentSummary(null);
-  router.push(homePath.value);
+  router.push({ path: '/member', query: { tab: 'orders' } });
 };
 </script>
 
@@ -57,7 +54,7 @@ const handleGoHome = () => {
           <i class="pi pi-check text-2xl text-white" />
         </div>
         <h1 class="text-3xl font-bold text-slate-950">付款成功</h1>
-        <Button :label="homeLabel" @click="handleGoHome" />
+        <Button label="查看我的訂單" outlined class="mt-1" @click="handleGoOrders" />
       </div>
 
       <!-- Order info -->

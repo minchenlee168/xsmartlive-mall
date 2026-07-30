@@ -32,6 +32,8 @@ interface AddOnProduct {
   spec?: string;
   /** 規格維度清單；長度 >=2 → header 顯示「規格」、送出時各維度用「, 」串接 */
   specs?: AddOnSpec[];
+  /** 庫存：數量不可超過此值 */
+  stock: number;
 }
 
 // 加價購：商城分類頁沒有、僅在購物車推薦的加價商品
@@ -43,6 +45,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 150,
     image:
       'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
+    stock: 18,
     // 兩個規格維度示範：顏色 + 尺寸 → header 會顯示「規格」
     specs: [
       { label: '顏色', options: ['粉色', '藍色', '黃色'] },
@@ -56,6 +59,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 80,
     image:
       'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400&fit=crop',
+    stock: 120,
   },
   {
     id: 9003,
@@ -64,6 +68,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 200,
     image:
       'https://images.unsplash.com/photo-1517242810446-cc8951b2be40?w=400&fit=crop',
+    stock: 7,
     specs: [{ label: '尺寸', options: ['S', 'M', 'L'] }],
   },
   {
@@ -73,6 +78,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 320,
     image:
       'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=400&fit=crop',
+    stock: 45,
   },
   {
     id: 9005,
@@ -81,6 +87,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 180,
     image:
       'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=400&fit=crop',
+    stock: 3,
     specs: [{ label: '口味', options: ['蘋果口味', '香蕉口味', '南瓜口味'] }],
   },
   {
@@ -90,6 +97,7 @@ const ADD_ON_PRODUCTS: AddOnProduct[] = [
     original: 480,
     image:
       'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&fit=crop',
+    stock: 60,
     specs: [{ label: '顏色', options: ['珍珠白', '玫瑰粉', '午夜藍'] }],
   },
 ];
@@ -341,6 +349,22 @@ const specAxesOf = (item: CartItem) =>
 const skusOf = (item: CartItem) =>
   products.find((p) => p.id === item.productId)?.skus ?? [];
 
+/**
+ * 購物車單列數量上限（不可超過庫存）：
+ * - 批次下標：可分配上限為所有 SKU 庫存總和
+ * - 一般品：依選定 SKU 庫存；只有單一 SKU 時直接用它
+ * - 無 SKU 資料（示範品）：回 undefined → 不設上限
+ */
+const itemStockMax = (item: CartItem): number | undefined => {
+  const skus = skusOf(item);
+  if (!skus.length) return undefined;
+  if (item.isBidBatch) return skus.reduce((sum, s) => sum + s.stock, 0);
+  const sku =
+    skus.find((s) => s.id === item.selectedSkuId) ??
+    (skus.length === 1 ? skus[0] : undefined);
+  return sku?.stock;
+};
+
 // ── 批次下標：規格分配（購物車列一顆按鈕 → 彈窗分配 → 確定寫回）──
 /** 某商品目前已確定分配的總數 / 明細（購物車列摘要用，讀 item.specAllocation）。 */
 const committedTotal = (item: CartItem): number =>
@@ -497,6 +521,12 @@ const dlgRemove = (skuId: string) => {
   const alloc = { ...bidDialogAlloc.value };
   delete alloc[skuId];
   bidDialogAlloc.value = alloc;
+};
+/** 已分配列的數量上限：該 SKU 的庫存。 */
+const dlgRowMax = (skuId: string): number => {
+  const item = bidDialogItem.value;
+  if (!item) return 0;
+  return skusOf(item).find((s) => s.id === skuId)?.stock ?? 0;
 };
 
 // ── 任選組合「挑選內容」彈窗（比照批次下標挑選規格）：
@@ -981,9 +1011,10 @@ const handleGoProduct = (productId?: number) => {
           :key="item.id"
           :class="ii !== group.items.length - 1 ? 'cart-divider' : ''"
         >
-          <!-- Item row -->
+          <!-- Item row（有備註時收窄底內距，讓備註貼齊所屬商品；下方間距改由備註 mb 提供，統一節奏） -->
           <div
-            class="flex flex-wrap items-start gap-3 px-[var(--card-pad)] py-[var(--card-pad)] @3xl:flex-nowrap @7xl:gap-4"
+            class="flex flex-wrap items-start gap-3 px-[var(--card-pad)] pt-[var(--card-pad)] @3xl:flex-nowrap @7xl:gap-4"
+            :class="item.note ? 'pb-2' : 'pb-[var(--card-pad)]'"
           >
             <!-- Checkbox + 圖片：default 是整台一起、paused 不能結帳，都不顯示 item 勾選 -->
             <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
@@ -1081,6 +1112,7 @@ const handleGoProduct = (productId?: number) => {
                   <InputNumber
                     v-model="item.qty"
                     :min="1"
+                    :max="itemStockMax(item)"
                     :max-fraction-digits="0"
                     :allow-empty="false"
                     :disabled="isQtyLocked(group)"
@@ -1184,6 +1216,7 @@ const handleGoProduct = (productId?: number) => {
                   <InputNumber
                     v-model="item.qty"
                     :min="1"
+                    :max="itemStockMax(item)"
                     :max-fraction-digits="0"
                     :allow-empty="false"
                     :disabled="isQtyLocked(group)"
@@ -1225,10 +1258,10 @@ const handleGoProduct = (productId?: number) => {
             </div>
           </div>
 
-          <!-- 商品備註：跟在商品列下方，若有 note 才顯示 -->
+          <!-- 商品備註：緊接商品列下方；mb 統一為 card-pad，讓「備註→分隔線 / 組合 / 小計」間距與無備註列一致 -->
           <div
             v-if="item.note"
-            class="mx-[var(--card-pad)] mb-3 flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"
+            class="mx-[var(--card-pad)] mb-[var(--card-pad)] flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"
           >
             <i class="pi pi-info-circle mt-0.5 shrink-0" />
             <span class="min-w-0">
@@ -1760,7 +1793,7 @@ const handleGoProduct = (productId?: number) => {
           <InputNumber
             v-model="addOnDialogQty"
             :min="1"
-            :max="999"
+            :max="addOnDialog.stock"
             :max-fraction-digits="0"
             :allow-empty="false"
             show-buttons
@@ -1769,6 +1802,7 @@ const handleGoProduct = (productId?: number) => {
             decrement-button-icon="pi pi-minus"
             class="qty-stepper qty-keep-stepper"
           />
+          <span class="text-sm text-slate-500">庫存 {{ addOnDialog.stock }} 件</span>
         </div>
       </div>
       <template #footer>
@@ -1921,6 +1955,7 @@ const handleGoProduct = (productId?: number) => {
                 <InputNumber
                   :model-value="row.qty"
                   :min="1"
+                  :max="dlgRowMax(row.skuId)"
                   :max-fraction-digits="0"
                   :allow-empty="false"
                   size="small"

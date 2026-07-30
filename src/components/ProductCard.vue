@@ -355,6 +355,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
             <InputNumber
               v-model="qty"
               :min="1"
+              :max="stock ?? undefined"
               show-buttons
               button-layout="horizontal"
               increment-button-icon="pi pi-plus"

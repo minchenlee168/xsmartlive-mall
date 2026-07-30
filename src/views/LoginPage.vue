@@ -435,7 +435,7 @@ onBeforeUnmount(() => {
   width: 100%;
   min-height: 48px;
   border-radius: 6px;
-  border: 1px solid var(--surface-700);
+  border: 1px solid var(--surface-300);
   background: white;
   color: var(--surface-700);
   font-weight: 700;

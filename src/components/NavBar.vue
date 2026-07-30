@@ -89,7 +89,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleDocClick));
 
 // Hot search keywords — shown below search bar (PC) and in collapsible search (mobile/tablet)
 const hotKeywords = [
-  '童裝男生',
+  '童裝',
   '男生女生童裝',
   '女童外套',
   '皮衣外套女童',
