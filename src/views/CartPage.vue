@@ -488,11 +488,20 @@ const dlgSku = () => {
     axes.every((a) => s.spec[a.name] === d[a.name]),
   );
 };
+/** 選定 SKU 的實際剩餘庫存（stock - 已分配），供「剩餘庫存」顯示。 */
+const dlgStockLeft = (): number => {
+  const sku = dlgSku();
+  if (!sku) return 0;
+  return Math.max(0, sku.stock - (bidDialogAlloc.value[sku.id] ?? 0));
+};
 const dlgDraftMax = (): number => {
   const sku = dlgSku();
   if (!sku) return 0;
-  // 只受該 SKU 庫存限制（允許總數超過得標數量，超過時指示轉紅）
-  return Math.max(0, sku.stock - (bidDialogAlloc.value[sku.id] ?? 0));
+  const alloc = bidDialogAlloc.value[sku.id] ?? 0;
+  const stockLeft = Math.max(0, sku.stock - alloc);
+  // 受庫存 + 限購（若有）雙重限制
+  if (sku.limit == null) return stockLeft;
+  return Math.max(0, Math.min(stockLeft, sku.limit - alloc));
 };
 const dlgCanAdd = (): boolean => {
   const qty = bidRowDraft.value.qty ?? 0;
@@ -513,8 +522,9 @@ const dlgSetQty = (skuId: string, value: number | null) => {
   if (!item) return;
   const sku = skusOf(item).find((s) => s.id === skuId);
   if (!sku) return;
-  // 只受該 SKU 庫存限制（允許總數超過得標數量）
-  const capped = Math.max(1, Math.min(value ?? 1, sku.stock));
+  // 受該 SKU 庫存 + 限購（若有）限制（允許總數超過得標數量）
+  const cap = sku.limit != null ? Math.min(sku.stock, sku.limit) : sku.stock;
+  const capped = Math.max(1, Math.min(value ?? 1, cap));
   bidDialogAlloc.value = { ...bidDialogAlloc.value, [skuId]: capped };
 };
 const dlgRemove = (skuId: string) => {
@@ -522,11 +532,13 @@ const dlgRemove = (skuId: string) => {
   delete alloc[skuId];
   bidDialogAlloc.value = alloc;
 };
-/** 已分配列的數量上限：該 SKU 的庫存。 */
+/** 已分配列的數量上限：該 SKU 的庫存與限購（若有）取小。 */
 const dlgRowMax = (skuId: string): number => {
   const item = bidDialogItem.value;
   if (!item) return 0;
-  return skusOf(item).find((s) => s.id === skuId)?.stock ?? 0;
+  const sku = skusOf(item).find((s) => s.id === skuId);
+  if (!sku) return 0;
+  return sku.limit != null ? Math.min(sku.stock, sku.limit) : sku.stock;
 };
 
 // ── 任選組合「挑選內容」彈窗（比照批次下標挑選規格）：
@@ -1927,10 +1939,22 @@ const handleGoProduct = (productId?: number) => {
                 @click="dlgAdd()"
               />
             </div>
-            <!-- 各軸選滿(命中 SKU) → 顯示該規格剩餘庫存 -->
-            <span v-if="dlgSku()" class="text-xs text-slate-500">
-              剩餘庫存 {{ dlgDraftMax() }} 件
-            </span>
+            <!-- 各軸選滿(命中 SKU) → 顯示剩餘庫存；該規格有限購時加紅字註記 -->
+            <div
+              v-if="dlgSku()"
+              class="flex flex-wrap items-center gap-x-3 gap-y-0.5"
+            >
+              <span class="text-xs text-slate-500"
+                >剩餘庫存 {{ dlgStockLeft() }} 件</span
+              >
+              <span
+                v-if="dlgSku()?.limit != null"
+                class="text-xs font-medium"
+                style="color: var(--danger)"
+              >
+                限購 {{ dlgSku()?.limit }} 件
+              </span>
+            </div>
           </div>
         </div>
 

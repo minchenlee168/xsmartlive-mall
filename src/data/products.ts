@@ -33,6 +33,8 @@ export interface Sku {
   spec: Record<string, string>;
   /** 剩餘庫存；0 → 售完不可選 */
   stock: number;
+  /** 此規格每人限購上限（未設定 → 不限購，只受庫存限制）。可低於庫存。 */
+  limit?: number;
 }
 
 export interface Product {
@@ -296,7 +298,12 @@ export const products: Product[] = [
       },
     ],
     skus: [
-      { id: 's3-66-01', spec: { 尺寸: '66cm', 顏色: '奶油白' }, stock: 128 },
+      {
+        id: 's3-66-01',
+        spec: { 尺寸: '66cm', 顏色: '奶油白' },
+        stock: 128,
+        limit: 10,
+      },
       { id: 's3-66-02', spec: { 尺寸: '66cm', 顏色: '霧藍' }, stock: 64 },
       { id: 's3-66-03', spec: { 尺寸: '66cm', 顏色: '櫻花粉' }, stock: 8 },
       { id: 's3-66-04', spec: { 尺寸: '66cm', 顏色: '薄荷綠' }, stock: 0 },
@@ -307,7 +314,12 @@ export const products: Product[] = [
       { id: 's3-66-09', spec: { 尺寸: '66cm', 顏色: '石墨灰' }, stock: 52 },
       { id: 's3-66-10', spec: { 尺寸: '66cm', 顏色: '磚紅' }, stock: 6 },
       { id: 's3-73-01', spec: { 尺寸: '73cm', 顏色: '奶油白' }, stock: 0 },
-      { id: 's3-73-02', spec: { 尺寸: '73cm', 顏色: '霧藍' }, stock: 110 },
+      {
+        id: 's3-73-02',
+        spec: { 尺寸: '73cm', 顏色: '霧藍' },
+        stock: 110,
+        limit: 5,
+      },
       { id: 's3-73-03', spec: { 尺寸: '73cm', 顏色: '櫻花粉' }, stock: 24 },
       { id: 's3-73-04', spec: { 尺寸: '73cm', 顏色: '薄荷綠' }, stock: 5 },
       { id: 's3-73-05', spec: { 尺寸: '73cm', 顏色: '鵝黃' }, stock: 38 },
@@ -366,6 +378,7 @@ export const products: Product[] = [
         id: 's5-01',
         spec: { 尺寸: '100cm', 顏色: '粉色', 袖長: '短袖' },
         stock: 132,
+        limit: 8,
       },
       {
         id: 's5-02',
@@ -603,7 +616,7 @@ export const products: Product[] = [
     // 單一規格軸（只有「尺寸」一個規格選項）+ 庫存；供直播得標後挑選規格使用
     specAxes: [{ name: '尺寸', options: ['100cm', '110cm', '120cm'] }],
     skus: [
-      { id: 's8-100', spec: { 尺寸: '100cm' }, stock: 46 },
+      { id: 's8-100', spec: { 尺寸: '100cm' }, stock: 46, limit: 5 },
       { id: 's8-110', spec: { 尺寸: '110cm' }, stock: 9 },
       { id: 's8-120', spec: { 尺寸: '120cm' }, stock: 0 },
     ],
