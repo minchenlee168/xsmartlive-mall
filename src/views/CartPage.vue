@@ -1556,20 +1556,20 @@ const handleGoProduct = (productId?: number) => {
               />
             </IconField>
             <Select
-              v-model="selectedAddOnCartId"
-              :options="addOnCartOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="購物車"
-              size="small"
-              class="w-32 shrink-0 !bg-white @3xl:w-40"
-            />
-            <Select
               v-model="selectedSessionId"
               :options="addOnSessionOptions"
               option-label="label"
               option-value="value"
               placeholder="直播場次"
+              size="small"
+              class="w-32 shrink-0 !bg-white @3xl:w-40"
+            />
+            <Select
+              v-model="selectedAddOnCartId"
+              :options="addOnCartOptions"
+              option-label="label"
+              option-value="value"
+              placeholder="購物車"
               size="small"
               class="w-32 shrink-0 !bg-white @3xl:w-40"
             />
