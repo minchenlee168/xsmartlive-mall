@@ -1336,7 +1336,7 @@ const handlePlaceOrder = () => {
                 <Tag
                   v-if="item.isAddOn"
                   value="加購"
-                  class="!mr-1.5 !border !border-slate-300 !bg-transparent !py-[3px] !align-middle !font-normal !text-slate-500"
+                  class="!mr-1.5 !border !border-slate-300 !bg-transparent !py-[1px] !align-middle !text-xs !font-normal !text-slate-500"
                 />
                 {{ item.name }}
               </p>
