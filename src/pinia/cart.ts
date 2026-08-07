@@ -425,6 +425,8 @@ export const useCartStore = defineStore('cart', () => {
       specPending?: boolean;
       /** 多軸規格商品：已選定的 SKU id（讓購物車單品規格下拉顯示 / 可改） */
       selectedSkuId?: string;
+      /** 由加購區加入：購物車列顯示「加購」標記 */
+      isAddOn?: boolean;
     },
   ) {
     // targetCartId 指定 → 直接找那台；否則走分派規則 / fallback / 新建
@@ -456,6 +458,8 @@ export const useCartStore = defineStore('cart', () => {
     if (existing) {
       existing.qty += qty;
       existing.checked = true;
+      // 從加購區再加同商品 → 標記為加購
+      if (options?.isAddOn) existing.isAddOn = true;
       return;
     }
     // 依商品 id 從商品目錄補齊組合商品內容；任選組合則由呼叫端帶入實際挑選的 customBundleItems
@@ -483,6 +487,7 @@ export const useCartStore = defineStore('cart', () => {
       isBidBatch: options?.specPending || undefined,
       specAllocation: options?.specPending ? {} : undefined,
       selectedSkuId: options?.selectedSkuId,
+      isAddOn: options?.isAddOn,
     };
     if (options?.prepend) {
       target.items.unshift(newItem);

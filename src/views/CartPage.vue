@@ -914,8 +914,8 @@ const handleConfirmAddOn = (e: MouseEvent) => {
     qty,
     // 加購區：進「該商品所屬那台車」（Dialog 開啟時記錄）且置頂；沒有才走預設分派
     addOnDialogCartId.value != null
-      ? { targetCartId: addOnDialogCartId.value, prepend: true }
-      : undefined,
+      ? { targetCartId: addOnDialogCartId.value, prepend: true, isAddOn: true }
+      : { isAddOn: true },
   );
   burstAddToCartFromEvent(e);
   flashAddedFor(addOnKey(addOnDialogCartId.value ?? -1, p.id));
@@ -1284,6 +1284,11 @@ const handleGoProduct = (productId?: number) => {
                   "
                   @click="handleGoProduct(item.productId)"
                 >
+                  <Tag
+                    v-if="item.isAddOn"
+                    value="加購"
+                    class="!mr-1.5 !border !border-slate-300 !bg-transparent !py-[3px] !align-middle !font-normal !text-slate-500"
+                  />
                   {{ item.name }}
                 </p>
                 <div class="flex shrink-0 flex-col items-end gap-0.5">

@@ -28,6 +28,8 @@ export interface CartItem {
   bulkDiscount?: BulkDiscount;
   /** 商品備註（顯示於商品列下方，例如冷藏須知、賣家提醒） */
   note?: string;
+  /** 由加購區加入：購物車列顯示「加購」標記。 */
+  isAddOn?: boolean;
   /** 直播下標後尚未選規格：購物車需補選 SKU 才能結帳（見 [[live-bid-deferred-spec-plan]]）。 */
   specPending?: boolean;
   /** 後選規格選定的 SKU id（對應 products.ts 的 skus[].id / 庫存）。 */

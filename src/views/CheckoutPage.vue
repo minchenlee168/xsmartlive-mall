@@ -1333,6 +1333,11 @@ const handlePlaceOrder = () => {
             </div>
             <div class="flex min-w-0 flex-1 flex-col gap-1">
               <p class="truncate text-base font-semibold text-slate-700">
+                <Tag
+                  v-if="item.isAddOn"
+                  value="加購"
+                  class="!mr-1.5 !border !border-slate-300 !bg-transparent !py-[3px] !align-middle !font-normal !text-slate-500"
+                />
                 {{ item.name }}
               </p>
               <!-- 規格列：直接顯示規格內容（不加「規格」label；spec 為預設值時不顯示） -->
