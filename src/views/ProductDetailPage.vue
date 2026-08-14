@@ -8,7 +8,7 @@ import { useViewportStore } from '../pinia/viewport';
 import { useCartStore } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { useAuthStore } from '../pinia/auth';
-import { products } from '../data/products';
+import { products, type PickOption } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
 import lineIcon from '../assets/line.svg';
 import instagramIcon from '../assets/instagram.svg';
@@ -96,12 +96,44 @@ const bundleSelections = ref<string[]>(
   product.value.bundleItems?.map((i) => i.spec) ?? [],
 );
 
-/** 任選組合：每個 option 已挑選的數量 + 對應規格。預設 maxQty=1。 */
-const pickedQty = ref<Record<number, number>>({});
-const pickedSpecs = ref<Record<number, string>>({});
-const pickedTotal = computed(() =>
-  Object.values(pickedQty.value).reduce((s, n) => s + (n || 0), 0),
+/** 任選組合：卡片草稿（目前選的規格 / 數量，按「加入」才進清單）+ 已加入清單。 */
+type PickEntry = {
+  optId: number;
+  name: string;
+  image?: string;
+  spec: string;
+  qty: number;
+};
+const draftSpec = ref<Record<number, string>>(
+  Object.fromEntries(
+    (product.value.pickOptions ?? []).map((o) => [o.id, o.spec]),
+  ),
 );
+const draftQty = ref<Record<number, number>>(
+  Object.fromEntries((product.value.pickOptions ?? []).map((o) => [o.id, 1])),
+);
+const pickedList = ref<PickEntry[]>([]);
+/** 單一選項跨所有規格的已加入數量加總（用於限購、卡片高亮）。 */
+const optPickedQty = (optId: number): number =>
+  pickedList.value
+    .filter((e) => e.optId === optId)
+    .reduce((s, e) => s + (e.qty || 0), 0);
+const pickedTotal = computed(() =>
+  pickedList.value.reduce((s, e) => s + (e.qty || 0), 0),
+);
+/** 已選清單依選項分組，供標題下方文字摘要（名稱 + 規格 ×數量）。 */
+const pickedGroups = computed(() => {
+  const map = new Map<
+    number,
+    { optId: number; name: string; parts: string[] }
+  >();
+  for (const e of pickedList.value) {
+    const g = map.get(e.optId) ?? { optId: e.optId, name: e.name, parts: [] };
+    g.parts.push(`${e.spec} ×${e.qty}`);
+    map.set(e.optId, g);
+  }
+  return [...map.values()];
+});
 /** 任選組合需挑選的總件數 = 單組 pickCount × 購買組數（qty）。 */
 const totalPickCount = computed(
   () => (product.value.pickCount ?? 0) * qty.value,
@@ -143,22 +175,48 @@ const isPickOver = computed(
 const overLimitOpt = computed(() => {
   if (!product.value.isPickBundle) return null;
   return (
-    product.value.pickOptions?.find((opt) => {
-      const cur = pickedQty.value[opt.id] ?? 0;
-      return cur > optMaxQty(opt);
-    }) ?? null
+    product.value.pickOptions?.find(
+      (opt) => optPickedQty(opt.id) > optMaxQty(opt),
+    ) ?? null
   );
 });
 /** 任一限購超額或總數超過 */
 const hasPickWarning = computed(() => isPickOver.value || !!overLimitOpt.value);
 
-const setPickQty = (opt: { id: number; spec: string }, picked: number) => {
-  pickedQty.value = { ...pickedQty.value, [opt.id]: picked };
-  if (picked === 0) {
-    delete pickedSpecs.value[opt.id];
-  } else if (!pickedSpecs.value[opt.id]) {
-    pickedSpecs.value[opt.id] = opt.spec;
+/** 卡片草稿設定。 */
+const setDraftSpec = (optId: number, spec: string) => {
+  draftSpec.value = { ...draftSpec.value, [optId]: spec };
+};
+const setDraftQty = (optId: number, value: number | null) => {
+  draftQty.value = { ...draftQty.value, [optId]: Math.max(1, value ?? 1) };
+};
+/** 按「加入」：把該選項草稿（規格 + 數量）併入已選清單；同選項同規格則累加。 */
+const addPick = (opt: PickOption): void => {
+  const spec = draftSpec.value[opt.id] ?? opt.spec;
+  const addQty = Math.max(1, draftQty.value[opt.id] ?? 1);
+  const exist = pickedList.value.find(
+    (e) => e.optId === opt.id && e.spec === spec,
+  );
+  if (exist) exist.qty += addQty;
+  else
+    pickedList.value.push({
+      optId: opt.id,
+      name: opt.name,
+      image: opt.image,
+      spec,
+      qty: addQty,
+    });
+  draftQty.value = { ...draftQty.value, [opt.id]: 1 };
+  // 不阻擋，超過限購 / 總數只提醒
+  if (opt.maxQty != null && optPickedQty(opt.id) > optMaxQty(opt)) {
+    ui.toast(`「${opt.name}」已超過限購 ${optMaxQty(opt)} 個`, 'warn');
+  } else if (pickedTotal.value > totalPickCount.value) {
+    ui.toast(`已超過 ${totalPickCount.value} 件`, 'warn');
   }
+};
+/** 移除某選項的所有已加入規格。 */
+const removeOption = (optId: number): void => {
+  pickedList.value = pickedList.value.filter((e) => e.optId !== optId);
 };
 
 // 查看優惠券：先判斷登入，未登入跳提示彈窗
@@ -175,10 +233,9 @@ const handleGoLogin = () => {
 const handleAddToCart = (e: MouseEvent) => {
   if (product.value.isPickBundle) {
     // 檢查是否有單一選項超過該項限購 maxQty
-    const overOpt = product.value.pickOptions?.find((opt) => {
-      const cur = pickedQty.value[opt.id] ?? 0;
-      return cur > optMaxQty(opt);
-    });
+    const overOpt = product.value.pickOptions?.find(
+      (opt) => optPickedQty(opt.id) > optMaxQty(opt),
+    );
     if (overOpt) {
       ui.toast(
         `「${overOpt.name}」限購 ${optMaxQty(overOpt)} 個，請調整數量`,
@@ -216,21 +273,14 @@ const handleAddToCart = (e: MouseEvent) => {
     | { name: string; image?: string; spec: string; qty: number }[]
     | undefined;
   if (product.value.isPickBundle) {
-    const picked = Object.entries(pickedQty.value)
-      .filter(([, n]) => (n ?? 0) > 0)
-      .map(([id, n]) => {
-        const opt = product.value.pickOptions?.find((o) => o.id === Number(id));
-        const spec = pickedSpecs.value[Number(id)] ?? opt?.spec ?? '預設';
-        return { id: Number(id), opt, spec, qty: n as number };
-      });
-    specLabel = picked
-      .map((p) => `${p.opt?.name ?? ''}（${p.spec}）× ${p.qty}`)
+    specLabel = pickedList.value
+      .map((e) => `${e.name}（${e.spec}）× ${e.qty}`)
       .join(' / ');
-    customBundle = picked.map((p) => ({
-      name: p.opt?.name ?? '',
-      image: p.opt?.image,
-      spec: p.spec,
-      qty: p.qty,
+    customBundle = pickedList.value.map((e) => ({
+      name: e.name,
+      image: e.image,
+      spec: e.spec,
+      qty: e.qty,
     }));
   } else if (product.value.isBundle && bundleSelections.value.length > 0) {
     specLabel = bundleSelections.value.join(' / ');
@@ -647,6 +697,30 @@ const handleNextThumb = () => {
                   已選 {{ pickedTotal }} / {{ totalPickCount }}
                 </span>
               </div>
+              <!-- 已加入清單：標題下方純文字摘要（名稱 + 規格 ×數量），可移除整個選項 -->
+              <div
+                v-if="pickedList.length"
+                class="-mt-2 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              >
+                <div
+                  v-for="g in pickedGroups"
+                  :key="g.optId"
+                  class="flex items-start justify-between gap-2"
+                >
+                  <div class="min-w-0">
+                    <p class="text-slate-700">{{ g.name }}</p>
+                    <p class="text-slate-500">{{ g.parts.join('、') }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="shrink-0 text-slate-400 transition hover:text-slate-600"
+                    :aria-label="`移除 ${g.name}`"
+                    @click="removeOption(g.optId)"
+                  >
+                    <i class="pi pi-times text-sm" />
+                  </button>
+                </div>
+              </div>
               <!-- 超過提示：總數超過 或 任一限購超額 -->
               <div
                 v-if="hasPickWarning"
@@ -669,51 +743,61 @@ const handleNextThumb = () => {
                   :key="opt.id"
                   class="relative flex w-[calc((100%-1rem)/2)] flex-col gap-2 overflow-hidden rounded-lg border-2 p-2 transition @3xl:w-[180px] @7xl:w-[243px]"
                   :class="
-                    (pickedQty[opt.id] ?? 0) > 0
+                    optPickedQty(opt.id) > 0
                       ? 'border-[color:var(--primary)] bg-[color:color-mix(in_srgb,var(--primary)_6%,transparent)]'
-                      : 'border-slate-200'
+                      : 'border-transparent'
                   "
                 >
                   <div
-                    class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
+                    class="relative aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
                   >
                     <ProductImage :src="opt.image" :alt="opt.name" size="sm" />
+                    <!-- 加入：圓形按鈕壓在商品圖右下，節省空間 -->
+                    <button
+                      type="button"
+                      class="absolute right-2 bottom-2 flex size-10 items-center justify-center rounded-full bg-[color:var(--primary)] text-white shadow-md transition hover:brightness-95"
+                      :aria-label="`加入 ${opt.name}`"
+                      @click="addPick(opt)"
+                    >
+                      <i class="pi pi-plus text-base" />
+                    </button>
                   </div>
 
-                  <div class="flex flex-col gap-1.5">
+                  <div class="flex flex-1 flex-col gap-1.5">
                     <p
                       class="line-clamp-2 h-10 overflow-hidden text-sm leading-snug text-slate-950 @7xl:h-[44px] @7xl:text-base"
                     >
                       {{ opt.name }}
                     </p>
-                    <div class="flex flex-col gap-2 text-sm text-slate-700">
-                      <div
-                        v-if="opt.specOptions?.length"
-                        class="flex items-center gap-2"
-                      >
-                        <span class="shrink-0 text-slate-500">規格</span>
-                        <Select
-                          :model-value="pickedSpecs[opt.id] ?? opt.spec"
-                          :options="opt.specOptions"
-                          fluid
-                          class="min-w-0 flex-1"
-                          @update:model-value="(v) => (pickedSpecs[opt.id] = v)"
-                        />
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="shrink-0 text-slate-500">數量</span>
-                        <!-- 不設 max：允許使用者自由加減；送出時再檢查是否超過總挑選數 -->
-                        <InputNumber
-                          :model-value="pickedQty[opt.id] ?? 0"
-                          :min="0"
-                          show-buttons
-                          button-layout="horizontal"
-                          increment-button-icon="pi pi-plus"
-                          decrement-button-icon="pi pi-minus"
-                          class="qty-stepper qty-keep-stepper min-w-0 flex-1"
-                          @update:model-value="(v) => setPickQty(opt, v)"
-                        />
-                      </div>
+                    <!-- 規格緊接名稱 -->
+                    <div
+                      v-if="opt.specOptions?.length"
+                      class="flex items-center gap-2 text-sm text-slate-700"
+                    >
+                      <span class="shrink-0 text-slate-500">規格</span>
+                      <Select
+                        :model-value="draftSpec[opt.id] ?? opt.spec"
+                        :options="opt.specOptions"
+                        fluid
+                        class="min-w-0 flex-1"
+                        @update:model-value="(v) => setDraftSpec(opt.id, v)"
+                      />
+                    </div>
+                    <!-- 數量：靠卡片底部對齊（加入改為圖上圓鈕） -->
+                    <div
+                      class="mt-auto flex items-center gap-2 pt-2 text-sm text-slate-700"
+                    >
+                      <span class="shrink-0 text-slate-500">數量</span>
+                      <InputNumber
+                        :model-value="draftQty[opt.id] ?? 1"
+                        :min="1"
+                        show-buttons
+                        button-layout="horizontal"
+                        increment-button-icon="pi pi-plus"
+                        decrement-button-icon="pi pi-minus"
+                        class="qty-stepper qty-keep-stepper min-w-0 flex-1"
+                        @update:model-value="(v) => setDraftQty(opt.id, v)"
+                      />
                     </div>
                   </div>
                 </div>
