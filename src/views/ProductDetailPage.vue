@@ -749,18 +749,9 @@ const handleNextThumb = () => {
                   "
                 >
                   <div
-                    class="relative aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
+                    class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
                   >
                     <ProductImage :src="opt.image" :alt="opt.name" size="sm" />
-                    <!-- 加入：圓形按鈕壓在商品圖右下，節省空間 -->
-                    <button
-                      type="button"
-                      class="absolute right-2 bottom-2 flex size-10 items-center justify-center rounded-full bg-[color:var(--primary)] text-white shadow-md transition hover:brightness-95"
-                      :aria-label="`加入 ${opt.name}`"
-                      @click="addPick(opt)"
-                    >
-                      <i class="pi pi-plus text-base" />
-                    </button>
                   </div>
 
                   <div class="flex flex-1 flex-col gap-1.5">
@@ -783,20 +774,28 @@ const handleNextThumb = () => {
                         @update:model-value="(v) => setDraftSpec(opt.id, v)"
                       />
                     </div>
-                    <!-- 數量：靠卡片底部對齊（加入改為圖上圓鈕） -->
-                    <div
-                      class="mt-auto flex items-center gap-2 pt-2 text-sm text-slate-700"
-                    >
-                      <span class="shrink-0 text-slate-500">數量</span>
-                      <InputNumber
-                        :model-value="draftQty[opt.id] ?? 1"
-                        :min="1"
-                        show-buttons
-                        button-layout="horizontal"
-                        increment-button-icon="pi pi-plus"
-                        decrement-button-icon="pi pi-minus"
-                        class="qty-stepper qty-keep-stepper min-w-0 flex-1"
-                        @update:model-value="(v) => setDraftQty(opt.id, v)"
+                    <!-- 數量 + 挑選：靠卡片底部對齊，挑選緊接數量（動線順） -->
+                    <div class="mt-auto flex flex-col gap-2 pt-2">
+                      <div
+                        class="flex items-center gap-2 text-sm text-slate-700"
+                      >
+                        <span class="shrink-0 text-slate-500">數量</span>
+                        <InputNumber
+                          :model-value="draftQty[opt.id] ?? 1"
+                          :min="1"
+                          show-buttons
+                          button-layout="horizontal"
+                          increment-button-icon="pi pi-plus"
+                          decrement-button-icon="pi pi-minus"
+                          class="qty-stepper qty-keep-stepper min-w-0 flex-1"
+                          @update:model-value="(v) => setDraftQty(opt.id, v)"
+                        />
+                      </div>
+                      <!-- 挑選：把目前規格 + 數量併入上方已選清單 -->
+                      <Button
+                        label="挑選"
+                        class="w-full transition duration-150 hover:-translate-y-0.5 active:scale-95"
+                        @click="addPick(opt)"
                       />
                     </div>
                   </div>

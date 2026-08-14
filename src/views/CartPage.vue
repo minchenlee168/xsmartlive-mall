@@ -1548,10 +1548,12 @@ const handleGoProduct = (productId?: number) => {
         >
           <div class="flex shrink-0 flex-col leading-tight">
             <span class="text-lg font-semibold text-slate-700">加購區</span>
-            <span class="text-sm text-slate-600">共 {{ addOnCards.length }} 件</span>
+            <span class="text-sm text-slate-600"
+              >共 {{ addOnCards.length }} 件</span
+            >
           </div>
           <div
-            class="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 @3xl:basis-auto @3xl:justify-end @3xl:flex-nowrap"
+            class="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 @3xl:basis-auto @3xl:flex-nowrap @3xl:justify-end"
           >
             <IconField class="min-w-[8rem] flex-1 @3xl:max-w-64">
               <InputIcon class="pi pi-search" />
@@ -1889,7 +1891,9 @@ const handleGoProduct = (productId?: number) => {
             decrement-button-icon="pi pi-minus"
             class="qty-stepper qty-keep-stepper"
           />
-          <span class="text-sm text-slate-500">庫存 {{ addOnDialog.stock }} 件</span>
+          <span class="text-sm text-slate-500"
+            >庫存 {{ addOnDialog.stock }} 件</span
+          >
         </div>
       </div>
       <template #footer>
@@ -1961,7 +1965,9 @@ const handleGoProduct = (productId?: number) => {
             <p class="line-clamp-2 text-sm font-medium text-slate-700">
               {{ bidDialogItem.name }}
             </p>
-            <p class="text-sm text-slate-500">得標 {{ bidDialogItem.qty }} 件</p>
+            <p class="text-sm text-slate-500">
+              得標 {{ bidDialogItem.qty }} 件
+            </p>
           </div>
         </div>
 
@@ -2149,6 +2155,7 @@ const handleGoProduct = (productId?: number) => {
                 : ''
             "
           >
+            <!-- 商品圖 -->
             <div
               class="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg bg-slate-200"
             >
@@ -2160,34 +2167,48 @@ const handleGoProduct = (productId?: number) => {
                 <i class="pi pi-check text-xs" style="color: var(--primary)" />
               </span>
             </div>
-            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-              <p class="line-clamp-2 text-sm leading-snug text-slate-950">
-                {{ opt.name }}
-              </p>
-              <p
-                v-if="
-                  opt.maxQty != null &&
-                  opt.maxQty < (pickCatOf(pickDialogItem)?.pickCount ?? 0)
-                "
-                class="text-xs font-medium"
-                style="color: var(--danger)"
-              >
-                限購 {{ pdOptionMax(opt) }} 個
-              </p>
-              <div
-                v-if="opt.specOptions?.length"
-                class="flex items-center gap-2 text-sm text-slate-700"
-              >
-                <span class="w-[36px] shrink-0 text-slate-500">規格</span>
-                <Select
-                  :model-value="pickOptSpecDraft[opt.id] ?? opt.spec"
-                  :options="opt.specOptions"
-                  size="small"
-                  fluid
-                  class="min-w-0 flex-1"
-                  @update:model-value="(v) => (pickOptSpecDraft[opt.id] = v)"
+            <!-- 右欄：上包(名稱/規格 + 加入) + 下包(數量)，兩包同寬 -->
+            <div class="flex min-w-0 flex-1 flex-col gap-2">
+              <!-- 上包：名稱 / 限購 / 規格 + 加入 -->
+              <div class="flex items-start gap-2">
+                <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <p class="line-clamp-2 text-sm leading-snug text-slate-950">
+                    {{ opt.name }}
+                  </p>
+                  <p
+                    v-if="
+                      opt.maxQty != null &&
+                      opt.maxQty < (pickCatOf(pickDialogItem)?.pickCount ?? 0)
+                    "
+                    class="text-xs font-medium"
+                    style="color: var(--danger)"
+                  >
+                    限購 {{ pdOptionMax(opt) }} 個
+                  </p>
+                  <div
+                    v-if="opt.specOptions?.length"
+                    class="flex items-center gap-2 text-sm text-slate-700"
+                  >
+                    <span class="w-[36px] shrink-0 text-slate-500">規格</span>
+                    <Select
+                      :model-value="pickOptSpecDraft[opt.id] ?? opt.spec"
+                      :options="opt.specOptions"
+                      size="small"
+                      fluid
+                      class="min-w-0 flex-1"
+                      @update:model-value="
+                        (v) => (pickOptSpecDraft[opt.id] = v)
+                      "
+                    />
+                  </div>
+                </div>
+                <Button
+                  label="挑選"
+                  class="pick-add-btn shrink-0 transition duration-150 hover:-translate-y-0.5 active:scale-95"
+                  @click="pdAddOption(opt)"
                 />
               </div>
+              <!-- 下包：數量，stepper 撐滿整行（輸入框吸收剩餘寬），＋對齊加入鈕 -->
               <div class="flex items-center gap-2 text-sm text-slate-700">
                 <span class="w-[36px] shrink-0 text-slate-500">數量</span>
                 <InputNumber
@@ -2199,18 +2220,11 @@ const handleGoProduct = (productId?: number) => {
                   button-layout="horizontal"
                   increment-button-icon="pi pi-plus"
                   decrement-button-icon="pi pi-minus"
-                  class="qty-stepper qty-keep-stepper min-w-0 flex-1"
+                  class="qty-stepper qty-keep-stepper is-fluid min-w-0 flex-1"
                   @update:model-value="(v) => pdSetOptQty(opt.id, v)"
                 />
               </div>
             </div>
-            <Button
-              label="加入"
-              icon="pi pi-plus"
-              size="small"
-              class="pick-add-btn shrink-0"
-              @click="pdAddOption(opt)"
-            />
           </div>
         </div>
 

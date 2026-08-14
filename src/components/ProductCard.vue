@@ -599,31 +599,45 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
               <i class="pi pi-check text-xs" style="color: var(--primary)" />
             </span>
           </div>
-          <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-            <p class="line-clamp-2 text-sm leading-snug text-slate-950">
-              {{ opt.name }}
-            </p>
-            <p
-              v-if="opt.maxQty != null && opt.maxQty < (product.pickCount ?? 0)"
-              class="text-xs font-medium"
-              style="color: var(--danger)"
-            >
-              限購 {{ optMaxQtyCard(opt) }} 個
-            </p>
-            <div
-              v-if="opt.specOptions?.length"
-              class="flex items-center gap-2 text-sm text-slate-700"
-            >
-              <span class="w-[36px] shrink-0 text-slate-500">規格</span>
-              <Select
-                :model-value="optSpecDraft[opt.id] ?? opt.spec"
-                :options="opt.specOptions"
-                size="small"
-                fluid
-                class="min-w-0 flex-1"
-                @update:model-value="(v) => (optSpecDraft[opt.id] = v)"
+          <!-- 右欄：上包(名稱/規格 + 加入) + 下包(數量)，兩包同寬 -->
+          <div class="flex min-w-0 flex-1 flex-col gap-2">
+            <!-- 上包：名稱 / 限購 / 規格 + 加入 -->
+            <div class="flex items-start gap-2">
+              <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                <p class="line-clamp-2 text-sm leading-snug text-slate-950">
+                  {{ opt.name }}
+                </p>
+                <p
+                  v-if="
+                    opt.maxQty != null && opt.maxQty < (product.pickCount ?? 0)
+                  "
+                  class="text-xs font-medium"
+                  style="color: var(--danger)"
+                >
+                  限購 {{ optMaxQtyCard(opt) }} 個
+                </p>
+                <div
+                  v-if="opt.specOptions?.length"
+                  class="flex items-center gap-2 text-sm text-slate-700"
+                >
+                  <span class="w-[36px] shrink-0 text-slate-500">規格</span>
+                  <Select
+                    :model-value="optSpecDraft[opt.id] ?? opt.spec"
+                    :options="opt.specOptions"
+                    size="small"
+                    fluid
+                    class="min-w-0 flex-1"
+                    @update:model-value="(v) => (optSpecDraft[opt.id] = v)"
+                  />
+                </div>
+              </div>
+              <Button
+                label="挑選"
+                class="pick-add-btn shrink-0 transition duration-150 hover:-translate-y-0.5 active:scale-95"
+                @click="addPickOption(opt)"
               />
             </div>
+            <!-- 下包：數量，stepper 撐滿整行（輸入框吸收剩餘寬），＋對齊加入鈕 -->
             <div class="flex items-center gap-2 text-sm text-slate-700">
               <span class="w-[36px] shrink-0 text-slate-500">數量</span>
               <InputNumber
@@ -633,18 +647,11 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
                 button-layout="horizontal"
                 increment-button-icon="pi pi-plus"
                 decrement-button-icon="pi pi-minus"
-                class="qty-stepper qty-keep-stepper min-w-0 flex-1"
+                class="qty-stepper qty-keep-stepper is-fluid min-w-0 flex-1"
                 @update:model-value="(v) => setOptQty(opt.id, v)"
               />
             </div>
           </div>
-          <Button
-            label="加入"
-            icon="pi pi-plus"
-            size="small"
-            class="pick-add-btn shrink-0"
-            @click="addPickOption(opt)"
-          />
         </div>
       </div>
 
