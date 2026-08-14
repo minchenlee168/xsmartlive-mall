@@ -266,6 +266,15 @@ const bidAllocRows = (
   });
 };
 
+/** 組合子品在結帳頁顯示的件數。
+ *  固定組合：sub.qty 為每組單位量 → × 購買組數 item.qty。
+ *  任選組合：sub.qty 於購物車挑選時已含組數(= pickCount × item.qty),不可再乘。 */
+const bundleSubQty = (item: CartItem, sub: { qty: number }): number => {
+  const isPickBundle = !!products.find((p) => p.id === item.productId)
+    ?.isPickBundle;
+  return isPickBundle ? sub.qty : sub.qty * item.qty;
+};
+
 /**
  * 依購物車拆組的商品明細；每組只保留有勾選的商品（結帳頁只讀，不可改動）。
  * 批次下標商品：數量只帶「已挑選規格的數量」（committedBidQty），未挑選的不帶入結帳；
@@ -1366,7 +1375,7 @@ const handlePlaceOrder = () => {
                   item.bundleItems
                     .map(
                       (s) =>
-                        `${s.name}${s.spec && s.spec !== '預設' ? ` - ${s.spec}` : ''} ×${s.qty * item.qty}`,
+                        `${s.name}${s.spec && s.spec !== '預設' ? ` - ${s.spec}` : ''} ×${bundleSubQty(item, s)}`,
                     )
                     .join('、')
                 }}
@@ -2091,7 +2100,7 @@ const handlePlaceOrder = () => {
                 "
                 @click="
                   isCouponUsableFor(couponDrawerGroup, c) &&
-                    (couponDrawerSelected = c.id)
+                  (couponDrawerSelected = c.id)
                 "
               >
                 <!-- Amount block -->
