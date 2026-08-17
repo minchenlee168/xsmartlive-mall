@@ -1677,7 +1677,7 @@ const handleGoProduct = (productId?: number) => {
                     justAddedMap[addOnKey(cartId, p.id)]
                       ? 'pi pi-check-circle'
                       : 'pi pi-cart-plus',
-                    isPC ? 'text-sm' : 'text-xl',
+                    'text-xl',
                   ]"
                 />
                 <span v-if="isPC">
