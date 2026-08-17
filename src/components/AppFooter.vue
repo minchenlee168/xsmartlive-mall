@@ -18,6 +18,9 @@ const PARTNERS = [
   { src: 'linepay-money.png', alt: 'LINE Pay Money' },
   { src: 'newebpay.png', alt: '藍新金流 NewebPay' },
 ] as const;
+
+// 物流組最後一項（黑貓宅急便）索引；桌機於此後強制換行，付款組另起一行
+const LOGISTICS_LAST_INDEX = 4;
 </script>
 
 <template>
@@ -29,17 +32,21 @@ const PARTNERS = [
           合作廠商
         </h3>
         <ul class="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          <li
-            v-for="partner in PARTNERS"
-            :key="partner.src"
-            class="flex h-9 items-center sm:h-11"
-          >
-            <img
-              :src="`${BASE_URL}partners/${partner.src}`"
-              :alt="partner.alt"
-              class="h-5 w-auto object-contain sm:h-6"
+          <template v-for="(partner, index) in PARTNERS" :key="partner.src">
+            <li class="flex h-9 items-center sm:h-11">
+              <img
+                :src="`${BASE_URL}partners/${partner.src}`"
+                :alt="partner.alt"
+                class="h-5 w-auto object-contain sm:h-6"
+              />
+            </li>
+            <!-- 桌機強制斷行：物流組(1~5) 一行、付款組(6~9) 另一行；小尺寸靠自然 flex-wrap -->
+            <li
+              v-if="index === LOGISTICS_LAST_INDEX"
+              aria-hidden="true"
+              class="hidden basis-full @5xl:block"
             />
-          </li>
+          </template>
         </ul>
       </div>
 
