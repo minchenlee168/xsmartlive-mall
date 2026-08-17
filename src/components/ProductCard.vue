@@ -425,7 +425,7 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
             <i
               :class="[
                 isJustAdded ? 'pi pi-check-circle' : 'pi pi-cart-plus',
-                isPC ? 'text-sm' : 'text-xl',
+                'text-xl',
               ]"
             />
             <span v-if="isPC">{{
