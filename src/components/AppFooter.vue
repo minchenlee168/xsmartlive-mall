@@ -31,7 +31,9 @@ const LOGISTICS_LAST_INDEX = 4;
         <h3 class="text-xs font-medium tracking-wide text-slate-400">
           合作廠商
         </h3>
-        <ul class="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+        <ul
+          class="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 sm:gap-x-3 sm:gap-y-1"
+        >
           <template v-for="(partner, index) in PARTNERS" :key="partner.src">
             <li class="flex h-9 items-center sm:h-11">
               <img
