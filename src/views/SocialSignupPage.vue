@@ -255,7 +255,11 @@ const handlePickOtherSocial = () => {
               {{ isPhoneVerified ? '即將完成綁定' : '即將完成註冊' }}
             </h2>
             <p class="text-sm" style="color: var(--text-muted)">
-              {{ isPhoneVerified ? '您選擇綁定以下社群帳號' : '您已透過以下帳號登入' }}
+              {{
+                isPhoneVerified
+                  ? '您選擇綁定以下社群帳號'
+                  : '您已透過以下帳號登入'
+              }}
             </p>
           </div>
 

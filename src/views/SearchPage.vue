@@ -139,7 +139,9 @@ watch(keyword, () => {
             class="w-40 max-w-full @4xl:w-52"
           />
           <p class="max-w-md text-center text-base leading-relaxed">
-            找不到符合「{{ keyword }}」的商品，請嘗試其他關鍵字，或聯繫客服獲得幫助。
+            找不到符合「{{
+              keyword
+            }}」的商品，請嘗試其他關鍵字，或聯繫客服獲得幫助。
           </p>
         </div>
 

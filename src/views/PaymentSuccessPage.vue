@@ -54,7 +54,12 @@ const handleGoOrders = () => {
           <i class="pi pi-check text-2xl text-white" />
         </div>
         <h1 class="text-3xl font-bold text-slate-950">付款成功</h1>
-        <Button label="查看我的訂單" outlined class="mt-1" @click="handleGoOrders" />
+        <Button
+          label="查看我的訂單"
+          outlined
+          class="mt-1"
+          @click="handleGoOrders"
+        />
       </div>
 
       <!-- Order info -->
