@@ -1058,6 +1058,11 @@ const availablePaymentMethods = computed(() =>
   ),
 );
 const isBankInfoVisible = computed(() => paymentMethod.value === 'transfer');
+/** 付款方式包含 LINE Pay 時，於標題列顯示「歡迎使用 LINE Pay」。 */
+const LINE_PAY_LOGO = `${import.meta.env.BASE_URL}partners/linepay.png`;
+const hasLinePay = computed(() =>
+  availablePaymentMethods.value.some((m) => m.value === 'line-pay'),
+);
 watch(
   supportedPaymentMethods,
   (methods) => {
@@ -1713,8 +1718,21 @@ const handlePlaceOrder = () => {
 
       <!-- 付款方式 -->
       <section class="shadow-card overflow-hidden rounded-xl bg-white">
-        <div class="cart-divider px-4 py-3">
+        <div
+          class="cart-divider flex items-center justify-between gap-2 px-4 py-3"
+        >
           <span class="font-medium text-slate-700">付款方式</span>
+          <span
+            v-if="hasLinePay"
+            class="flex items-center gap-1.5 text-sm text-slate-500"
+          >
+            歡迎使用
+            <img
+              :src="LINE_PAY_LOGO"
+              alt="LINE Pay"
+              class="h-4 w-auto object-contain"
+            />
+          </span>
         </div>
         <div class="card-pad max-w-[440px]">
           <label class="mb-1 block text-sm text-slate-700">選擇付款方式</label>
