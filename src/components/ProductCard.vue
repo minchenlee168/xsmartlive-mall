@@ -323,113 +323,116 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
       class="flex flex-1 flex-col px-1 pt-1"
       :class="isPC ? 'gap-2 px-2 pt-2' : 'gap-1'"
     >
-      <!-- Title -->
+      <!-- Title（固定保留兩行高度，超過兩行以省略號截斷） -->
       <p
-        class="line-clamp-2 text-base leading-normal font-medium text-slate-950"
+        class="line-clamp-2 min-h-[2lh] text-base leading-normal font-medium text-slate-950"
       >
         {{ name }}
       </p>
 
-      <!-- Price -->
-      <div class="flex flex-col gap-1">
-        <span
-          class="text-slate-500 line-through"
-          :class="isPC ? 'text-base' : 'text-xs'"
-          >{{ money(original) }}</span
-        >
-        <span
-          class="font-semibold text-rose-500"
-          :class="isPC ? 'text-2xl' : 'text-base'"
-        >
-          <span class="align-baseline text-xs font-normal">{{
-            currencySymbol
-          }}</span
-          >{{ amount(price) }}
-        </span>
-      </div>
-
-      <!-- Quantity + CTA -->
-      <div
-        v-if="!hideActions"
-        class="mt-auto flex flex-col"
-        :class="isPC ? 'gap-2' : 'gap-1'"
-      >
-        <!-- Quantity selector（手機隱藏，平板以上顯示） -->
-        <div
-          v-if="!simple && !isMobile"
-          class="flex flex-col gap-1"
-          @click.stop
-        >
-          <div class="flex items-center" :class="isPC ? 'gap-4' : 'gap-2'">
-            <span class="text-slate-700" :class="isPC ? 'text-sm' : 'text-sm'"
-              >數量</span
-            >
-            <InputNumber
-              v-model="qty"
-              :min="1"
-              :max="stock ?? undefined"
-              show-buttons
-              button-layout="horizontal"
-              increment-button-icon="pi pi-plus"
-              decrement-button-icon="pi pi-minus"
-              class="qty-stepper qty-keep-stepper"
-              :class="{ 'is-sm': !isPC }"
-            />
-          </div>
-          <span class="text-slate-700" :class="isPC ? 'text-sm' : 'text-xs'"
-            >還剩{{ stock ?? 11 }}件</span
+      <!-- 底部群組：價格 + 數量 + CTA 一起貼齊資訊區底部 -->
+      <div class="mt-auto flex flex-col" :class="isPC ? 'gap-2' : 'gap-1'">
+        <!-- Price -->
+        <div class="flex flex-col gap-1">
+          <span
+            class="text-slate-500 line-through"
+            :class="isPC ? 'text-base' : 'text-xs'"
+            >{{ money(original) }}</span
           >
+          <span
+            class="font-semibold text-rose-500"
+            :class="isPC ? 'text-2xl' : 'text-base'"
+          >
+            <span class="align-baseline text-xs font-normal">{{
+              currencySymbol
+            }}</span
+            >{{ amount(price) }}
+          </span>
         </div>
 
-        <!-- CTA Button — 一律「加入購物車」；成功後暫時變成綠色✓ -->
-        <button
-          class="add-cart-btn flex w-full items-center justify-center font-medium transition-all duration-200"
-          :class="[
-            isPC
-              ? 'gap-2 rounded-lg px-4 py-3 text-base'
-              : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
-            isJustAdded ? 'added-pop' : '',
-          ]"
-          :style="
-            isJustAdded
-              ? {
-                  background: 'var(--success)',
-                  border: '1px solid var(--success-border)',
-                  color: '#fff',
-                }
-              : {
-                  background: 'var(--primary-bg)',
-                  border: '1px solid var(--primary)',
-                  color: '#fff',
-                }
-          "
-          :disabled="isJustAdded"
-          @mouseover="
-            (e) => {
-              if (isJustAdded) return;
-              (e.currentTarget as HTMLElement).style.background =
-                'var(--primary-hover-bg)';
-            }
-          "
-          @mouseleave="
-            (e) => {
-              if (isJustAdded) return;
-              (e.currentTarget as HTMLElement).style.background =
-                'var(--primary-bg)';
-            }
-          "
-          @click.stop="handlePrimaryAction"
+        <!-- Quantity + CTA -->
+        <div
+          v-if="!hideActions"
+          class="flex flex-col"
+          :class="isPC ? 'gap-2' : 'gap-1'"
         >
-          <i
+          <!-- Quantity selector（手機隱藏，平板以上顯示） -->
+          <div
+            v-if="!simple && !isMobile"
+            class="flex flex-col gap-1"
+            @click.stop
+          >
+            <div class="flex items-center" :class="isPC ? 'gap-4' : 'gap-2'">
+              <span class="text-slate-700" :class="isPC ? 'text-sm' : 'text-sm'"
+                >數量</span
+              >
+              <InputNumber
+                v-model="qty"
+                :min="1"
+                :max="stock ?? undefined"
+                show-buttons
+                button-layout="horizontal"
+                increment-button-icon="pi pi-plus"
+                decrement-button-icon="pi pi-minus"
+                class="qty-stepper qty-keep-stepper"
+                :class="{ 'is-sm': !isPC }"
+              />
+            </div>
+            <span class="text-slate-700" :class="isPC ? 'text-sm' : 'text-xs'"
+              >還剩{{ stock ?? 11 }}件</span
+            >
+          </div>
+
+          <!-- CTA Button — 一律「加入購物車」；成功後暫時變成綠色✓ -->
+          <button
+            class="add-cart-btn flex w-full items-center justify-center font-medium transition-all duration-200"
             :class="[
-              isJustAdded ? 'pi pi-check-circle' : 'pi pi-cart-plus',
-              isPC ? 'text-sm' : 'text-xl',
+              isPC
+                ? 'gap-2 rounded-lg px-4 py-3 text-base'
+                : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
+              isJustAdded ? 'added-pop' : '',
             ]"
-          />
-          <span v-if="isPC">{{
-            isJustAdded ? '已加入購物車' : '加入購物車'
-          }}</span>
-        </button>
+            :style="
+              isJustAdded
+                ? {
+                    background: 'var(--success)',
+                    border: '1px solid var(--success-border)',
+                    color: '#fff',
+                  }
+                : {
+                    background: 'var(--primary-bg)',
+                    border: '1px solid var(--primary)',
+                    color: '#fff',
+                  }
+            "
+            :disabled="isJustAdded"
+            @mouseover="
+              (e) => {
+                if (isJustAdded) return;
+                (e.currentTarget as HTMLElement).style.background =
+                  'var(--primary-hover-bg)';
+              }
+            "
+            @mouseleave="
+              (e) => {
+                if (isJustAdded) return;
+                (e.currentTarget as HTMLElement).style.background =
+                  'var(--primary-bg)';
+              }
+            "
+            @click.stop="handlePrimaryAction"
+          >
+            <i
+              :class="[
+                isJustAdded ? 'pi pi-check-circle' : 'pi pi-cart-plus',
+                isPC ? 'text-sm' : 'text-xl',
+              ]"
+            />
+            <span v-if="isPC">{{
+              isJustAdded ? '已加入購物車' : '加入購物車'
+            }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
