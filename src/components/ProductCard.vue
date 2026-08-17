@@ -7,8 +7,12 @@ import { useUiStore } from '../pinia/ui';
 import { products } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
 import { useMoney } from '../composables/useMoney';
+import { usePrefsStore } from '../pinia/prefs';
 
-const { money } = useMoney();
+const { money, amount } = useMoney();
+const prefs = usePrefsStore();
+/** 目前貨幣符號（NT$ / US$ / ¥…），供價格小首碼使用，隨右上角幣別變動。 */
+const currencySymbol = computed(() => prefs.currency.symbol);
 
 const props = defineProps<{
   id: number;
@@ -32,6 +36,7 @@ const ui = useUiStore();
 const qty = ref(1);
 const vp = computed(() => useViewportStore().current.id);
 const isPC = computed(() => vp.value === 'pc');
+const isMobile = computed(() => vp.value === 'mobile');
 
 const product = computed(() => products.find((p) => p.id === props.id));
 
@@ -336,7 +341,10 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
           class="font-semibold text-rose-500"
           :class="isPC ? 'text-2xl' : 'text-base'"
         >
-          {{ money(price) }}
+          <span class="align-baseline text-xs font-normal">{{
+            currencySymbol
+          }}</span
+          >{{ amount(price) }}
         </span>
       </div>
 
@@ -346,8 +354,12 @@ const handleConfirmBundleAdd = (e: MouseEvent) => {
         class="mt-auto flex flex-col"
         :class="isPC ? 'gap-2' : 'gap-1'"
       >
-        <!-- Quantity selector -->
-        <div v-if="!simple" class="flex flex-col gap-1" @click.stop>
+        <!-- Quantity selector（手機隱藏，平板以上顯示） -->
+        <div
+          v-if="!simple && !isMobile"
+          class="flex flex-col gap-1"
+          @click.stop
+        >
           <div class="flex items-center" :class="isPC ? 'gap-4' : 'gap-2'">
             <span class="text-slate-700" :class="isPC ? 'text-sm' : 'text-sm'"
               >數量</span
