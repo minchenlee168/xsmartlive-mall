@@ -18,6 +18,9 @@ const ordersStore = useOrdersStore();
 const appMode = useAppModeStore();
 
 const summary = computed(() => ordersStore.lastPaymentSummary);
+/** 付款方式為 LINE Pay 時，以 logo 圖取代文字顯示。 */
+const LINE_PAY_LOGO = `${import.meta.env.BASE_URL}partners/linepay.png`;
+const isLinePay = computed(() => summary.value?.paymentMethod === 'LINE Pay');
 /**
  * 完成訂單後的落地路徑：
  * - 直播主未用商城 → 返回購物車頁面
@@ -105,7 +108,13 @@ const handleGoOrders = () => {
             <!-- 付款方式 -->
             <div class="flex flex-col gap-1">
               <span class="text-sm text-slate-500">付款方式</span>
-              <span class="text-base text-slate-700">
+              <img
+                v-if="isLinePay"
+                :src="LINE_PAY_LOGO"
+                alt="LINE Pay"
+                class="h-5 w-auto self-start object-contain"
+              />
+              <span v-else class="text-base text-slate-700">
                 {{ summary.paymentMethod }}
               </span>
             </div>
