@@ -57,13 +57,26 @@ const emit = defineEmits<{
 
 const PHONE_CODES = ['+886', '+852', '+86', '+81'];
 
+const CITIES = ['台北市', '新北市', '桃園市', '台中市', '高雄市'];
+const DISTRICT_MAP: Record<string, string[]> = {
+  台北市: ['信義區', '大安區', '中山區', '內湖區'],
+  新北市: ['板橋區', '新莊區', '三重區', '中和區'],
+  桃園市: ['桃園區', '中壢區', '平鎮區', '龜山區'],
+  台中市: ['西屯區', '北屯區', '南屯區', '大里區'],
+  高雄市: ['三民區', '前鎮區', '左營區', '鳳山區'],
+};
+
 const sevenIcon = `${import.meta.env.BASE_URL}member-icons/seven.png`;
 const familyIcon = `${import.meta.env.BASE_URL}member-icons/family.png`;
 
 const recipient = ref('');
 const phoneCode = ref('+886');
 const phone = ref('');
-const address = ref('');
+/** 新配送地址：城市 / 區連動下拉 + 詳細地址（比照新增宅配地址格式）。 */
+const city = ref('台北市');
+const district = ref('信義區');
+const detail = ref('');
+const districts = computed(() => DISTRICT_MAP[city.value] ?? []);
 const newChain = ref<CvsChain>('7-11');
 const newStoreName = ref('');
 /** 由電子地圖挑選帶回的門市地址（比照收件地址門市，免手填）。 */
@@ -89,6 +102,11 @@ const headerText = computed(() =>
   props.mode === 'store' ? '更換門市' : '更換配送地址',
 );
 
+// 切換城市時，區重設為該城市的第一個選項
+watch(city, (c) => {
+  district.value = DISTRICT_MAP[c]?.[0] ?? '';
+});
+
 // 開啟時清空輸入欄位
 watch(
   () => props.visible,
@@ -96,7 +114,9 @@ watch(
     if (v) {
       recipient.value = '';
       phone.value = '';
-      address.value = '';
+      city.value = '台北市';
+      district.value = '信義區';
+      detail.value = '';
       phoneCode.value = '+886';
       newChain.value = '7-11';
       newStoreName.value = '';
@@ -114,7 +134,10 @@ const handleConfirm = (): void => {
     recipient: recipient.value,
     phoneCode: phoneCode.value,
     phone: phone.value,
-    address: props.mode === 'store' ? newStoreAddress.value : address.value,
+    address:
+      props.mode === 'store'
+        ? newStoreAddress.value
+        : `${city.value}${district.value} ${detail.value}`.trim(),
   };
   if (props.mode === 'store') {
     payload.chain = newChain.value;
@@ -265,10 +288,23 @@ const handleConfirm = (): void => {
         </div>
       </div>
 
-      <!-- 新配送地址 -->
+      <!-- 新配送地址：城市 / 區連動下拉 + 詳細收件地址 -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-sm font-medium text-slate-700">新配送地址</label>
-        <InputText v-model="address" class="w-full" />
+        <label class="text-sm font-medium text-slate-700">城市 / 區</label>
+        <div class="flex gap-2">
+          <Select v-model="city" :options="CITIES" class="flex-1" />
+          <Select v-model="district" :options="districts" class="flex-1" />
+        </div>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-sm font-medium text-slate-700">
+          詳細收件地址<span class="text-red-500"> *</span>
+        </label>
+        <InputText
+          v-model="detail"
+          placeholder="街道、門牌、樓層"
+          class="w-full"
+        />
       </div>
     </div>
 
@@ -287,7 +323,7 @@ const handleConfirm = (): void => {
           outlined
           @click="handleClose"
         />
-        <Button label="確認更新" @click="handleConfirm" />
+        <Button label="確認更換" @click="handleConfirm" />
       </div>
     </template>
   </Dialog>
