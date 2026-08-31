@@ -1187,21 +1187,44 @@ const handlePlaceOrder = () => {
     '個人發票（紙本）';
 
   // 每個群組（賣家 / 場次）拆成獨立一筆訂單，收集訂單編號
-  const orderNos: string[] = checkoutGroups.value.map((g) =>
-    ordersStore.placeOrder({
+  const orderNos: string[] = checkoutGroups.value.map((g) => {
+    const appliedCoupon = appliedCouponOf(g);
+    return ordersStore.placeOrder({
       items: g.items.map((i) => ({
         name: i.name,
         image: i.image,
         spec: i.spec || '預設',
         price: effectiveUnitPrice(i),
         qty: i.qty,
+        isBundle: i.isBundle,
+        // 固定組合子品數量需 × 組數；任選組合維持原值。訂單端無 productId
+        // 無法回推 isPickBundle，故在此把顯示用數量定案後寫入。
+        bundleItems: i.bundleItems?.map((s) => ({
+          ...s,
+          qty: bundleSubQty(i, s),
+        })),
+        isAddOn: i.isAddOn,
       })),
       total: groupDisplayTotal(g),
       payment: method,
       delivery: SHIPPING_METHOD_LABELS[groupShipMethod(g)!],
       invoice: invoiceLabel,
-    }),
-  );
+      amounts: {
+        goodsTotal: groupGoodsTotal(g),
+        bulkDiscount: groupBulkDiscount(g),
+        couponName: appliedCoupon?.title,
+        couponDiscount: groupCouponDiscount(g),
+        // 夾擠：total 有 Math.max(0,…)，紅利折抵不可超過扣紅利前金額，
+        // 否則邊界情境（改券使 subtotal 下降）明細相加會 ≠ 實付。
+        rewardPointsUsed: Math.min(
+          rewardPointsOfGroup(g),
+          groupSubtotalBeforeRewards(g),
+        ),
+        shippingFee: groupShippingFee(g) ?? 0,
+        shippingDiscount: groupShippingDiscount(g),
+      },
+    });
+  });
 
   // 收件聯絡人 / 電話：整筆自取 → 用自取聯絡人；否則沿用共用宅配地址簿
   const isAllPickup = sharedShipMethod.value === 'pickup';

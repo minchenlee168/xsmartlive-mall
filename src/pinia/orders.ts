@@ -1,11 +1,19 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { OrderRecord, OrderItem, Transaction } from '../types/order';
+import type {
+  OrderRecord,
+  OrderItem,
+  OrderBundleItem,
+  OrderAmountBreakdown,
+  Transaction,
+} from '../types/order';
 
 // 型別 re-export，方便 store 使用者只 import 一處
 export type {
   OrderRecord,
   OrderItem,
+  OrderBundleItem,
+  OrderAmountBreakdown,
   PackageInfo,
   OrderStatus,
   TimelineStepKey,
@@ -167,8 +175,8 @@ export const useOrdersStore = defineStore('orders', () => {
       id: '1',
       date: '2026/02/03 11:24',
       orderNo: '1000000020',
-      qty: 3,
-      total: 600,
+      qty: 4,
+      total: 1449,
       payment: '線上信用卡（藍新）',
       delivery: '宅配',
       invoice: '捐贈',
@@ -193,11 +201,17 @@ export const useOrdersStore = defineStore('orders', () => {
           ],
         },
         {
-          image: IMG_HAT,
-          name: '嬰兒抗 UV 遮陽帽',
-          spec: '牛仔，F',
-          price: 150,
+          image: IMG_PJ,
+          name: '寶寶穿搭超值三件組',
+          spec: '固定組合',
+          price: 599,
           qty: 1,
+          isBundle: true,
+          bundleItems: [
+            { image: IMG_PJ, name: '寶寶長袖包屁衣', spec: '奶油白，66cm', qty: 1 },
+            { image: IMG_BIB, name: '寶寶可愛印花圍兜', spec: '黃', qty: 1 },
+            { image: IMG_HAT, name: '嬰兒抗 UV 遮陽帽', spec: '米，F', qty: 1 },
+          ],
           packages: [
             {
               no: 'F2026020502',
@@ -207,7 +221,32 @@ export const useOrdersStore = defineStore('orders', () => {
             },
           ],
         },
+        {
+          image: IMG_HAT,
+          name: '嬰兒抗 UV 遮陽帽',
+          spec: '牛仔，F',
+          price: 150,
+          qty: 1,
+          isAddOn: true,
+          packages: [
+            {
+              no: 'F2026020503',
+              qty: 1,
+              currentStep: 'unpaid',
+              stepTimes: SAMPLE_TIMES,
+            },
+          ],
+        },
       ],
+      amounts: {
+        goodsTotal: 1649,
+        couponName: '新客折100',
+        couponDiscount: 100,
+        rewardPointsUsed: 100,
+        // 宅配常溫費率 80（達免運門檻 → 全額折抵）。
+        shippingFee: 80,
+        shippingDiscount: 80,
+      },
     },
     {
       id: '2',
@@ -508,6 +547,9 @@ export const useOrdersStore = defineStore('orders', () => {
       spec: string;
       price: number;
       qty: number;
+      isBundle?: boolean;
+      bundleItems?: OrderBundleItem[];
+      isAddOn?: boolean;
     }>;
     total: number;
     payment: string;
@@ -515,6 +557,8 @@ export const useOrdersStore = defineStore('orders', () => {
     /** 發票類型（結帳頁 INVOICE_TYPES 的 label）；未提供時用個人發票（紙本）。 */
     invoice?: string;
     buyerNote?: string;
+    /** 金額明細（優惠券 / 紅利 / 運費折抵等）。 */
+    amounts?: OrderAmountBreakdown;
   }): string {
     seq += 1;
     const now = new Date();
@@ -531,6 +575,9 @@ export const useOrdersStore = defineStore('orders', () => {
       spec: it.spec || '預設',
       price: it.price,
       qty: it.qty,
+      isBundle: it.isBundle,
+      bundleItems: it.bundleItems,
+      isAddOn: it.isAddOn,
       packages: [
         {
           no: `F${ymd}${pad2(seq)}${pad2(idx + 1)}`,
@@ -560,6 +607,7 @@ export const useOrdersStore = defineStore('orders', () => {
       expanded: true,
       items,
       buyerNote: input.buyerNote,
+      amounts: input.amounts,
     });
     transactions.value.unshift({
       date: dateShort,

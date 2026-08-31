@@ -35,6 +35,14 @@ export interface PackageInfo {
 
 export type ReturnRequestStatus = 'pending' | 'approved' | 'rejected';
 
+/** 組合商品的子品項（與購物車 CartBundleItem 同形，下單時原樣帶入）。 */
+export interface OrderBundleItem {
+  name: string;
+  image?: string;
+  spec: string;
+  qty: number;
+}
+
 export interface OrderItem {
   image?: string;
   name: string;
@@ -46,6 +54,33 @@ export interface OrderItem {
   returnStatus?: ReturnRequestStatus;
   /** 駁回原因，僅在 returnStatus === 'rejected' 時使用 */
   returnRejectReason?: string;
+  /** 組合商品：展開明細顯示「組合商品」標籤 + 子品清單。 */
+  isBundle?: boolean;
+  bundleItems?: OrderBundleItem[];
+  /** 由加購區加入：展開明細顯示「加購」標籤。 */
+  isAddOn?: boolean;
+}
+
+/**
+ * 訂單金額明細（結帳時各組拆單後各自算好帶入）。
+ * total（OrderRecord.total）為實付金額，等於：
+ * goodsTotal − bulkDiscount − couponDiscount − rewardPointsUsed + shippingFee − shippingDiscount
+ */
+export interface OrderAmountBreakdown {
+  /** 商品小計（原價 × 數量，未套任何優惠）。 */
+  goodsTotal: number;
+  /** 買多優惠折抵（正數＝折抵額）。 */
+  bulkDiscount?: number;
+  /** 套用的優惠券名稱（有套用才有）。 */
+  couponName?: string;
+  /** 優惠券折抵金額（正數＝折抵額）。 */
+  couponDiscount?: number;
+  /** 使用的紅利點數（1 點＝1 元，正數＝折抵額）。 */
+  rewardPointsUsed?: number;
+  /** 運費。 */
+  shippingFee?: number;
+  /** 運費折抵（達免運門檻時折抵全額運費，正數＝折抵額）。 */
+  shippingDiscount?: number;
 }
 
 export interface OrderRecord {
@@ -64,6 +99,8 @@ export interface OrderRecord {
   items: OrderItem[];
   /** 買家對這筆訂單的備註（留言給賣家）；下單時從結帳頁帶入。 */
   buyerNote?: string;
+  /** 金額明細（優惠券 / 紅利 / 運費折抵等）；下單時從結帳頁帶入，顯示於訂購/付款資訊。 */
+  amounts?: OrderAmountBreakdown;
 }
 
 export interface Transaction {
