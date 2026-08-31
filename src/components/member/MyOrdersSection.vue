@@ -453,9 +453,17 @@ const inquirySelectKey = ref(0);
 // ── 訂購/付款資訊 dialog ──
 const isPaymentInfoDialogVisible = ref(false);
 const paymentInfoTargetOrder = ref<OrderRecord | null>(null);
+
+// ── 金額明細 dialog（由訂單總額旁「明細」開啟）──
+const isAmountDialogVisible = ref(false);
+const amountTargetOrder = ref<OrderRecord | null>(null);
+const handleOpenAmountDialog = (order: OrderRecord): void => {
+  amountTargetOrder.value = order;
+  isAmountDialogVisible.value = true;
+};
 /** 金額明細列：依 amounts 動態組出，無折抵的列自動略過（負值＝折抵）。 */
-const paymentInfoAmountRows = computed(() => {
-  const a = paymentInfoTargetOrder.value?.amounts;
+const amountRows = computed(() => {
+  const a = amountTargetOrder.value?.amounts;
   if (!a) return [];
   const rows: { label: string; value: number; isDiscount: boolean }[] = [];
   rows.push({ label: '商品小計', value: a.goodsTotal, isDiscount: false });
@@ -749,9 +757,21 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
           <div>
             <p class="text-xs text-slate-500">訂單總額</p>
-            <p class="font-bold" style="color: var(--danger)">
-              {{ money(order.total) }}
-            </p>
+            <div class="flex items-center gap-2">
+              <p class="font-bold" style="color: var(--danger)">
+                {{ money(order.total) }}
+              </p>
+              <Button
+                v-if="order.amounts"
+                label="明細"
+                icon="pi pi-external-link"
+                icon-pos="right"
+                outlined
+                size="small"
+                class="!py-1"
+                @click="handleOpenAmountDialog(order)"
+              />
+            </div>
           </div>
           <div>
             <p class="text-xs text-slate-500">付款方式</p>
@@ -804,7 +824,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               </th>
               <th
                 class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 110px"
+                style="width: 175px"
               >
                 訂單總額
               </th>
@@ -839,8 +859,22 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <td class="py-3 pr-3 pl-4 text-slate-700">{{ order.date }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.orderNo }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.qty }}</td>
-              <td class="px-3 py-3 font-bold" style="color: var(--danger)">
-                {{ money(order.total) }}
+              <td class="px-3 py-3">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold" style="color: var(--danger)">
+                    {{ money(order.total) }}
+                  </span>
+                  <Button
+                    v-if="order.amounts"
+                    label="明細"
+                    icon="pi pi-external-link"
+                    icon-pos="right"
+                    outlined
+                    size="small"
+                    class="!py-1"
+                    @click="handleOpenAmountDialog(order)"
+                  />
+                </div>
               </td>
               <td class="px-3 py-3 text-slate-700">{{ order.payment }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
@@ -1563,33 +1597,37 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             {{ paymentInfoTargetOrder?.payment ?? '線上信用卡（藍新）' }}
           </span>
         </div>
+      </div>
+    </Dialog>
 
-        <!-- 金額明細：商品小計、各項折抵、運費、實付 -->
+    <!-- 金額明細 dialog（由訂單總額旁「明細」開啟）-->
+    <Dialog
+      v-model:visible="isAmountDialogVisible"
+      modal
+      :draggable="false"
+      dismissable-mask
+      header="金額明細"
+      :breakpoints="{ '768px': '92vw' }"
+      :style="{ width: '420px' }"
+    >
+      <div class="flex flex-col gap-2 text-sm">
         <div
-          v-if="paymentInfoAmountRows.length"
-          class="mt-1 flex flex-col gap-2 border-t border-slate-100 pt-4"
+          v-for="(row, ri) in amountRows"
+          :key="ri"
+          class="flex items-center justify-between"
         >
-          <span class="text-xs text-slate-500">金額明細</span>
-          <div
-            v-for="(row, ri) in paymentInfoAmountRows"
-            :key="ri"
-            class="flex items-center justify-between"
-          >
-            <span class="text-slate-600">{{ row.label }}</span>
-            <span :class="row.isDiscount ? 'text-red-500' : 'text-slate-950'">
-              {{ row.isDiscount ? `-${money(-row.value)}` : money(row.value) }}
-            </span>
-          </div>
-          <div
-            class="flex items-center justify-between border-t border-slate-100 pt-2"
-          >
-            <span class="font-medium text-slate-950">實付金額</span>
-            <span
-              class="text-base font-bold"
-              style="color: var(--primary)"
-              >{{ money(paymentInfoTargetOrder?.total ?? 0) }}</span
-            >
-          </div>
+          <span class="text-slate-600">{{ row.label }}</span>
+          <span :class="row.isDiscount ? 'text-red-500' : 'text-slate-950'">
+            {{ row.isDiscount ? `-${money(-row.value)}` : money(row.value) }}
+          </span>
+        </div>
+        <div
+          class="mt-1 flex items-center justify-between border-t border-slate-100 pt-3"
+        >
+          <span class="font-medium text-slate-950">實付金額</span>
+          <span class="text-base font-bold" style="color: var(--primary)">
+            {{ money(amountTargetOrder?.total ?? 0) }}
+          </span>
         </div>
       </div>
     </Dialog>
