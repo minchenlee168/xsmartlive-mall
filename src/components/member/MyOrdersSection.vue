@@ -453,6 +453,36 @@ const inquirySelectKey = ref(0);
 // ── 訂購/付款資訊 dialog ──
 const isPaymentInfoDialogVisible = ref(false);
 const paymentInfoTargetOrder = ref<OrderRecord | null>(null);
+/** 金額明細列：依 amounts 動態組出，無折抵的列自動略過（負值＝折抵）。 */
+const paymentInfoAmountRows = computed(() => {
+  const a = paymentInfoTargetOrder.value?.amounts;
+  if (!a) return [];
+  const rows: { label: string; value: number; isDiscount: boolean }[] = [];
+  rows.push({ label: '商品小計', value: a.goodsTotal, isDiscount: false });
+  if (a.bulkDiscount)
+    rows.push({ label: '買多優惠', value: -a.bulkDiscount, isDiscount: true });
+  if (a.couponDiscount)
+    rows.push({
+      label: a.couponName ? `優惠券（${a.couponName}）` : '優惠券折抵',
+      value: -a.couponDiscount,
+      isDiscount: true,
+    });
+  if (a.rewardPointsUsed)
+    rows.push({
+      label: `紅利折抵（${a.rewardPointsUsed} 點）`,
+      value: -a.rewardPointsUsed,
+      isDiscount: true,
+    });
+  if (a.shippingFee)
+    rows.push({ label: '運費', value: a.shippingFee, isDiscount: false });
+  if (a.shippingDiscount)
+    rows.push({
+      label: '運費折抵',
+      value: -a.shippingDiscount,
+      isDiscount: true,
+    });
+  return rows;
+});
 
 // ── 物流配送進度 dialog ──
 interface ShippingTrackingEvent {
@@ -989,6 +1019,16 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               </div>
               <div class="min-w-0 flex-1">
                 <p class="line-clamp-1 text-sm leading-snug text-slate-700">
+                  <Tag
+                    v-if="item.isAddOn"
+                    value="加購"
+                    class="!mr-1.5 !border !border-slate-300 !bg-transparent !py-[1px] !align-middle !text-xs !font-normal !text-slate-500"
+                  />
+                  <Tag
+                    v-if="item.isBundle"
+                    value="組合"
+                    class="!mr-1.5 !border !border-slate-300 !bg-transparent !py-[1px] !align-middle !text-xs !font-normal !text-slate-500"
+                  />
                   {{ item.name }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500">{{ item.spec }}</p>
@@ -1012,6 +1052,44 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                   size="small"
                   @click="handleReturnButtonClick(item)"
                 />
+              </div>
+            </div>
+
+            <!-- 組合商品內容（唯讀）：外框卡 + 浮貼「組合商品」標籤，比照購物車 -->
+            <div
+              v-if="item.isBundle && item.bundleItems?.length"
+              class="mb-3 ml-15"
+            >
+              <div
+                class="relative rounded-lg border border-slate-200 bg-slate-50 p-3 pt-4"
+              >
+                <span
+                  class="absolute top-0 left-3 -translate-y-1/2 bg-white px-2 py-0.5 text-xs font-medium text-slate-600"
+                >
+                  組合商品
+                </span>
+                <ul class="flex flex-col gap-2.5">
+                  <li
+                    v-for="(b, bi) in item.bundleItems"
+                    :key="bi"
+                    class="flex items-center gap-2.5"
+                  >
+                    <div
+                      class="h-9 w-9 shrink-0 overflow-hidden rounded bg-slate-100"
+                    >
+                      <ProductImage :src="b.image" :alt="b.name" size="sm" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="line-clamp-1 text-xs text-slate-700">
+                        {{ b.name }}
+                      </p>
+                      <p class="mt-0.5 text-xs text-slate-400">{{ b.spec }}</p>
+                    </div>
+                    <span class="shrink-0 text-xs text-slate-500"
+                      >×{{ b.qty }}</span
+                    >
+                  </li>
+                </ul>
               </div>
             </div>
 
@@ -1484,6 +1562,34 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <span class="text-slate-950">
             {{ paymentInfoTargetOrder?.payment ?? '線上信用卡（藍新）' }}
           </span>
+        </div>
+
+        <!-- 金額明細：商品小計、各項折抵、運費、實付 -->
+        <div
+          v-if="paymentInfoAmountRows.length"
+          class="mt-1 flex flex-col gap-2 border-t border-slate-100 pt-4"
+        >
+          <span class="text-xs text-slate-500">金額明細</span>
+          <div
+            v-for="(row, ri) in paymentInfoAmountRows"
+            :key="ri"
+            class="flex items-center justify-between"
+          >
+            <span class="text-slate-600">{{ row.label }}</span>
+            <span :class="row.isDiscount ? 'text-red-500' : 'text-slate-950'">
+              {{ row.isDiscount ? `-${money(-row.value)}` : money(row.value) }}
+            </span>
+          </div>
+          <div
+            class="flex items-center justify-between border-t border-slate-100 pt-2"
+          >
+            <span class="font-medium text-slate-950">實付金額</span>
+            <span
+              class="text-base font-bold"
+              style="color: var(--primary)"
+              >{{ money(paymentInfoTargetOrder?.total ?? 0) }}</span
+            >
+          </div>
         </div>
       </div>
     </Dialog>
