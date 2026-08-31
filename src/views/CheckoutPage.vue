@@ -2243,8 +2243,8 @@ const handlePlaceOrder = () => {
                 <h3 class="text-lg font-bold text-slate-950">
                   {{
                     shipDrawerGroupId == null
-                      ? '選擇運送方式（套用全部）'
-                      : '選擇運送方式'
+                      ? '選擇配送方式（套用全部）'
+                      : '選擇配送方式'
                   }}
                 </h3>
                 <Button
