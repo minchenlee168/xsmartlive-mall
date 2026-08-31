@@ -260,7 +260,7 @@ const bidAllocRows = (
     const sku = skus.find((s) => s.id === skuId);
     return {
       skuId,
-      label: sku ? axes.map((a) => sku.spec[a.name]).join(' / ') : skuId,
+      label: sku ? axes.map((a) => sku.spec[a.name]).join('，') : skuId,
       qty,
     };
   });

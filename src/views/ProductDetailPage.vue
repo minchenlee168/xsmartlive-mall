@@ -267,7 +267,7 @@ const handleAddToCart = (e: MouseEvent) => {
   }
   let specLabel =
     hasSpecAxes.value && !product.value.isBundle
-      ? specAxes.value.map((a) => selectedAxisSpec.value[a.name]).join(' / ')
+      ? specAxes.value.map((a) => selectedAxisSpec.value[a.name]).join('，')
       : selectedSize.value || '預設';
   let customBundle:
     | { name: string; image?: string; spec: string; qty: number }[]
