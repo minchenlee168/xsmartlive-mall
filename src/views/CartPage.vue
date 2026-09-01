@@ -472,7 +472,7 @@ const bidAllocRows = (item: CartItem) =>
       label: sku
         ? specAxesOf(item)
             .map((a) => sku.spec[a.name])
-            .join('，')
+            .join('/')
         : skuId,
       qty,
     };
@@ -540,7 +540,7 @@ const dlgRows = () => {
       label: sku
         ? specAxesOf(item)
             .map((a) => sku.spec[a.name])
-            .join('，')
+            .join('/')
         : skuId,
       qty,
     };
@@ -770,12 +770,12 @@ const confirmFixedDialog = () => {
 };
 
 // 加價購：跟商品分類頁一樣，點按鈕跳 Dialog 選規格 + 數量。
-/** 多維度規格的笛卡兒積：[[顏色A,顏色B], [尺寸S,尺寸M]] → ['顏色A，尺寸S', '顏色A，尺寸M', ...]。 */
+/** 多維度規格的笛卡兒積：[[顏色A,顏色B], [尺寸S,尺寸M]] → ['顏色A/尺寸S', '顏色A/尺寸M', ...]。 */
 const combinedSpecOptions = (p: AddOnProduct): string[] => {
   if (!p.specs?.length) return [];
   return p.specs.reduce<string[]>((acc, dim) => {
     if (acc.length === 0) return dim.options.slice();
-    return acc.flatMap((prev) => dim.options.map((o) => `${prev}，${o}`));
+    return acc.flatMap((prev) => dim.options.map((o) => `${prev}/${o}`));
   }, []);
 };
 

@@ -1594,7 +1594,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
         <div class="flex flex-col gap-1">
           <span class="text-xs text-slate-500">付款方式</span>
           <span class="text-slate-950">
-            {{ paymentInfoTargetOrder?.payment ?? '線上信用卡（藍新）' }}
+            {{ paymentInfoTargetOrder?.payment ?? '線上信用卡' }}
           </span>
         </div>
       </div>

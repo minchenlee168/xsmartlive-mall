@@ -87,8 +87,7 @@ const DONATE_ORGS = [
   '財團法人愛盲基金會',
 ];
 const PAYMENT_METHODS: { label: string; value: PaymentMethodId }[] = [
-  { label: '線上信用卡（藍新）', value: 'credit' },
-  { label: '線上信用卡（數位鑑）', value: 'credit-digital' },
+  { label: '線上信用卡', value: 'credit' },
   { label: 'Apple Pay', value: 'apple-pay' },
   { label: 'ATM 繳費帳號', value: 'atm' },
   { label: '超商代碼繳費', value: 'cvs-code' },
@@ -260,7 +259,7 @@ const bidAllocRows = (
     const sku = skus.find((s) => s.id === skuId);
     return {
       skuId,
-      label: sku ? axes.map((a) => sku.spec[a.name]).join('，') : skuId,
+      label: sku ? axes.map((a) => sku.spec[a.name]).join('/') : skuId,
       qty,
     };
   });
@@ -1181,7 +1180,7 @@ const handlePlaceOrder = () => {
   }
   const method =
     PAYMENT_METHODS.find((m) => m.value === paymentMethod.value)?.label ??
-    '線上信用卡（藍新）';
+    '線上信用卡';
   const invoiceLabel =
     INVOICE_TYPES.find((t) => t.value === invoiceType.value)?.label ??
     '個人發票（紙本）';

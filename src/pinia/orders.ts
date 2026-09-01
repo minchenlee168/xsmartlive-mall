@@ -65,7 +65,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '寶寶純棉長袖兩件組',
-          spec: '灰，70cm',
+          spec: '灰/70cm',
           price: 490,
           qty: 1,
           packages: [
@@ -86,7 +86,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 2,
       total: 300,
       amounts: { goodsTotal: 300, shippingFee: 60, shippingDiscount: 60 },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '超商取貨',
       invoice: '手機條碼',
       invoiceStatus: 'issued',
@@ -97,7 +97,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_HAT,
           name: '嬰兒抗 UV 遮陽帽',
-          spec: '米，F',
+          spec: '米/F',
           price: 150,
           qty: 2,
           packages: [
@@ -118,7 +118,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 1,
       total: 290,
       amounts: { goodsTotal: 290 },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '自取',
       invoice: '會員載具',
       invoiceStatus: 'pending',
@@ -150,7 +150,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 2,
       total: 720,
       amounts: { goodsTotal: 720 },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '自取',
       invoice: '公司統編',
       invoiceStatus: 'issued',
@@ -161,7 +161,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '寶寶長袖包屁衣親子裝',
-          spec: '綠，66cm',
+          spec: '綠/66cm',
           price: 360,
           qty: 2,
           packages: [
@@ -181,7 +181,7 @@ export const useOrdersStore = defineStore('orders', () => {
       orderNo: '1000000020',
       qty: 4,
       total: 1449,
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '宅配',
       invoice: '捐贈',
       invoiceStatus: 'pending',
@@ -192,7 +192,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '秋裝長袖公主南瓜系包屁衣',
-          spec: '黃，60cm',
+          spec: '黃/60cm',
           price: 450,
           qty: 2,
           packages: [
@@ -212,9 +212,9 @@ export const useOrdersStore = defineStore('orders', () => {
           qty: 1,
           isBundle: true,
           bundleItems: [
-            { image: IMG_PJ, name: '寶寶長袖包屁衣', spec: '奶油白，66cm', qty: 1 },
+            { image: IMG_PJ, name: '寶寶長袖包屁衣', spec: '奶油白/66cm', qty: 1 },
             { image: IMG_BIB, name: '寶寶可愛印花圍兜', spec: '黃', qty: 1 },
-            { image: IMG_HAT, name: '嬰兒抗 UV 遮陽帽', spec: '米，F', qty: 1 },
+            { image: IMG_HAT, name: '嬰兒抗 UV 遮陽帽', spec: '米/F', qty: 1 },
           ],
           packages: [
             {
@@ -228,7 +228,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_HAT,
           name: '嬰兒抗 UV 遮陽帽',
-          spec: '牛仔，F',
+          spec: '牛仔/F',
           price: 150,
           qty: 1,
           isAddOn: true,
@@ -276,7 +276,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '秋裝長袖公主南瓜系包屁衣',
-          spec: '紅，60cm',
+          spec: '紅/60cm',
           price: 450,
           qty: 3,
           packages: [
@@ -291,7 +291,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_HAT,
           name: '嬰兒抗 UV 遮陽帽',
-          spec: '藍，F',
+          spec: '藍/F',
           price: 150,
           qty: 1,
           packages: [
@@ -312,7 +312,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 2,
       total: 720,
       amounts: { goodsTotal: 720, shippingFee: 60, shippingDiscount: 60 },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '超商取貨',
       invoice: '個人發票（紙本）',
       invoiceStatus: 'issued',
@@ -323,7 +323,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '寶寶長袖包屁衣親子裝',
-          spec: '黑，66cm',
+          spec: '黑/66cm',
           price: 360,
           qty: 2,
           packages: [
@@ -383,7 +383,7 @@ export const useOrdersStore = defineStore('orders', () => {
         shippingFee: 80,
         shippingDiscount: 80,
       },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '宅配',
       invoice: '會員載具',
       invoiceStatus: 'issued',
@@ -394,7 +394,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '秋裝長袖公主南瓜系包屁衣',
-          spec: '黃，60cm',
+          spec: '黃/60cm',
           price: 450,
           qty: 3,
           packages: [
@@ -415,7 +415,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_HAT,
           name: '嬰兒抗 UV 遮陽帽',
-          spec: '牛仔，F',
+          spec: '牛仔/F',
           price: 150,
           qty: 1,
           packages: [
@@ -436,7 +436,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 4,
       total: 980,
       amounts: { goodsTotal: 980, shippingFee: 80, shippingDiscount: 80 },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '宅配',
       invoice: '不開立',
       invoiceStatus: 'none',
@@ -447,7 +447,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '寶寶純棉長袖兩件組',
-          spec: '白，66cm',
+          spec: '白/66cm',
           price: 490,
           qty: 2,
           packages: [
@@ -474,7 +474,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 1,
       total: 520,
       amounts: { goodsTotal: 520, shippingFee: 80, shippingDiscount: 80 },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '宅配',
       invoice: '自然人憑證',
       invoiceStatus: 'issued',
@@ -485,7 +485,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_PJ,
           name: '寶寶純棉短袖套裝',
-          spec: '粉，70cm',
+          spec: '粉/70cm',
           price: 520,
           qty: 1,
           returnStatus: 'approved',
@@ -507,7 +507,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 1,
       total: 380,
       amounts: { goodsTotal: 380, shippingFee: 80, shippingDiscount: 80 },
-      payment: '線上信用卡（藍新）',
+      payment: '線上信用卡',
       delivery: '宅配',
       invoice: '個人發票（紙本）',
       invoiceStatus: 'issued',
@@ -518,7 +518,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_HAT,
           name: '嬰兒抗 UV 遮陽帽',
-          spec: '藍，F',
+          spec: '藍/F',
           price: 380,
           qty: 1,
           returnStatus: 'rejected',

@@ -44,10 +44,9 @@ const SHIPPING_OPTS: { label: string; value: ShippingMethodId }[] = [
   { label: '自取（不計運費）', value: 'pickup' },
   { label: '商家自建（如郵局）', value: 'post' },
 ];
-// 支付方式：對齊後台「支付方式設定」複選項（10 種）與結帳頁 PAYMENT_METHODS label 一致。
+// 支付方式：對齊後台「支付方式設定」複選項（9 種）與結帳頁 PAYMENT_METHODS label 一致。
 const PAYMENT_OPTS: { label: string; value: PaymentMethodId }[] = [
-  { label: '線上信用卡（藍新）', value: 'credit' },
-  { label: '線上信用卡（數位鑑）', value: 'credit-digital' },
+  { label: '線上信用卡', value: 'credit' },
   { label: 'Apple Pay', value: 'apple-pay' },
   { label: 'ATM 繳費帳號', value: 'atm' },
   { label: '超商代碼繳費', value: 'cvs-code' },

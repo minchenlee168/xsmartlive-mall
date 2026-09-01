@@ -218,8 +218,8 @@ export const products: Product[] = [
         name: '嬰兒抗 UV 遮陽帽',
         image:
           'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
-        spec: '黃-F',
-        specOptions: ['黃-F', '藍-F'],
+        spec: '黃/F',
+        specOptions: ['黃/F', '藍/F'],
         maxQty: 1,
       },
       {
@@ -689,17 +689,17 @@ export const products: Product[] = [
         name: '新款 包屁衣韓版小洋裝 秋冬刺繡款',
         image:
           'https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=400&fit=crop',
-        spec: '黑，S',
+        spec: '黑/S',
         qty: 1,
-        specOptions: ['黑，S', '黑，M', '黑，L', '白，S', '白，M', '白，L'],
+        specOptions: ['黑/S', '黑/M', '黑/L', '白/S', '白/M', '白/L'],
       },
       {
         name: '新款 包屁衣韓版小洋裝 春夏蕾絲款',
         image:
           'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
-        spec: '白，S',
+        spec: '白/S',
         qty: 1,
-        specOptions: ['黑，S', '黑，M', '黑，L', '白，S', '白，M', '白，L'],
+        specOptions: ['黑/S', '黑/M', '黑/L', '白/S', '白/M', '白/L'],
       },
     ],
   },
@@ -722,32 +722,32 @@ export const products: Product[] = [
         name: '寶寶連身包屁衣 有機棉長袖春秋款',
         image:
           'https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=400&fit=crop',
-        spec: '黃-66cm',
-        specOptions: ['黃-66cm', '黃-73cm', '白-66cm', '白-73cm'],
+        spec: '黃/66cm',
+        specOptions: ['黃/66cm', '黃/73cm', '白/66cm', '白/73cm'],
       },
       {
         id: 102,
         name: '嬰兒連帽爬服 卡通印花長袖款',
         image:
           'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
-        spec: '藍-66cm',
-        specOptions: ['藍-66cm', '藍-73cm', '粉-66cm', '粉-73cm'],
+        spec: '藍/66cm',
+        specOptions: ['藍/66cm', '藍/73cm', '粉/66cm', '粉/73cm'],
       },
       {
         id: 103,
         name: 'MM 巧克力男寶寶搞怪包屁衣',
         image:
           'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=400&fit=crop',
-        spec: '棕-66cm',
-        specOptions: ['棕-66cm', '棕-73cm'],
+        spec: '棕/66cm',
+        specOptions: ['棕/66cm', '棕/73cm'],
       },
       {
         id: 104,
         name: '愛兒抗 UV 遮陽帽',
         image:
           'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
-        spec: '黃-F',
-        specOptions: ['黃-F', '藍-F'],
+        spec: '黃/F',
+        specOptions: ['黃/F', '藍/F'],
       },
       {
         id: 105,
@@ -797,21 +797,21 @@ export const products: Product[] = [
         name: '純棉短袖 T 男童',
         image:
           'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=400&fit=crop',
-        spec: '白-110cm',
+        spec: '白/110cm',
         qty: 1,
       },
       {
         name: '純棉短袖 T 女童',
         image:
           'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
-        spec: '粉-110cm',
+        spec: '粉/110cm',
         qty: 1,
       },
       {
         name: '純棉短袖 T 中性款',
         image:
           'https://images.unsplash.com/photo-1571513722275-4b41940f54b8?w=400&fit=crop',
-        spec: '灰-110cm',
+        spec: '灰/110cm',
         qty: 1,
       },
     ],
