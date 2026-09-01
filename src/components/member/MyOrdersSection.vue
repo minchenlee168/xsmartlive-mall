@@ -320,13 +320,17 @@ interface TimelineRow {
   status: 'done' | 'current' | 'pending';
 }
 const timelineFor = (pkg: PackageInfo): TimelineRow[] => {
-  return PROGRESS_STEPS.map((s) => ({
-    key: s.key,
-    label: s.label,
-    icon: s.icon,
-    time: pkg.stepTimes?.[s.key] ?? '—',
-    status: stepStatus(pkg, s.key),
-  }));
+  return PROGRESS_STEPS.map((s) => {
+    const status = stepStatus(pkg, s.key);
+    return {
+      key: s.key,
+      label: s.label,
+      icon: s.icon,
+      // 未亮燈（pending）的階段尚未發生 → 不顯示時間
+      time: status === 'pending' ? '' : (pkg.stepTimes?.[s.key] ?? '—'),
+      status,
+    };
+  });
 };
 
 // ── 更換配送地址 / 更換門市 dialog ──
