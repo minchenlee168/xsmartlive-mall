@@ -1,8 +1,6 @@
 <script setup lang="ts">
 const SITE_URL = 'https://www.168money.com.tw';
 const PLATFORM_URL = 'https://www.168money.com.tw/';
-const PRIVACY_URL = 'https://live02.168money.com.tw/privacy-policy.html';
-const TERMS_URL = 'https://live02.168money.com.tw/terms-of-service.html';
 
 const BASE_URL = import.meta.env.BASE_URL;
 
@@ -59,27 +57,6 @@ const LOGISTICS_LAST_INDEX = 4;
       <div
         class="flex flex-col items-center gap-2 text-center text-sm text-slate-500"
       >
-        <!-- 政策連結 -->
-        <div class="flex items-center gap-3">
-          <a
-            :href="PRIVACY_URL"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="transition-colors hover:text-[color:var(--primary)] hover:underline"
-          >
-            Privacy Policy
-          </a>
-          <span class="text-slate-300">|</span>
-          <a
-            :href="TERMS_URL"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="transition-colors hover:text-[color:var(--primary)] hover:underline"
-          >
-            Terms of Service
-          </a>
-        </div>
-
         <!-- Copyright -->
         <p class="text-xs leading-relaxed text-slate-400">
           Copyright ©
