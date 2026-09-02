@@ -53,6 +53,8 @@ onBeforeUnmount(() => {
 
 // 入口頁與 auth 頁；不顯示 Footer、不套 Aurora shell
 const AUTH_PATHS = ['/login', '/register', '/forgot', '/social-signup'];
+// 純內容頁（供新分頁開啟）：不顯示 Footer
+const CONTENT_ONLY_PATHS = ['/privacy', '/terms'];
 
 const isAurora = computed(() => themeStore.current.id === 'aurora');
 /** Aurora 但走到 auth 路徑時不套 Shell，讓頁面像其他外觀一樣全寬 */
@@ -66,7 +68,10 @@ const frameRef = ref<HTMLElement | null>(null);
 const isFullscreen = computed(() => false);
 const showControls = computed(() => route.path !== '/');
 const showFooter = computed(
-  () => route.path !== '/' && !AUTH_PATHS.includes(route.path),
+  () =>
+    route.path !== '/' &&
+    !AUTH_PATHS.includes(route.path) &&
+    !CONTENT_ONLY_PATHS.includes(route.path),
 );
 
 const frameStyle = computed(() => {

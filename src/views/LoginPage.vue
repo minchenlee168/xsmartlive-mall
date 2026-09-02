@@ -271,7 +271,7 @@ onBeforeUnmount(() => {
                   <a
                     class="cursor-pointer underline"
                     style="color: var(--primary)"
-                    href="https://live02.168money.com.tw/terms-of-service.html"
+                    :href="router.resolve('/terms').href"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -281,7 +281,7 @@ onBeforeUnmount(() => {
                   <a
                     class="cursor-pointer underline"
                     style="color: var(--primary)"
-                    href="https://www-uat-3.xsmartlive.com/zh-TW/privacy"
+                    :href="router.resolve('/privacy').href"
                     target="_blank"
                     rel="noopener noreferrer"
                   >

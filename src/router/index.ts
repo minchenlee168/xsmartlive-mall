@@ -13,6 +13,8 @@ import RegisterPage from '../views/RegisterPage.vue';
 import SocialSignupPage from '../views/SocialSignupPage.vue';
 import ForgotPasswordPage from '../views/ForgotPasswordPage.vue';
 import InfoPage from '../views/InfoPage.vue';
+import PrivacyPolicyPage from '../views/PrivacyPolicyPage.vue';
+import TermsOfServicePage from '../views/TermsOfServicePage.vue';
 import { useUiStore } from '../pinia/ui';
 import { useAuthStore } from '../pinia/auth';
 import { useAppModeStore } from '../pinia/appMode';
@@ -34,8 +36,8 @@ const router = createRouter({
     { path: '/register', component: RegisterPage },
     { path: '/social-signup', component: SocialSignupPage },
     { path: '/forgot', component: ForgotPasswordPage },
-    { path: '/terms', component: InfoPage },
-    { path: '/privacy', component: InfoPage },
+    { path: '/terms', component: TermsOfServicePage },
+    { path: '/privacy', component: PrivacyPolicyPage },
     { path: '/help', component: InfoPage },
   ],
   scrollBehavior() {
