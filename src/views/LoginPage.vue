@@ -281,7 +281,7 @@ onBeforeUnmount(() => {
                   <a
                     class="cursor-pointer underline"
                     style="color: var(--primary)"
-                    href="https://live02.168money.com.tw/privacy-policy.html"
+                    href="https://www-uat-3.xsmartlive.com/zh-TW/privacy"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
