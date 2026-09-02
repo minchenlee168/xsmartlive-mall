@@ -271,7 +271,9 @@ onBeforeUnmount(() => {
                   <a
                     class="cursor-pointer underline"
                     style="color: var(--primary)"
-                    @click="router.push('/terms')"
+                    href="https://live02.168money.com.tw/terms-of-service.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     服務政策
                   </a>
@@ -279,7 +281,9 @@ onBeforeUnmount(() => {
                   <a
                     class="cursor-pointer underline"
                     style="color: var(--primary)"
-                    @click="router.push('/privacy')"
+                    href="https://live02.168money.com.tw/privacy-policy.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     隱私權政策
                   </a>
