@@ -307,7 +307,7 @@ const isString = (item: ListItem): item is string => typeof item === 'string';
 
 <template>
   <main class="mx-auto w-full max-w-[860px] px-4 py-8">
-    <h1 class="mb-6 text-2xl font-bold text-slate-950">服務條款</h1>
+    <h1 class="mb-6 text-2xl font-bold text-slate-950">服務政策</h1>
     <div class="flex flex-col gap-6">
       <p class="text-base leading-relaxed text-slate-600">{{ INTRO }}</p>
 
@@ -321,30 +321,34 @@ const isString = (item: ListItem): item is string => typeof item === 'string';
         >
           {{ section.h }}
         </h2>
-        <template v-for="(block, bi) in section.blocks" :key="bi">
-          <p
-            v-if="block.type === 'p'"
-            class="text-base leading-relaxed text-slate-600"
-          >
-            {{ block.text }}
-          </p>
-          <ol
-            v-else
-            class="flex list-decimal flex-col gap-2 pl-6 text-base leading-relaxed text-slate-600"
-          >
-            <li v-for="(item, ii) in block.items" :key="ii" class="pl-1">
-              <template v-if="isString(item)">{{ item }}</template>
-              <template v-else>
-                {{ item.text }}
-                <ul
-                  class="mt-1 flex list-none flex-col gap-1 pl-2 text-slate-600"
-                >
-                  <li v-for="(s, si) in item.sub" :key="si">{{ s }}</li>
-                </ul>
-              </template>
-            </li>
-          </ol>
-        </template>
+        <div
+          class="ml-6 flex flex-col gap-2 border-l-2 border-dashed border-slate-300 pl-4"
+        >
+          <template v-for="(block, bi) in section.blocks" :key="bi">
+            <p
+              v-if="block.type === 'p'"
+              class="text-base leading-relaxed text-slate-600"
+            >
+              {{ block.text }}
+            </p>
+            <ol
+              v-else
+              class="flex list-decimal flex-col gap-2 pl-6 text-base leading-relaxed text-slate-600"
+            >
+              <li v-for="(item, ii) in block.items" :key="ii" class="pl-1">
+                <template v-if="isString(item)">{{ item }}</template>
+                <template v-else>
+                  {{ item.text }}
+                  <ul
+                    class="mt-1 flex list-none flex-col gap-1 pl-2 text-slate-600"
+                  >
+                    <li v-for="(s, si) in item.sub" :key="si">{{ s }}</li>
+                  </ul>
+                </template>
+              </li>
+            </ol>
+          </template>
+        </div>
       </div>
     </div>
   </main>

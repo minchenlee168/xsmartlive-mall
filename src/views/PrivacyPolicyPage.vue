@@ -90,27 +90,31 @@ const SECTIONS: PolicySection[] = [
           >
             {{ section.h }}
           </h2>
-          <p
-            v-for="(para, pi) in section.paras"
-            :key="pi"
-            class="text-base leading-relaxed text-slate-600"
+          <div
+            class="ml-6 flex flex-col gap-2 border-l-2 border-dashed border-slate-300 pl-4"
           >
-            {{ para }}
-          </p>
-          <p
-            v-if="section.itemsIntro"
-            class="text-base leading-relaxed text-slate-600"
-          >
-            {{ section.itemsIntro }}
-          </p>
-          <ol
-            v-if="section.items"
-            class="flex list-decimal flex-col gap-2 pl-6 text-base leading-relaxed text-slate-600"
-          >
-            <li v-for="(item, ii) in section.items" :key="ii" class="pl-1">
-              {{ item }}
-            </li>
-          </ol>
+            <p
+              v-for="(para, pi) in section.paras"
+              :key="pi"
+              class="text-base leading-relaxed text-slate-600"
+            >
+              {{ para }}
+            </p>
+            <p
+              v-if="section.itemsIntro"
+              class="text-base leading-relaxed text-slate-600"
+            >
+              {{ section.itemsIntro }}
+            </p>
+            <ol
+              v-if="section.items"
+              class="flex list-decimal flex-col gap-2 pl-6 text-base leading-relaxed text-slate-600"
+            >
+              <li v-for="(item, ii) in section.items" :key="ii" class="pl-1">
+                {{ item }}
+              </li>
+            </ol>
+          </div>
         </div>
       </div>
     </main>
