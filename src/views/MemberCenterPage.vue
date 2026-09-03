@@ -1160,11 +1160,10 @@ const handleSaveAddr = () => {
                 "
               >
                 <MemberIcon
-                  v-if="c.status === 'unused'"
                   name="coupon"
                   :size="26"
+                  :class="c.status === 'unused' ? '' : 'opacity-50 grayscale'"
                 />
-                <i v-else class="pi pi-ticket text-xl text-slate-400" />
                 <span
                   class="text-center text-xl leading-tight font-bold"
                   :class="c.status === 'unused' ? '' : 'text-slate-400'"
@@ -1223,14 +1222,14 @@ const handleSaveAddr = () => {
             <div
               v-for="c in claimableCoupons"
               :key="c.id"
-              class="flex min-h-[120px] overflow-hidden rounded-[10px] bg-white"
+              class="flex min-h-[120px] overflow-hidden rounded-[10px] border border-slate-200 bg-white"
             >
               <div
-                class="flex w-[150px] shrink-0 flex-col items-center justify-center gap-2 px-3 text-white"
-                style="background: var(--primary-bg)"
+                class="flex w-[150px] shrink-0 flex-col items-center justify-center gap-2 px-3"
+                style="background: var(--primary-surface); color: var(--primary)"
               >
-                <i class="pi pi-ticket text-2xl" />
-                <span class="text-center text-2xl leading-tight font-bold">{{
+                <MemberIcon name="coupon" :size="26" />
+                <span class="text-center text-xl leading-tight font-bold">{{
                   c.amount
                 }}</span>
               </div>
