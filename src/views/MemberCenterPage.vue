@@ -6,6 +6,7 @@ import MyOrdersSection from '../components/member/MyOrdersSection.vue';
 import NavBar from '../components/NavBar.vue';
 import CategoryTabs from '../components/CategoryTabs.vue';
 import StoreMapPicker from '../components/StoreMapPicker.vue';
+import couponWhiteIcon from '../assets/coupon_white.svg';
 import { useAuthStore } from '../pinia/auth';
 import { useUiStore } from '../pinia/ui';
 import { useOrdersStore } from '../pinia/orders';
@@ -1222,13 +1223,13 @@ const handleSaveAddr = () => {
             <div
               v-for="c in claimableCoupons"
               :key="c.id"
-              class="flex min-h-[120px] overflow-hidden rounded-[10px] border border-slate-200 bg-white"
+              class="flex min-h-[120px] overflow-hidden rounded-[10px] bg-white"
             >
               <div
-                class="flex w-[150px] shrink-0 flex-col items-center justify-center gap-2 px-3"
-                style="background: var(--primary-surface); color: var(--primary)"
+                class="flex w-[150px] shrink-0 flex-col items-center justify-center gap-2 px-3 text-white"
+                style="background: var(--primary-bg)"
               >
-                <MemberIcon name="coupon" :size="26" />
+                <img :src="couponWhiteIcon" alt="" class="h-[26px] w-[26px]" />
                 <span class="text-center text-xl leading-tight font-bold">{{
                   c.amount
                 }}</span>
