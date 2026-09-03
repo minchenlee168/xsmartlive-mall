@@ -7,6 +7,7 @@ import {
   useCartStore,
   type CartGroup,
   type CartItem,
+  type BulkDiscountResult,
   type CartBundleItem,
 } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
@@ -244,26 +245,71 @@ const handleOpenImagePreview = (src: string | undefined, alt: string): void => {
   previewImageAlt.value = alt;
   isImagePreviewOpen.value = true;
 };
-/** 是否命中買多優惠：qty 達 minQty。 */
-const hasBulkDiscount = (item: CartItem): boolean =>
-  !!item.bulkDiscount && item.qty >= item.bulkDiscount.minQty;
+/** 商品列小計（原價 × 數量）。 */
+const lineTotalOf = (item: CartItem): number => item.price * item.qty;
 
-/** 商品目前實際單價（達門檻 → 折抵單價；否則 → 原價）。 */
-const effectiveUnitPrice = (item: CartItem): number =>
-  hasBulkDiscount(item) ? item.bulkDiscount!.unitPrice : item.price;
+/** 該群組（僅已勾選）的買多優惠折抵：Map<productId, BulkDiscountResult>。 */
+const bulkMapOf = (group: CartGroup): Map<number, BulkDiscountResult> =>
+  cart.bulkDiscountForItems(
+    group.items.filter((i) => i.checked),
+    group.checkoutMode,
+  );
 
-/** 商品折抵金額（達門檻才有）。 */
-const bulkDiscountAmount = (item: CartItem): number =>
-  hasBulkDiscount(item)
-    ? (item.price - item.bulkDiscount!.unitPrice) * item.qty
-    : 0;
+/** 該群組買多優惠折抵總額（每商品折一次）。 */
+const groupBulkDiscount = (group: CartGroup): number => {
+  let sum = 0;
+  for (const r of bulkMapOf(group).values()) sum += r.discount;
+  return sum;
+};
 
-/** 該商品在購物車顯示的主要金額：單價 × 數量（達門檻時單價已折抵）。 */
-const lineDisplayTotal = (item: CartItem): number =>
-  effectiveUnitPrice(item) * item.qty;
-
-/** 尚未套用買多優惠的價格（僅買多優惠達標時顯示、劃線用）：單價 × 數量。 */
-const preBulkDiscountTotal = (item: CartItem): number => item.price * item.qty;
+/**
+ * 該列的買多優惠提示（只在該商品「第一個已勾選列」顯示一次；跨規格合計）：
+ * - reached：已達標，帶該階 minQty / 折扣額與實際已折抵。
+ * - 未達標：帶「下一階（門檻最低階）」的 minQty / 折扣額與還差幾件。
+ * 沒有規則 / 未勾選 / default 車 → null。
+ */
+interface BulkHint {
+  reached: boolean;
+  minQty: number;
+  tierDiscount: number;
+  discount: number;
+  remaining: number;
+}
+const bulkHintForItem = (
+  group: CartGroup,
+  item: CartItem,
+): BulkHint | null => {
+  if (!item.checked || item.productId == null) return null;
+  if (group.checkoutMode === 'default') return null;
+  const rule = cart.findBulkRuleFor(item.productId);
+  if (!rule || rule.tiers.length === 0) return null;
+  const firstChecked = group.items.find(
+    (i) => i.checked && i.productId === item.productId,
+  );
+  if (firstChecked?.id !== item.id) return null;
+  const totalQty = group.items
+    .filter((i) => i.checked && i.productId === item.productId)
+    .reduce((s, i) => s + i.qty, 0);
+  const res = bulkMapOf(group).get(item.productId);
+  if (res) {
+    const tier = rule.tiers.find((t) => t.minQty === res.minQty);
+    return {
+      reached: true,
+      minQty: res.minQty,
+      tierDiscount: tier?.discountAmount ?? res.discount,
+      discount: res.discount,
+      remaining: 0,
+    };
+  }
+  const next = [...rule.tiers].sort((a, b) => a.minQty - b.minQty)[0];
+  return {
+    reached: false,
+    minQty: next.minQty,
+    tierDiscount: next.discountAmount,
+    discount: 0,
+    remaining: Math.max(0, next.minQty - totalQty),
+  };
+};
 
 const isGroupAllChecked = (group: CartGroup) =>
   group.items.length > 0 && group.items.every((i) => i.checked);
@@ -297,9 +343,8 @@ const toggleGlobalAll = () => {
 };
 
 const groupSubtotal = (group: CartGroup) =>
-  group.items
-    .filter((i) => i.checked)
-    .reduce((s, i) => s + effectiveUnitPrice(i) * i.qty, 0);
+  group.items.filter((i) => i.checked).reduce((s, i) => s + lineTotalOf(i), 0) -
+  groupBulkDiscount(group);
 
 const globalTotal = computed(() =>
   groups.value.reduce((s, g) => s + groupSubtotal(g), 0),
@@ -1163,24 +1208,24 @@ const handleGoProduct = (productId?: number) => {
                 >
                   {{ item.name }}
                 </p>
-                <div class="flex shrink-0 flex-col items-end gap-0.5">
+                <div class="flex shrink-0 items-center gap-1.5">
                   <Tag
-                    v-if="hasBulkDiscount(item)"
-                    value="已達買多優惠"
-                    severity="success"
+                    v-if="bulkHintForItem(group, item)"
+                    :value="
+                      bulkHintForItem(group, item)!.reached
+                        ? '已達買多優惠'
+                        : '買多優惠'
+                    "
+                    :severity="
+                      bulkHintForItem(group, item)!.reached ? 'success' : 'warn'
+                    "
                     class="!py-0.5 !text-[10px]"
                   />
                   <span
                     class="text-base font-bold whitespace-nowrap @7xl:text-lg"
                     style="color: var(--primary)"
                   >
-                    {{ money(lineDisplayTotal(item)) }}
-                  </span>
-                  <span
-                    v-if="hasBulkDiscount(item)"
-                    class="text-xs whitespace-nowrap text-slate-500 line-through"
-                  >
-                    {{ money(preBulkDiscountTotal(item)) }}
+                    {{ money(lineTotalOf(item)) }}
                   </span>
                 </div>
               </div>
@@ -1255,22 +1300,6 @@ const handleGoProduct = (productId?: number) => {
                 待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
               </span>
 
-              <!-- 買多優惠提示 -->
-              <div
-                v-if="item.bulkDiscount"
-                class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
-                :class="
-                  hasBulkDiscount(item)
-                    ? 'bg-green-50 text-green-700'
-                    : 'bg-amber-50 text-amber-700'
-                "
-              >
-                <i class="pi pi-tag text-[10px]" />
-                <span>{{ item.bulkDiscount.note }}</span>
-                <span v-if="hasBulkDiscount(item)" class="font-medium">
-                  · 已折抵 -{{ money(bulkDiscountAmount(item)) }}
-                </span>
-              </div>
             </div>
 
             <!-- 非批次下標：全寬兩排（名稱↔金額 / 數量↔刪除），左右邊界一致 -->
@@ -1293,24 +1322,24 @@ const handleGoProduct = (productId?: number) => {
                   />
                   {{ item.name }}
                 </p>
-                <div class="flex shrink-0 flex-col items-end gap-0.5">
+                <div class="flex shrink-0 items-center gap-1.5">
                   <Tag
-                    v-if="hasBulkDiscount(item)"
-                    value="已達買多優惠"
-                    severity="success"
+                    v-if="bulkHintForItem(group, item)"
+                    :value="
+                      bulkHintForItem(group, item)!.reached
+                        ? '已達買多優惠'
+                        : '買多優惠'
+                    "
+                    :severity="
+                      bulkHintForItem(group, item)!.reached ? 'success' : 'warn'
+                    "
                     class="!py-0.5 !text-[10px]"
                   />
                   <span
                     class="text-base font-bold whitespace-nowrap @7xl:text-lg"
                     style="color: var(--primary)"
                   >
-                    {{ money(lineDisplayTotal(item)) }}
-                  </span>
-                  <span
-                    v-if="hasBulkDiscount(item)"
-                    class="text-xs whitespace-nowrap text-slate-500 line-through"
-                  >
-                    {{ money(preBulkDiscountTotal(item)) }}
+                    {{ money(lineTotalOf(item)) }}
                   </span>
                 </div>
               </div>
@@ -1356,20 +1385,30 @@ const handleGoProduct = (productId?: number) => {
                 />
               </div>
 
-              <!-- 買多優惠提示（緊接在第 2 排下方） -->
+              <!-- 買多優惠提示：達標綠底 + 已折抵；未達琥珀底 + 再買幾件（跨規格合計，只在第一列顯示） -->
               <div
-                v-if="item.bulkDiscount"
+                v-if="bulkHintForItem(group, item)"
                 class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
                 :class="
-                  hasBulkDiscount(item)
+                  bulkHintForItem(group, item)!.reached
                     ? 'bg-green-50 text-green-700'
                     : 'bg-amber-50 text-amber-700'
                 "
               >
                 <i class="pi pi-tag text-[10px]" />
-                <span>{{ item.bulkDiscount.note }}</span>
-                <span v-if="hasBulkDiscount(item)" class="font-medium">
-                  · 已折抵 -{{ money(bulkDiscountAmount(item)) }}
+                <template v-if="bulkHintForItem(group, item)!.reached">
+                  <span>
+                    買 {{ bulkHintForItem(group, item)!.minQty }} 件以上折扣
+                    {{ money(bulkHintForItem(group, item)!.tierDiscount) }}
+                  </span>
+                  <span class="font-medium">
+                    · 已折抵 -{{ money(bulkHintForItem(group, item)!.discount) }}
+                  </span>
+                </template>
+                <span v-else>
+                  買 {{ bulkHintForItem(group, item)!.minQty }} 件以上折扣
+                  {{ money(bulkHintForItem(group, item)!.tierDiscount) }}，再買
+                  {{ bulkHintForItem(group, item)!.remaining }} 件即享
                 </span>
               </div>
             </div>

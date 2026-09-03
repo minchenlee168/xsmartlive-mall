@@ -135,29 +135,50 @@ const handleChangeRuleType = (
   });
 };
 
-/** 新增多件優惠：預設抓第一個未設定的商品，門檻 2 件、單價抓 9 折。 */
+/** 新增多件優惠：預設抓第一個未設定的商品，一階「滿 2 件折原價 10%」。 */
 const handleAddDiscount = () => {
   const usedIds = new Set(cartStore.bulkDiscountRules.map((r) => r.productId));
   const firstUnused = products.find((p) => !usedIds.has(p.id)) ?? products[0];
   if (!firstUnused) return;
-  const suggested = Math.max(1, Math.round(firstUnused.price * 0.9));
+  const suggested = Math.max(1, Math.round(firstUnused.price * 0.1));
   cartStore.addBulkDiscountRule({
     productId: firstUnused.id,
-    discount: {
-      minQty: 2,
-      unitPrice: suggested,
-      note: `買 2 件以上每件 $${suggested.toLocaleString()}`,
-    },
+    tiers: [{ minQty: 2, discountAmount: suggested }],
   });
 };
 
-/** 更新某條規則的單一 discount 欄位；備註在 unitPrice / minQty 改動時同步刷新（僅在還沒被手動編輯過時）。 */
-const updateDiscountField = (
+/** 更新某條規則的某一階梯（門檻 / 折抵金額）。 */
+const updateTier = (
   rule: BulkDiscountRule,
-  patch: Partial<BulkDiscountRule['discount']>,
+  tierIndex: number,
+  patch: Partial<BulkDiscountRule['tiers'][number]>,
 ) => {
-  const nextDiscount = { ...rule.discount, ...patch };
-  cartStore.updateBulkDiscountRule(rule.id, { discount: nextDiscount });
+  const tiers = rule.tiers.map((t, i) =>
+    i === tierIndex ? { ...t, ...patch } : t,
+  );
+  cartStore.updateBulkDiscountRule(rule.id, { tiers });
+};
+
+/** 新增一階：門檻取現有最高階 +1，折抵沿用最後一階。 */
+const addTier = (rule: BulkDiscountRule) => {
+  const last = rule.tiers[rule.tiers.length - 1];
+  cartStore.updateBulkDiscountRule(rule.id, {
+    tiers: [
+      ...rule.tiers,
+      {
+        minQty: (last?.minQty ?? 1) + 1,
+        discountAmount: last?.discountAmount ?? 1,
+      },
+    ],
+  });
+};
+
+/** 刪除某一階（至少保留一階）。 */
+const removeTier = (rule: BulkDiscountRule, tierIndex: number) => {
+  if (rule.tiers.length <= 1) return;
+  cartStore.updateBulkDiscountRule(rule.id, {
+    tiers: rule.tiers.filter((_, i) => i !== tierIndex),
+  });
 };
 
 const densities: { id: DensityMode; label: string; icon: string }[] = [
@@ -787,8 +808,8 @@ const buildTimeDisplay = (() => {
         <TabPanel value="discounts">
           <div class="flex flex-col gap-3">
             <p class="text-xs text-slate-500">
-              「買到 N 件、每件變 M
-              元」的規則綁在商品上；修改後會即時同步到所有購物車內同商品的顯示與計價。
+              「滿 N 件、整筆折抵 M
+              元（不隨件數增加）」的規則綁在商品上；修改後會即時同步到所有購物車內同商品的顯示與計價。
             </p>
 
             <div
@@ -796,27 +817,35 @@ const buildTimeDisplay = (() => {
               :key="rule.id"
               class="rounded-xl border border-slate-200 p-3"
             >
-              <div class="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr_1fr]">
-                <div>
-                  <p class="mb-1 text-xs text-slate-500">商品</p>
-                  <Select
-                    :model-value="rule.productId"
-                    :options="productOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="w-full"
-                    filter
-                    @update:model-value="
-                      cartStore.updateBulkDiscountRule(rule.id, {
-                        productId: Number($event),
-                      })
-                    "
-                  />
-                </div>
-                <div>
-                  <p class="mb-1 text-xs text-slate-500">門檻數量</p>
+              <div>
+                <p class="mb-1 text-xs text-slate-500">商品</p>
+                <Select
+                  :model-value="rule.productId"
+                  :options="productOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="w-full"
+                  filter
+                  @update:model-value="
+                    cartStore.updateBulkDiscountRule(rule.id, {
+                      productId: Number($event),
+                    })
+                  "
+                />
+              </div>
+
+              <!-- 階梯：滿 N 件折 M 元（跨規格合計，取最高達標階） -->
+              <p class="mt-3 mb-1 text-xs text-slate-500">
+                優惠階梯（滿 N 件折 M 元）
+              </p>
+              <div class="flex flex-col gap-2">
+                <div
+                  v-for="(tier, ti) in rule.tiers"
+                  :key="ti"
+                  class="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
+                >
                   <InputNumber
-                    :model-value="rule.discount.minQty"
+                    :model-value="tier.minQty"
                     :min="2"
                     show-buttons
                     button-layout="horizontal"
@@ -824,40 +853,43 @@ const buildTimeDisplay = (() => {
                     decrement-button-icon="pi pi-minus"
                     class="w-full"
                     @update:model-value="
-                      updateDiscountField(rule, { minQty: Number($event ?? 2) })
+                      updateTier(rule, ti, { minQty: Number($event ?? 2) })
                     "
                   />
-                </div>
-                <div>
-                  <p class="mb-1 text-xs text-slate-500">每件單價</p>
                   <InputNumber
-                    :model-value="rule.discount.unitPrice"
+                    :model-value="tier.discountAmount"
                     :min="1"
                     mode="currency"
                     currency="TWD"
                     locale="zh-TW"
                     class="w-full"
                     @update:model-value="
-                      updateDiscountField(rule, {
-                        unitPrice: Number($event ?? 1),
+                      updateTier(rule, ti, {
+                        discountAmount: Number($event ?? 1),
                       })
                     "
                   />
+                  <Button
+                    icon="pi pi-trash"
+                    severity="secondary"
+                    text
+                    rounded
+                    class="!min-h-9 !min-w-9"
+                    :disabled="rule.tiers.length <= 1"
+                    aria-label="刪除此階梯"
+                    @click="removeTier(rule, ti)"
+                  />
                 </div>
               </div>
-
-              <div class="mt-3">
-                <p class="mb-1 text-xs text-slate-500">
-                  說明（顯示於購物車 / 結帳頁）
-                </p>
-                <InputText
-                  :model-value="rule.discount.note"
-                  class="w-full"
-                  @update:model-value="
-                    updateDiscountField(rule, { note: String($event ?? '') })
-                  "
-                />
-              </div>
+              <Button
+                label="新增階梯"
+                icon="pi pi-plus"
+                severity="secondary"
+                text
+                size="small"
+                class="mt-1"
+                @click="addTier(rule)"
+              />
 
               <div class="mt-2 flex justify-end">
                 <Button

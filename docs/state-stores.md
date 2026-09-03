@@ -12,10 +12,11 @@ CartTag   { label, type: 'info' | 'danger' | 'secondary' }
 CartItem  {
   id, productId?, name, image?, spec, qty, price, original?, checked,
   isBundle?, bundleExpanded?, bundleItems?: CartBundleItem[],
-  bulkDiscount?: BulkDiscount,   // 買多優惠
+  // 買多優惠不再掛在 item 上；改由規則 + 群組即時計算（見下）
 }
-CartBundleItem { name, image?, spec, qty }
-BulkDiscount   { minQty, unitPrice, note }
+CartBundleItem   { name, image?, spec, qty }
+BulkDiscountRule { id, productId, tiers: BulkDiscountTier[] }
+BulkDiscountTier { minQty, discountAmount }
 ```
 
 **每台購物車 = 一組 `CartGroup`**。`tags` 除了配送方式（`常溫` / `冷凍`）也可能有 `禁止棄標`（`danger`）— 有這個 tag 的 group 不能刪商品。
@@ -24,19 +25,22 @@ BulkDiscount   { minQty, unitPrice, note }
 
 目前使用「常溫」與「冷凍」（沒有「一般配送」/「低溫配送」——是舊命名，已改）。之後如果新增配送類型，在 group `tags` 加 label 就好，UI 是純顯示。
 
-### bulkDiscount — 買多優惠
+### 買多優惠（bulkDiscountRules）
 
-`qty >= minQty` 時每件單價變 `unitPrice`；`note` 用於購物車 / 結帳 UI 提示。**目前只有商品 100（新春海陸雙享套組）有這條**，做為原型示範。想擴充 → 在 `pinia/cart.ts` 對應 `CartItem` 塞 `bulkDiscount`。
+規則綁在**商品**上，可設**多個階梯**（`滿 N 件折 M 元`）。判定與計算原則：
 
-計算公式（見 `CartPage.vue` / `CheckoutPage.vue`）：
+- **跨規格合計**：同一 `productId` 的所有列（不同規格）數量先合計，再判門檻。
+- **取最高達標階**：合計數量達哪一階，就折那一階的 `discountAmount`（多階取 minQty 最大的已達標階）。
+- **每商品折一次**：固定折抵，不隨件數倍增；折抵夾到不超過該商品在群組內的小計（避免負數）。
+- **default（禁止棄標）車不套用**。
 
-```ts
-hasBulkDiscount(i)     = !!i.bulkDiscount && i.qty >= i.bulkDiscount.minQty
-effectiveUnitPrice(i)  = hasBulkDiscount(i) ? i.bulkDiscount.unitPrice : i.price
-bulkDiscountAmount(i)  = hasBulkDiscount(i) ? (i.price - i.bulkDiscount.unitPrice) * i.qty : 0
-```
+核心：`cart.bulkDiscountForItems(items, checkoutMode)` → `Map<productId, BulkDiscountResult>`（`BulkDiscountResult { productId, totalQty, minQty, discount }`）。
+`CartPage` / `CheckoutPage` 各自以「群組內（已勾選）品項」呼叫，得到每商品折抵。
 
-結帳頁**優惠券以「買多優惠後金額」為基底**再折抵，順序不能倒（見 `discountOf(c)`）。
+顯示：`CartPage` 折抵摘要只掛在該商品**第一列**（「本商品共 N 件 · 已達買多優惠 · 已折抵 -$M」），群組折抵直接用 Map 合計。`CheckoutPage` 因逐列要顯示 after-bulk 並作為指定商品券的基底，`bulkDiscountAmount(g, item)` 把整筆折抵**按各規格列小計比例攤分**到各列（確保逐列非負、券不重複折）；群組折抵仍以 `groupBulkDiscount`（Map 合計）為準。
+
+訂單：`item.price` 傳**原價**，折抵走 `amounts.bulkDiscount`。
+結帳頁**優惠券以「買多優惠後金額」為基底**再折抵，順序不能倒（見 `discountOf(c)`）。**目前 seed 只有商品 100（滿 2 件折 $200）**。
 
 ### bundleItems — 組合商品
 
@@ -85,7 +89,7 @@ PackageInfo { no, qty, currentStep: TimelineStepKey, stepTimes? }
 - **`orders.value.unshift(...)`** 把最新訂單放最前面；且把舊訂單的 `expanded` 都設為 `false`
 - 同步 `unshift` 一筆 `Transaction`（會員中心「交易記錄」用）
 
-**改進訂單資料流時**：`price` 要傳「實際成交單價」——目前是 `effectiveUnitPrice(i)`（買多優惠後）。不是 `i.price`。
+**改進訂單資料流時**：order item 的 `price` 傳**原價** `i.price`；買多優惠改為整筆固定折抵，折抵金額走訂單的 `amounts.bulkDiscount`（不再壓進單價）。
 
 ## ui（`pinia/ui.ts`）
 

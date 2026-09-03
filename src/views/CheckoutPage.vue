@@ -18,6 +18,7 @@ import {
   type CartTag,
   type ShippingMethodId,
   type PaymentMethodId,
+  type CheckoutMode,
 } from '../pinia/cart';
 import { useOrdersStore } from '../pinia/orders';
 import { products } from '../data/products';
@@ -37,6 +38,7 @@ interface CheckoutGroup {
   items: CartItem[];
   shippingMethods: ShippingMethodId[];
   paymentMethods: PaymentMethodId[];
+  checkoutMode: CheckoutMode;
 }
 interface Coupon {
   id: string;
@@ -291,6 +293,7 @@ const checkoutGroups = computed<CheckoutGroup[]>(() =>
         .filter((i) => i.qty > 0),
       shippingMethods: g.shippingMethods,
       paymentMethods: g.paymentMethods,
+      checkoutMode: g.checkoutMode,
     }))
     .filter((g) => g.items.length > 0),
 );
@@ -328,28 +331,44 @@ const allItems = computed<CartItem[]>(() =>
   checkoutGroups.value.flatMap((g) => g.items),
 );
 
-/** 買多優惠判定與計算。 */
-const hasBulkDiscount = (item: CartItem): boolean =>
-  !!item.bulkDiscount && item.qty >= item.bulkDiscount.minQty;
-const effectiveUnitPrice = (item: CartItem): number =>
-  hasBulkDiscount(item) ? item.bulkDiscount!.unitPrice : item.price;
-const bulkDiscountAmount = (item: CartItem): number =>
-  hasBulkDiscount(item)
-    ? (item.price - item.bulkDiscount!.unitPrice) * item.qty
-    : 0;
+/** 買多優惠判定與計算（跨規格合計、取最高達標階、每商品折一次）。 */
+const bulkMapOf = (g: CheckoutGroup) =>
+  cartStore.bulkDiscountForItems(g.items, g.checkoutMode);
+/**
+ * 該列分攤到的買多優惠折抵：整筆折抵「按各規格列小計比例」攤到同商品各列。
+ * 確保每列 after-bulk 非負、指定商品券的基底正確（不會重複折同一筆）。
+ * 群組層折抵仍以 groupBulkDiscount（Map 合計）為準，逐列僅為顯示 / 券基底。
+ */
+const bulkDiscountAmount = (g: CheckoutGroup, item: CartItem): number => {
+  if (item.productId == null) return 0;
+  const res = bulkMapOf(g).get(item.productId);
+  if (!res) return 0;
+  const productTotal = g.items
+    .filter((i) => i.productId === item.productId)
+    .reduce((s, i) => s + i.price * i.qty, 0);
+  if (productTotal <= 0) return 0;
+  const lineTotalValue = item.price * item.qty;
+  const share = Math.round((res.discount * lineTotalValue) / productTotal);
+  return Math.min(lineTotalValue, share);
+};
+const hasBulkDiscount = (g: CheckoutGroup, item: CartItem): boolean =>
+  bulkDiscountAmount(g, item) > 0;
 
 /** 原始總計（單價 × 數量），不含任何優惠。 */
 const lineTotal = (item: CartItem) => item.price * item.qty;
-/** 買多優惠後總計（不含優惠券）。 */
-const lineTotalAfterBulk = (item: CartItem) =>
-  effectiveUnitPrice(item) * item.qty;
+/** 買多優惠後總計（不含優惠券）：原價小計 − 該列分攤的買多優惠折抵。 */
+const lineTotalAfterBulk = (g: CheckoutGroup, item: CartItem) =>
+  lineTotal(item) - bulkDiscountAmount(g, item);
 
 /** 該組商品金額（未套用任何優惠）。 */
 const groupGoodsTotal = (g: CheckoutGroup): number =>
   g.items.reduce((s, i) => s + lineTotal(i), 0);
-/** 該組買多優惠折抵總額。 */
-const groupBulkDiscount = (g: CheckoutGroup): number =>
-  g.items.reduce((s, i) => s + bulkDiscountAmount(i), 0);
+/** 該組買多優惠折抵總額（每商品折一次）。 */
+const groupBulkDiscount = (g: CheckoutGroup): number => {
+  let sum = 0;
+  for (const r of bulkMapOf(g).values()) sum += r.discount;
+  return sum;
+};
 /** 該組商品金額（扣買多優惠後）— 免運門檻、優惠券門檻皆以此為基底。 */
 const groupAfterBulk = (g: CheckoutGroup): number =>
   groupGoodsTotal(g) - groupBulkDiscount(g);
@@ -857,7 +876,7 @@ const discountOfFor = (g: CheckoutGroup, c: Coupon): number => {
   if (c.applicableItemIds) {
     const target = g.items.find((i) => c.applicableItemIds!.includes(i.id));
     if (!target) return 0;
-    const line = lineTotalAfterBulk(target);
+    const line = lineTotalAfterBulk(g, target);
     const fixed = c.amount.match(/折(\d+)/);
     if (fixed) return Math.min(line, Number(fixed[1]));
     const pct = c.amount.match(/(\d+)%/);
@@ -888,7 +907,7 @@ const discountedLineTotal = (
   const c = appliedCouponOf(g);
   if (!c || !c.applicableItemIds || !c.applicableItemIds.includes(item.id))
     return null;
-  return Math.max(0, lineTotalAfterBulk(item) - discountOfFor(g, c));
+  return Math.max(0, lineTotalAfterBulk(g, item) - discountOfFor(g, c));
 };
 
 // --- Coupon drawer（依訂單開啟） ---
@@ -1193,7 +1212,8 @@ const handlePlaceOrder = () => {
         name: i.name,
         image: i.image,
         spec: i.spec || '預設',
-        price: effectiveUnitPrice(i),
+        // 買多優惠改為整筆固定折抵，單價維持原價；折抵已計入 amounts.bulkDiscount
+        price: i.price,
         qty: i.qty,
         isBundle: i.isBundle,
         // 固定組合子品數量需 × 組數；任選組合維持原值。訂單端無 productId
@@ -1215,9 +1235,9 @@ const handlePlaceOrder = () => {
         couponDiscount: groupCouponDiscount(g),
         // 夾擠：total 有 Math.max(0,…)，紅利折抵不可超過扣紅利前金額，
         // 否則邊界情境（改券使 subtotal 下降）明細相加會 ≠ 實付。
-        rewardPointsUsed: Math.min(
-          rewardPointsOfGroup(g),
-          groupSubtotalBeforeRewards(g),
+        rewardPointsUsed: Math.max(
+          0,
+          Math.min(rewardPointsOfGroup(g), groupSubtotalBeforeRewards(g)),
         ),
         shippingFee: groupShippingFee(g) ?? 0,
         shippingDiscount: groupShippingDiscount(g),
@@ -1407,15 +1427,18 @@ const handlePlaceOrder = () => {
                     .join('、')
                 }}
               </p>
-              <!-- 買多優惠明細（組合商品下方、數量上方） -->
+              <!-- 買多優惠明細（跨規格合計判門檻、折抵按各列小計比例攤分） -->
               <div
-                v-if="hasBulkDiscount(item)"
+                v-if="hasBulkDiscount(group, item)"
                 class="mt-0.5 flex items-center gap-1.5 text-xs text-green-700"
               >
                 <i class="pi pi-tag text-[10px]" />
-                <span>{{ item.bulkDiscount!.note }}</span>
+                <span>
+                  買多優惠（滿
+                  {{ bulkMapOf(group).get(item.productId!)?.minQty }} 件）
+                </span>
                 <span class="font-medium">
-                  · 已折抵 -{{ money(bulkDiscountAmount(item)) }}
+                  · 已折抵 -{{ money(bulkDiscountAmount(group, item)) }}
                 </span>
               </div>
               <!-- 數量列固定放最後 -->
@@ -1434,21 +1457,21 @@ const handlePlaceOrder = () => {
                   {{ money(lineTotal(item)) }}
                 </span>
                 <span
-                  v-if="hasBulkDiscount(item)"
+                  v-if="hasBulkDiscount(group, item)"
                   class="text-xs text-slate-500"
                 >
-                  買多優惠後 {{ money(lineTotalAfterBulk(item)) }}
+                  買多優惠後 {{ money(lineTotalAfterBulk(group, item)) }}
                 </span>
                 <span class="text-base font-bold" style="color: var(--primary)">
                   {{ money(discountedLineTotal(group, item)!) }}
                 </span>
               </template>
-              <template v-else-if="hasBulkDiscount(item)">
+              <template v-else-if="hasBulkDiscount(group, item)">
                 <span class="text-sm text-slate-400 line-through">
                   {{ money(lineTotal(item)) }}
                 </span>
                 <span class="text-base font-bold" style="color: var(--primary)">
-                  {{ money(lineTotalAfterBulk(item)) }}
+                  {{ money(lineTotalAfterBulk(group, item)) }}
                 </span>
               </template>
               <template v-else>

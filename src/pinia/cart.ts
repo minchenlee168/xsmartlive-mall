@@ -8,7 +8,7 @@ import type {
   RoutingRule,
   RoutingCondition,
   CheckoutMode,
-  BulkDiscount,
+  BulkDiscountResult,
   BulkDiscountRule,
 } from '../types/cart';
 
@@ -18,7 +18,8 @@ export type {
   CartItem,
   CartBundleItem,
   CartTag,
-  BulkDiscount,
+  BulkDiscountTier,
+  BulkDiscountResult,
   ShippingMethodId,
   PaymentMethodId,
   RoutingRule,
@@ -125,10 +126,11 @@ export const useCartStore = defineStore('cart', () => {
           name: '新春海陸雙享套組',
           image: products.find((p) => p.id === 100)?.image,
           spec: '雙人份',
-          qty: 1,
+          // 預設數量 2 + 勾選：一進購物車即達買多優惠門檻（滿 2 件折 $200），直接看到 tag
+          qty: 2,
           price: 1280,
           original: 1580,
-          checked: false,
+          checked: true,
           isBundle: true,
           bundleExpanded: true,
           note: '直播現場限定價，售完不補；下訂後 3–5 個工作天出貨。',
@@ -307,16 +309,12 @@ export const useCartStore = defineStore('cart', () => {
   /** 分派規則：加入商品時，第一條命中的規則決定進哪台購物車；沒命中走 fallback。 */
   const routingRules = ref<RoutingRule[]>([]);
 
-  /** 多件優惠規則：綁定商品 id，套用到現有 + 未來加入的購物車項目。 */
+  /** 多件優惠規則：綁定商品 id，可設多個階梯（滿 N 件折 M 元），取最高達標階折抵一次。 */
   const bulkDiscountRules = ref<BulkDiscountRule[]>([
     {
       id: 'bd_seed_100',
       productId: 100,
-      discount: {
-        minQty: 2,
-        unitPrice: 1080,
-        note: '買 2 件以上每件 $1,080（省 $200/件）',
-      },
+      tiers: [{ minQty: 2, discountAmount: 200 }],
     },
   ]);
 
@@ -328,29 +326,51 @@ export const useCartStore = defineStore('cart', () => {
     return `${mm}/${dd}`;
   };
 
-  /** 查詢單一商品的買多優惠設定；沒設定 → undefined。 */
-  const findBulkDiscountFor = (
+  /** 查詢單一商品的買多優惠規則；沒設定 → undefined。 */
+  const findBulkRuleFor = (
     productId: number | undefined,
-  ): BulkDiscount | undefined => {
-    if (productId == null) return undefined;
-    return bulkDiscountRules.value.find((r) => r.productId === productId)
-      ?.discount;
-  };
+  ): BulkDiscountRule | undefined =>
+    productId == null
+      ? undefined
+      : bulkDiscountRules.value.find((r) => r.productId === productId);
 
-  /** 將優惠規則同步套到所有現有購物車項目（規則新增 / 修改 / 刪除時呼叫）。 */
-  const syncBulkDiscountsToItems = () => {
-    groups.value.forEach((g) => {
-      g.items.forEach((i) => {
-        // 禁止棄標（default）的購物車一律不套用買多優惠（整台固定、不可調量，買多優惠無意義）
-        i.bulkDiscount =
-          g.checkoutMode === 'default'
-            ? undefined
-            : findBulkDiscountFor(i.productId);
+  /**
+   * 依商品清單算每個 productId 的買多優惠折抵：
+   * 同商品跨規格「合計數量」判門檻、取最高達標階、每商品折一次，折抵夾到不超過該商品小計。
+   * 禁止棄標（default）購物車不套用（整台固定、買多優惠無意義）。
+   * 回傳 Map<productId, BulkDiscountResult>。
+   */
+  const bulkDiscountForItems = (
+    items: Pick<CartItem, 'productId' | 'qty' | 'price'>[],
+    checkoutMode: CheckoutMode,
+  ): Map<number, BulkDiscountResult> => {
+    const result = new Map<number, BulkDiscountResult>();
+    if (checkoutMode === 'default') return result;
+    // 先把同 productId 的數量與小計跨規格合計
+    const agg = new Map<number, { qty: number; lineTotal: number }>();
+    for (const i of items) {
+      if (i.productId == null || !findBulkRuleFor(i.productId)) continue;
+      const cur = agg.get(i.productId) ?? { qty: 0, lineTotal: 0 };
+      cur.qty += i.qty;
+      cur.lineTotal += i.price * i.qty;
+      agg.set(i.productId, cur);
+    }
+    for (const [productId, { qty, lineTotal }] of agg) {
+      const tiers = findBulkRuleFor(productId)!.tiers;
+      // 取「已達標」中門檻最高的一階
+      const reached = tiers
+        .filter((t) => qty >= t.minQty)
+        .sort((a, b) => b.minQty - a.minQty)[0];
+      if (!reached) continue;
+      result.set(productId, {
+        productId,
+        totalQty: qty,
+        minQty: reached.minQty,
+        discount: Math.min(reached.discountAmount, lineTotal),
       });
-    });
+    }
+    return result;
   };
-  // 首次執行一次，把 seed 規則貼到 seed 商品上
-  syncBulkDiscountsToItems();
 
   const totalCount = computed(() =>
     groups.value.reduce((sum, g) => sum + g.items.length, 0),
@@ -447,11 +467,6 @@ export const useCartStore = defineStore('cart', () => {
       isBundle: cat?.isBundle,
       bundleExpanded: cat?.isBundle ? true : undefined,
       bundleItems: resolvedBundleItems,
-      // 禁止棄標（default）的購物車一律不套用買多優惠
-      bulkDiscount:
-        target.checkoutMode === 'default'
-          ? undefined
-          : findBulkDiscountFor(p.id),
       specPending: options?.specPending,
       isBidBatch: options?.specPending || undefined,
       specAllocation: options?.specPending ? {} : undefined,
@@ -540,7 +555,6 @@ export const useCartStore = defineStore('cart', () => {
       id: `bd_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
       ...rule,
     });
-    syncBulkDiscountsToItems();
   }
   function updateBulkDiscountRule(
     id: string,
@@ -549,13 +563,11 @@ export const useCartStore = defineStore('cart', () => {
     const r = bulkDiscountRules.value.find((x) => x.id === id);
     if (!r) return;
     Object.assign(r, patch);
-    syncBulkDiscountsToItems();
   }
   function removeBulkDiscountRule(id: string) {
     bulkDiscountRules.value = bulkDiscountRules.value.filter(
       (r) => r.id !== id,
     );
-    syncBulkDiscountsToItems();
   }
 
   return {
@@ -563,6 +575,8 @@ export const useCartStore = defineStore('cart', () => {
     totalCount,
     routingRules,
     bulkDiscountRules,
+    findBulkRuleFor,
+    bulkDiscountForItems,
     addItem,
     removeItem,
     addCart,

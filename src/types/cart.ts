@@ -5,11 +5,21 @@ export interface CartBundleItem {
   qty: number;
 }
 
-/** 買多優惠：達 minQty 件後，每件單價變為 unitPrice */
-export interface BulkDiscount {
+/** 買多優惠單一階梯：滿 minQty 件 → 整筆折抵 discountAmount 元。 */
+export interface BulkDiscountTier {
   minQty: number;
-  unitPrice: number;
-  note: string;
+  discountAmount: number;
+}
+
+/**
+ * 某商品套用買多優惠的結果（跨規格合計、取最高達標階、每商品折一次）。
+ * discount 已夾到不超過該商品在群組內的小計。
+ */
+export interface BulkDiscountResult {
+  productId: number;
+  totalQty: number;
+  minQty: number;
+  discount: number;
 }
 
 export interface CartItem {
@@ -25,7 +35,6 @@ export interface CartItem {
   isBundle?: boolean;
   bundleExpanded?: boolean;
   bundleItems?: CartBundleItem[];
-  bulkDiscount?: BulkDiscount;
   /** 商品備註（顯示於商品列下方，例如冷藏須知、賣家提醒） */
   note?: string;
   /** 由加購區加入：購物車列顯示「加購」標記。 */
@@ -101,9 +110,12 @@ export interface RoutingRule {
   targetCartId: number;
 }
 
-/** 多件優惠規則：綁在商品 id 上，套用到所有同商品的購物車項目。 */
+/**
+ * 多件優惠規則：綁在商品 id 上，可設多個階梯（取「已達標的最高階」折抵一次）。
+ * 數量以「同商品跨規格合計」判定門檻。
+ */
 export interface BulkDiscountRule {
   id: string;
   productId: number;
-  discount: BulkDiscount;
+  tiers: BulkDiscountTier[];
 }
