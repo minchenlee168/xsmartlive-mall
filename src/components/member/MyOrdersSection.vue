@@ -55,7 +55,10 @@ const OVERRIDE_TABS: Array<{ key: StatusTab; label: string }> = [
   { key: 'exchanged', label: '已換貨' },
   { key: 'cancelled', label: '已取消' },
 ];
-const activeTab = ref<StatusTab>('all');
+// 狀態篩選改為兩個下拉：付款狀態（全部/待付款/已付款）+ 配送狀態，兩者獨立 AND
+type PayFilter = 'all' | 'unpaid' | 'paid';
+const payFilter = ref<PayFilter>('all');
+const shipFilter = ref<StatusTab>('all');
 /**
  * 進度狀態 tab 全部用包裹 currentStep 過濾，不再依賴 order.status
  * （避免 mock 資料 status 與包裹階段不一致時跑錯 tab）。
@@ -204,36 +207,64 @@ const OVERRIDE_KEYS: OverrideStatus[] = [
   'cancelled',
 ];
 
-/** 給定 tab key，回傳對應訂單列表（不含 status tab 過濾）→ 該 tab 的訂單。 */
-const ordersForTab = (key: StatusTab) => {
-  const list = dateKeywordFilteredOrders.value;
-  if (key === 'all') return list;
-  // 終點貨態分頁：只看 overrideStatus；有終點貨態的訂單也不落入其他進度分頁
-  if (OVERRIDE_KEYS.includes(key as OverrideStatus)) {
-    return list.filter((o) => o.overrideStatus === key);
-  }
+/** 單筆訂單是否符合某配送狀態 key（沿用原進度 / 終點貨態判定）。 */
+const matchesStatusKey = (o: OrderRecord, key: StatusTab): boolean => {
+  if (key === 'all') return true;
+  if (OVERRIDE_KEYS.includes(key as OverrideStatus))
+    return o.overrideStatus === key;
   const timelineStep = TIMELINE_TABS[key];
   if (timelineStep) {
-    return list.filter(
-      (o) =>
-        !o.overrideStatus &&
-        o.items.some((it) =>
-          it.packages.some((p) => p.currentStep === timelineStep),
-        ),
+    return (
+      !o.overrideStatus &&
+      o.items.some((it) =>
+        it.packages.some((p) => p.currentStep === timelineStep),
+      )
     );
   }
-  return list.filter((o) => !o.overrideStatus && o.status === key);
+  return !o.overrideStatus && o.status === key;
 };
 
-const filteredOrders = computed(() => ordersForTab(activeTab.value));
+/** 付款狀態是否符合（已付款＝非待付款，含 paying / paid / refund…）。 */
+const matchesPay = (o: OrderRecord, pf: PayFilter): boolean => {
+  if (pf === 'all') return true;
+  const unpaid = payStatusOf(o) === 'unpaid';
+  return pf === 'unpaid' ? unpaid : !unpaid;
+};
 
-/** 各 tab 的訂單數量（受日期 + 關鍵字篩選影響，但不受 activeTab 影響）。 */
-const tabCount = (key: StatusTab) => ordersForTab(key).length;
+/** 依付款篩選後的清單（配送狀態選項計數的母體）。 */
+const payFilteredOrders = computed(() =>
+  dateKeywordFilteredOrders.value.filter((o) => matchesPay(o, payFilter.value)),
+);
+/** 最終清單：付款 AND 配送。 */
+const filteredOrders = computed(() =>
+  payFilteredOrders.value.filter((o) => matchesStatusKey(o, shipFilter.value)),
+);
 
-/** 顯示中的狀態分頁：固定 7 個 + 有資料才出現的終點貨態分頁。 */
-const visibleStatusTabs = computed(() => [
-  ...statusTabs,
-  ...OVERRIDE_TABS.filter((t) => tabCount(t.key) > 0),
+const payCount = (pf: PayFilter) =>
+  dateKeywordFilteredOrders.value.filter((o) => matchesPay(o, pf)).length;
+/** 配送各狀態數量（在目前付款篩選範圍內計）。 */
+const shipCount = (key: StatusTab) =>
+  payFilteredOrders.value.filter((o) => matchesStatusKey(o, key)).length;
+
+/** 付款狀態下拉選項：全部 / 待付款 / 已付款。 */
+const paymentFilterOptions = computed(() => [
+  {
+    label: `全部 (${dateKeywordFilteredOrders.value.length})`,
+    value: 'all' as PayFilter,
+  },
+  { label: `待付款 (${payCount('unpaid')})`, value: 'unpaid' as PayFilter },
+  { label: `已付款 (${payCount('paid')})`, value: 'paid' as PayFilter },
+]);
+/** 配送狀態下拉選項：全部 + 進度狀態（待出貨…已完成）+ 有資料的終點貨態。 */
+const deliveryFilterOptions = computed(() => [
+  { label: `全部 (${shipCount('all')})`, value: 'all' as StatusTab },
+  ...statusTabs
+    .filter((t) => t.key !== 'all' && t.key !== 'unpaid')
+    .map((t) => ({ label: `${t.label} (${shipCount(t.key)})`, value: t.key })),
+  ...OVERRIDE_TABS.filter((t) => shipCount(t.key) > 0).map((t) => ({
+    label: `${t.label} (${shipCount(t.key)})`,
+    value: t.key,
+  })),
 ]);
 
 const stepStatus = (
@@ -644,39 +675,29 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
   <div class="flex flex-col gap-4">
     <!-- 篩選卡：頁籤 + 日期/搜尋 + 結果摘要（購物權益與售後說明區塊已依規劃移除） -->
     <div class="shadow-card flex flex-col gap-4 rounded-xl bg-white p-4">
-      <!-- Status filter：手機版用 pill button、桌機保留 tab 樣式；label 後面顯示符合查詢條件的訂單數量 -->
-      <div v-if="isMobile" class="-mx-4 -mt-4 px-4 pt-3 pb-2">
-        <div class="flex flex-wrap gap-2">
-          <Button
-            v-for="t in visibleStatusTabs"
-            :key="t.key"
-            :label="`${t.label} (${tabCount(t.key)})`"
-            size="small"
-            rounded
-            :outlined="activeTab !== t.key"
-            :severity="activeTab === t.key ? undefined : 'secondary'"
-            @click="activeTab = t.key"
+      <!-- 狀態篩選：付款狀態 + 配送狀態（可各自選、兩者 AND）；面板全展開不卷軸 -->
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <label class="text-xs text-slate-500">付款狀態</label>
+          <Select
+            v-model="payFilter"
+            :options="paymentFilterOptions"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+            :pt="{ listContainer: { style: 'max-height: none' } }"
           />
         </div>
-      </div>
-      <div v-else class="-mx-4 -mt-4 border-b border-slate-200 px-4 pt-1">
-        <div class="flex scrollbar-none items-center gap-1 overflow-x-auto">
-          <button
-            v-for="t in visibleStatusTabs"
-            :key="t.key"
-            class="-mb-px border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors"
-            :style="
-              activeTab === t.key
-                ? 'color: var(--primary); border-color: var(--primary)'
-                : 'color: var(--text-muted); border-color: transparent'
-            "
-            @click="activeTab = t.key"
-          >
-            {{ t.label }}
-            <span class="ml-1 text-xs text-slate-400"
-              >({{ tabCount(t.key) }})</span
-            >
-          </button>
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <label class="text-xs text-slate-500">配送狀態</label>
+          <Select
+            v-model="shipFilter"
+            :options="deliveryFilterOptions"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+            :pt="{ listContainer: { style: 'max-height: none' } }"
+          />
         </div>
       </div>
 
@@ -760,13 +781,14 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <p class="font-bold" style="color: var(--danger)">
                 {{ money(order.total) }}
               </p>
-              <!-- 金額明細：眼睛圖示（與金額同列） -->
+              <!-- 金額明細：眼睛圖示（與金額同列，灰色）-->
               <Button
                 v-if="order.amounts"
                 icon="pi pi-eye"
                 text
                 rounded
                 size="small"
+                severity="secondary"
                 aria-label="金額明細"
                 @click="handleOpenAmountDialog(order)"
               />
@@ -864,13 +886,14 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                   <span class="font-bold" style="color: var(--danger)">
                     {{ money(order.total) }}
                   </span>
-                  <!-- 金額明細：眼睛圖示（與金額同列） -->
+                  <!-- 金額明細：眼睛圖示（與金額同列，灰色）-->
                   <Button
                     v-if="order.amounts"
                     icon="pi pi-eye"
                     text
                     rounded
                     size="small"
+                    severity="secondary"
                     aria-label="金額明細"
                     @click="handleOpenAmountDialog(order)"
                   />
@@ -1018,7 +1041,11 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
         <!-- 商品列 + 多包裹 timeline；收合時整段隱藏 -->
         <div v-if="order.expanded" class="flex flex-col">
           <!-- 權益膠囊：狀態 · 可退 / 可取消 / 可換 對照文案 -->
-          <div v-if="rightsBannerOf(order)" class="px-4 pt-3">
+          <div
+            v-if="rightsBannerOf(order)"
+            class="flex flex-wrap items-center gap-1.5 px-4 pt-3"
+          >
+            <span class="text-xs text-slate-400">開發備註：</span>
             <span
               class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs"
               :class="
