@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useViewportStore } from '../../pinia/viewport';
 import { useOrdersStore } from '../../pinia/orders';
 import { useUiStore } from '../../pinia/ui';
@@ -55,9 +55,7 @@ const OVERRIDE_TABS: Array<{ key: StatusTab; label: string }> = [
   { key: 'exchanged', label: '已換貨' },
   { key: 'cancelled', label: '已取消' },
 ];
-// 狀態篩選改為兩個下拉：付款狀態（全部 + 六態，精確比對）+ 配送狀態，兩者獨立 AND
-type PayFilter = 'all' | PayStatus;
-const payFilter = ref<PayFilter>('all');
+// 狀態篩選：只保留配送狀態下拉（付款狀態改為僅欄位顯示，不作篩選）
 const shipFilter = ref<StatusTab>('all');
 /**
  * 進度狀態 tab 全部用包裹 currentStep 過濾，不再依賴 order.status
@@ -85,13 +83,11 @@ const appliedDateRange = ref<Array<Date | null>>([
   dateRange.value[1],
 ]);
 const appliedKeyword = ref('');
-// 付款 / 配送狀態同樣採「按查詢才套用」：payFilter/shipFilter 為 draft，applied 才驅動篩選
-const appliedPayFilter = ref<PayFilter>('all');
+// 配送狀態同樣採「按查詢才套用」：shipFilter 為 draft，applied 才驅動篩選
 const appliedShipFilter = ref<StatusTab>('all');
 const handleApplyQuery = (): void => {
   appliedDateRange.value = [dateRange.value[0], dateRange.value[1]];
   appliedKeyword.value = keyword.value;
-  appliedPayFilter.value = payFilter.value;
   appliedShipFilter.value = shipFilter.value;
 };
 
@@ -246,55 +242,18 @@ const matchesStatusKey = (o: OrderRecord, key: StatusTab): boolean => {
   return !o.overrideStatus && o.status === key;
 };
 
-/** 付款狀態是否符合：全部或與該訂單付款狀態精確相符（待付款/已付款/待退款/已退款…各自獨立）。 */
-const matchesPay = (o: OrderRecord, pf: PayFilter): boolean =>
-  pf === 'all' || payStatusOf(o) === pf;
-
-/** 依「已套用」付款篩選後的清單（配送狀態選項計數的母體）。 */
-const payFilteredOrders = computed(() =>
-  dateKeywordFilteredOrders.value.filter((o) =>
-    matchesPay(o, appliedPayFilter.value),
-  ),
-);
-/** 最終清單：已套用的付款 AND 配送（按查詢才更新）。 */
+/** 最終清單：日期/搜尋範圍內，再依「已套用」配送狀態篩選（按查詢才更新）。 */
 const filteredOrders = computed(() =>
-  payFilteredOrders.value.filter((o) =>
+  dateKeywordFilteredOrders.value.filter((o) =>
     matchesStatusKey(o, appliedShipFilter.value),
   ),
 );
 
-const payCount = (pf: PayFilter) =>
-  dateKeywordFilteredOrders.value.filter((o) => matchesPay(o, pf)).length;
-
-/**
- * 配送狀態下拉的母體：依「草稿」付款篩選即時連動（不必按查詢）。
- * → 選付款狀態時，配送狀態選項與數量立刻反映該付款狀態下實際存在的配送狀態。
- */
-const payDraftFilteredOrders = computed(() =>
-  dateKeywordFilteredOrders.value.filter((o) => matchesPay(o, payFilter.value)),
-);
-/** 配送各狀態數量（在目前草稿付款篩選範圍內計）。 */
+/** 配送各狀態數量（在日期/搜尋範圍內計）。 */
 const shipCount = (key: StatusTab) =>
-  payDraftFilteredOrders.value.filter((o) => matchesStatusKey(o, key)).length;
+  dateKeywordFilteredOrders.value.filter((o) => matchesStatusKey(o, key)).length;
 
-/** 付款狀態下拉選項：全部 / 待付款 / 已付款 / 待退款 / 已退款（各自獨立）。 */
-const paymentFilterOptions = computed(() => [
-  {
-    label: `全部 (${dateKeywordFilteredOrders.value.length})`,
-    value: 'all' as PayFilter,
-  },
-  { label: `待付款 (${payCount('unpaid')})`, value: 'unpaid' as PayFilter },
-  { label: `已付款 (${payCount('paid')})`, value: 'paid' as PayFilter },
-  {
-    label: `待退款 (${payCount('refund_pending')})`,
-    value: 'refund_pending' as PayFilter,
-  },
-  { label: `已退款 (${payCount('refunded')})`, value: 'refunded' as PayFilter },
-]);
-/**
- * 配送狀態下拉選項：全部 + 「當前付款狀態下實際有訂單（count>0）」的配送狀態。
- * 例：選待付款 → 只剩待出貨 / 已取消；選已付款 → 不含退貨中/已退貨/已取消。
- */
+/** 配送狀態下拉選項：全部 + 實際有訂單（count>0）的配送狀態。 */
 const deliveryFilterOptions = computed(() => [
   { label: `全部 (${shipCount('all')})`, value: 'all' as StatusTab },
   ...statusTabs
@@ -305,12 +264,6 @@ const deliveryFilterOptions = computed(() => [
     value: t.key,
   })),
 ]);
-
-/** 切換付款狀態時，若目前選的配送狀態在新選項中已不存在，重設為「全部」。 */
-watch(payFilter, () => {
-  const available = deliveryFilterOptions.value.map((o) => o.value);
-  if (!available.includes(shipFilter.value)) shipFilter.value = 'all';
-});
 
 const stepStatus = (
   pkg: PackageInfo,
@@ -727,20 +680,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
   <div class="flex flex-col gap-4">
     <!-- 篩選卡：頁籤 + 日期/搜尋 + 結果摘要（購物權益與售後說明區塊已依規劃移除） -->
     <div class="shadow-card flex flex-col gap-4 rounded-xl bg-white p-4">
-      <!-- 查詢條件：PC 版一排（付款 / 配送 / 日期 / 搜尋 / 查詢）；手機堆疊。
+      <!-- 查詢條件：PC 版一排（配送 / 日期 / 搜尋 / 查詢）；手機堆疊。
            所有條件皆為 draft，按「查詢」才套用篩選（下方清單才更新）。 -->
       <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
-        <div class="flex min-w-0 flex-col gap-1 lg:w-40">
-          <label class="text-xs text-slate-500">付款狀態</label>
-          <Select
-            v-model="payFilter"
-            :options="paymentFilterOptions"
-            option-label="label"
-            option-value="value"
-            class="w-full"
-            :pt="{ listContainer: { style: 'max-height: none' } }"
-          />
-        </div>
         <div class="flex min-w-0 flex-col gap-1 lg:w-40">
           <label class="text-xs text-slate-500">配送狀態</label>
           <Select
