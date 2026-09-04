@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useViewportStore } from '../../pinia/viewport';
 import { useOrdersStore } from '../../pinia/orders';
 import { useUiStore } from '../../pinia/ui';
@@ -265,9 +265,17 @@ const filteredOrders = computed(() =>
 
 const payCount = (pf: PayFilter) =>
   dateKeywordFilteredOrders.value.filter((o) => matchesPay(o, pf)).length;
-/** 配送各狀態數量（在目前付款篩選範圍內計）。 */
+
+/**
+ * 配送狀態下拉的母體：依「草稿」付款篩選即時連動（不必按查詢）。
+ * → 選付款狀態時，配送狀態選項與數量立刻反映該付款狀態下實際存在的配送狀態。
+ */
+const payDraftFilteredOrders = computed(() =>
+  dateKeywordFilteredOrders.value.filter((o) => matchesPay(o, payFilter.value)),
+);
+/** 配送各狀態數量（在目前草稿付款篩選範圍內計）。 */
 const shipCount = (key: StatusTab) =>
-  payFilteredOrders.value.filter((o) => matchesStatusKey(o, key)).length;
+  payDraftFilteredOrders.value.filter((o) => matchesStatusKey(o, key)).length;
 
 /** 付款狀態下拉選項：全部 / 待付款 / 已付款 / 待退款 / 已退款（各自獨立）。 */
 const paymentFilterOptions = computed(() => [
@@ -283,17 +291,26 @@ const paymentFilterOptions = computed(() => [
   },
   { label: `已退款 (${payCount('refunded')})`, value: 'refunded' as PayFilter },
 ]);
-/** 配送狀態下拉選項：全部 + 進度狀態（待出貨…已完成）+ 有資料的終點貨態。 */
+/**
+ * 配送狀態下拉選項：全部 + 「當前付款狀態下實際有訂單（count>0）」的配送狀態。
+ * 例：選待付款 → 只剩待出貨 / 已取消；選已付款 → 不含退貨中/已退貨/已取消。
+ */
 const deliveryFilterOptions = computed(() => [
   { label: `全部 (${shipCount('all')})`, value: 'all' as StatusTab },
   ...statusTabs
-    .filter((t) => t.key !== 'all' && t.key !== 'unpaid')
+    .filter((t) => t.key !== 'all' && t.key !== 'unpaid' && shipCount(t.key) > 0)
     .map((t) => ({ label: `${t.label} (${shipCount(t.key)})`, value: t.key })),
   ...OVERRIDE_TABS.filter((t) => shipCount(t.key) > 0).map((t) => ({
     label: `${t.label} (${shipCount(t.key)})`,
     value: t.key,
   })),
 ]);
+
+/** 切換付款狀態時，若目前選的配送狀態在新選項中已不存在，重設為「全部」。 */
+watch(payFilter, () => {
+  const available = deliveryFilterOptions.value.map((o) => o.value);
+  if (!available.includes(shipFilter.value)) shipFilter.value = 'all';
+});
 
 const stepStatus = (
   pkg: PackageInfo,
