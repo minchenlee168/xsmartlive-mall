@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>結帳頁改版預覽（對應 CheckoutPage.vue 新版）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  /* 設計 token 全部取自專案 src/style.css，不另行發明 */
+  :root{
+    --primary:#7008e7;
+    --primary-hover:#5b06bd;
+    --primary-surface:color-mix(in srgb, #7008e7 12%, #fff);
+    --card-shadow:0px 1px 3px 0px rgba(0,0,0,.1), 0px 1px 2px -1px rgba(0,0,0,.1);
+    --page-bg:#f1f5f9;
+    --ink:#020617;          /* slate-950 */
+    --text:#334155;         /* slate-700 */
+    --muted:#64748b;        /* slate-500 */
+    --faint:#94a3b8;        /* slate-400 */
+    --line:#e2e8f0;         /* slate-200 */
+    --red:#ef4444;          /* red-500 */
+    --green:#15803d;        /* green-700 */
+    --amber-bg:#fffbeb;
+    --amber:#b45309;
+  }
+  *{box-sizing:border-box;}
+  *{font-family:'Noto Sans TC',sans-serif;}
+  body{
+    margin:0;padding-bottom:120px;
+    background:var(--page-bg);color:var(--text);font-size:14px;
+  }
+
+  /* ===== NavBar / CategoryTabs（復刻專案 NavBar.vue 桌機版）===== */
+  .nav{background:#fff;}
+  .nav-inner{max-width:1280px;margin:0 auto;padding:14px 16px 6px;display:flex;align-items:center;gap:24px;}
+  .logo img{height:30px;display:block;}
+  .search{flex:1;max-width:560px;position:relative;}
+  .search input{width:100%;padding:10px 76px 10px 38px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;}
+  .search::before{content:"🔍";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.55;}
+  .search .go{position:absolute;right:0;top:0;bottom:0;padding:0 18px;border:none;border-radius:0 8px 8px 0;background:var(--primary);color:#fff;font-weight:500;font-size:14px;cursor:pointer;}
+  .nav-right{display:flex;gap:22px;color:var(--text);font-size:14px;align-items:center;white-space:nowrap;}
+  .nav-right .itm{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .cart-ic{position:relative;font-size:17px;}
+  .cart-ic .cart-badge{position:absolute;top:-8px;right:-9px;background:var(--primary);color:#fff;font-size:10px;font-weight:500;border-radius:10px;padding:1px 5px;line-height:1.4;}
+  .avatar{width:26px;height:26px;border-radius:50%;background:var(--primary-surface);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:500;font-size:13px;}
+  .keywords{max-width:1280px;margin:0 auto;padding:0 16px 10px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);}
+  .keywords a{color:var(--muted);text-decoration:none;cursor:pointer;}
+  .tabs{background:var(--primary);}
+  .tabs-inner{max-width:1280px;margin:0 auto;padding:11px 16px;display:flex;gap:28px;color:#fff;font-weight:500;font-size:14px;flex-wrap:wrap;}
+
+  /* ===== 頁面 ===== */
+  .wrap{max-width:1280px;margin:0 auto;padding:0 16px;}
+  .page-head{display:flex;align-items:center;gap:12px;padding:20px 0;}
+  .page-head .back{width:44px;height:44px;border:none;background:transparent;font-size:18px;cursor:pointer;border-radius:50%;color:var(--muted);}
+  .page-head .back:hover{background:#e8ecf3;}
+  .page-head h1{font-size:24px;margin:0;font-weight:700;color:var(--ink);}
+  .stack{display:flex;flex-direction:column;gap:16px;}
+
+  .card{background:#fff;border-radius:12px;box-shadow:var(--card-shadow);overflow:hidden;}
+  .card-head{padding:12px 16px;border-bottom:1px solid var(--line);font-weight:500;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .card-body{padding:16px;}
+
+  .tag{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:6px;line-height:1.6;}
+  .tag.info{background:#e0f2fe;color:#0369a1;}
+  .tag.secondary{background:#f1f5f9;color:#64748b;}
+  .tag.success{background:#dcfce7;color:#15803d;}
+  .tag.primary{background:var(--primary-surface);color:var(--primary);}
+  .tag.off{background:#f1f5f9;color:#94a3b8;}
+  .tag.warn{background:#fef3c7;color:#b45309;}
+  .tag.danger{background:#fee2e2;color:#b91c1c;}
+
+  .k{color:var(--muted);font-size:13px;}
+  .link-btn{border:none;background:none;color:var(--primary);font-size:13px;font-weight:500;cursor:pointer;padding:6px 4px;display:inline-flex;align-items:center;gap:4px;min-height:32px;}
+  .link-btn:hover{text-decoration:underline;}
+
+  /* 商品列 */
+  .item{display:flex;align-items:flex-start;gap:16px;padding:12px 16px;}
+  .item .combo{font-size:14px;line-height:1.65;color:var(--text);margin-top:2px;}
+  .item .combo b{font-weight:500;}
+  .item .pic{width:56px;height:56px;border-radius:4px;flex:none;object-fit:cover;background:#f1f5f9;}
+  .item .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+  .item .name{font-weight:700;font-size:16px;color:var(--text);}
+  .item .meta{font-size:14px;color:var(--text);display:flex;gap:16px;}
+  .item .bulk{color:var(--green);font-size:12px;}
+  .price-col{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+  .price-old{color:var(--faint);font-size:14px;text-decoration:line-through;}
+  .price{font-weight:700;font-size:16px;color:var(--primary);}
+  .price.plain{color:var(--text);font-weight:500;font-size:14px;}
+  .item-divider{border-bottom:1px solid var(--line);margin:0 16px;}
+
+  /* 收據式明細：網格對齊（標籤 96px｜操作 132px｜說明 1fr｜金額靠右） */
+  .receipt{border-top:1px solid var(--line);margin:0 16px;padding:10px 0;}
+  .r-row{display:grid;grid-template-columns:96px 132px minmax(0,1fr) auto;gap:4px 12px;align-items:center;min-height:42px;padding:2px 0;}
+  .r-label{grid-column:1;grid-row:1;font-size:14px;color:var(--text);}
+  .r-ctl{grid-column:2;grid-row:1;}
+  .r-hint{grid-column:3;grid-row:1;display:flex;align-items:center;gap:8px;min-width:0;font-size:14px;color:var(--muted);}
+  .r-hint .lk{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .r-hint b{color:var(--primary);font-weight:500;}
+  .r-amt{grid-column:4;grid-row:1;justify-self:end;font-size:14px;white-space:nowrap;color:var(--text);}
+  .r-amt.red{color:var(--red);font-weight:500;}
+  .r-amt.dash{color:var(--faint);}
+  .r-btn{width:132px;height:34px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-size:13px;cursor:pointer;color:var(--text);}
+  .r-btn:hover{background:#f1f5f9;}
+  .r-tag-cell{display:flex;width:132px;height:34px;align-items:center;justify-content:center;border-radius:6px;font-size:12px;font-weight:500;background:var(--primary-surface);color:var(--primary);}
+  .stepper{display:inline-flex;align-items:center;width:132px;height:34px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .stepper button{width:34px;height:100%;border:none;background:#f8fafc;color:var(--text);font-size:14px;cursor:pointer;}
+  .stepper button:disabled{color:#cbd5e1;cursor:not-allowed;}
+  .stepper .n{flex:1;text-align:center;font-size:13px;border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:32px;}
+  @media(max-width:768px){
+    .r-row{grid-template-columns:96px minmax(0,1fr) auto;}
+    .r-hint{grid-column:2 / span 2;grid-row:2;}
+    .r-amt{grid-column:3;grid-row:1;}
+  }
+  /* 訂單備註（選填；預設收合一行） */
+  .note-box{border-top:1px solid var(--line);margin:0 16px;padding:6px 0;}
+  .note-row{display:flex;align-items:center;gap:12px;min-height:36px;}
+  .note-row .nl{width:96px;flex:none;font-size:14px;color:var(--text);}
+  .note-row .nv{flex:1;min-width:0;font-size:14px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .note-link{border:none;background:none;color:var(--primary);font-size:13px;cursor:pointer;padding:6px 0;font-weight:500;}
+  .note-link.add{min-height:36px;font-size:14px;}
+  .note-link:hover{text-decoration:underline;}
+  .note-edit{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;padding:6px 0;}
+  .note-edit .nl{font-size:14px;color:var(--text);padding-top:8px;}
+  .note-edit textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:14px;color:var(--text);resize:vertical;min-height:56px;}
+  .note-edit textarea:focus{outline:2px solid var(--primary);outline-offset:-1px;}
+  .note-edit .nf{display:flex;justify-content:space-between;align-items:center;margin-top:4px;}
+  .subtotal{border-top:1px solid var(--line);margin:0 16px;padding:14px 0;display:flex;align-items:center;justify-content:space-between;}
+  .subtotal .sk{font-weight:700;font-size:15px;color:var(--ink);}
+  .subtotal .sv{font-weight:700;font-size:24px;color:var(--primary);}
+
+  /* 表單 */
+  .field-group{max-width:440px;display:flex;flex-direction:column;gap:12px;}
+  .field-group label{font-size:13px;color:var(--text);display:block;margin-bottom:4px;}
+  select,input.txt{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;background:#fff;color:var(--text);}
+  select:focus,input.txt:focus{outline:2px solid var(--primary);outline-offset:-1px;}
+  .bank-info{margin-top:12px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:12px 16px;}
+  .bank-info .bt{font-weight:700;font-size:13.5px;margin-bottom:4px;color:var(--text);}
+  .bank-info .br{color:var(--muted);font-size:13.5px;padding:2px 0;}
+  .note{color:var(--muted);font-size:12px;margin-top:8px;}
+
+  /* Sticky bar */
+  .paybar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);z-index:40;}
+  .paybar-main{max-width:1280px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:flex-end;gap:16px;}
+  .pay-total{border:none;background:none;cursor:pointer;text-align:right;display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;padding:0;}
+  .pay-total .row1{display:flex;align-items:baseline;gap:8px;}
+  .pay-total .tl{color:var(--text);font-size:15px;}
+  .pay-total .tv{color:var(--primary);font-weight:700;font-size:26px;}
+  .pay-total .caret{color:var(--primary);font-size:12px;transition:transform .2s;}
+  .pay-total .save{color:var(--red);font-size:13px;margin-top:2px;}
+  .pay-btn{background:var(--primary);color:#fff;border:none;border-radius:6px;padding:13px 56px;font-size:15px;font-weight:500;cursor:pointer;min-height:48px;}
+  .pay-btn:hover{background:var(--primary-hover);}
+  .pay-panel{border-bottom:1px solid var(--line);display:none;}
+  .pay-panel.open{display:block;}
+  .pay-panel-inner{max-width:1280px;margin:0 auto;padding:14px 16px;}
+  .pp-head{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:8px;}
+  .pp-toggle{border:none;background:none;color:var(--primary);font-size:12px;cursor:pointer;}
+  .pp-line{display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;}
+  .pp-line .pk{color:var(--muted);}
+  .pp-line .pv{color:var(--text);}
+  .pp-line .pv.red{color:var(--red);font-weight:500;}
+  .pp-total{border-top:1px solid var(--line);margin-top:6px;padding-top:9px;}
+  .pp-total .pk{color:var(--ink);font-weight:700;}
+  .pp-total .pv{color:var(--primary);font-weight:700;font-size:16px;}
+
+  /* Drawer（對應專案 bottom-sheet 樣式） */
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:none;}
+  .drawer{position:fixed;left:50%;bottom:0;transform:translate(-50%,105%);width:min(720px,100vw);z-index:110;background:#fff;border-radius:16px 16px 0 0;max-height:90vh;overflow-y:auto;box-shadow:0 -4px 20px rgba(0,0,0,.15);transition:transform .3s cubic-bezier(.4,0,.2,1);}
+  .drawer.open{transform:translate(-50%,0);}
+  .backdrop.open{display:block;}
+  .drawer-inner{max-width:680px;margin:0 auto;padding:20px 16px;}
+  .d-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .d-head h3{margin:0;font-size:18px;font-weight:700;color:var(--ink);}
+  .d-close{width:44px;height:44px;border:none;background:none;font-size:18px;color:var(--muted);cursor:pointer;border-radius:50%;}
+  .d-close:hover{background:#f1f5f9;}
+  .d-note{background:var(--amber-bg);color:var(--amber);font-size:12px;border-radius:6px;padding:8px 12px;margin-bottom:12px;}
+
+  .m-card{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+  .m-card.active{border-color:var(--primary);}
+  .m-head{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;background:#fff;border:none;width:100%;text-align:left;min-height:48px;}
+  .m-card.active .m-head{background:var(--primary-surface);}
+  .radio{width:18px;height:18px;border-radius:50%;border:2px solid #cbd5e1;flex:none;display:flex;align-items:center;justify-content:center;}
+  .m-card.active .radio,.radio.on{border-color:var(--primary);}
+  .m-card.active .radio::after,.radio.on::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--primary);}
+  .m-ic{font-size:15px;opacity:.7;}
+  .m-name{flex:1;font-size:15px;color:var(--text);}
+  .m-fee{font-size:13px;color:var(--muted);}
+  .m-card.active .m-fee{color:var(--text);font-weight:500;}
+  .m-body{border-top:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:8px;}
+
+  .addr{width:100%;border:2px solid var(--line);border-radius:10px;padding:12px;text-align:left;background:#fff;cursor:pointer;font-size:13.5px;color:var(--text);}
+  .addr:hover{border-color:#cbd5e1;}
+  .addr.on{border-color:var(--primary);background:var(--primary-surface);}
+  .addr .a1{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:500;}
+  .addr .badge{background:var(--primary);color:#fff;font-size:11px;padding:2px 7px;border-radius:5px;font-weight:500;}
+  .addr .a2{margin-top:4px;color:var(--text);}
+  .addr.disabled{cursor:not-allowed;opacity:.75;}
+  .addr .warn{color:var(--red);font-size:12px;margin-top:4px;}
+  .add-btn{width:100%;border:2px dashed #cbd5e1;background:none;border-radius:10px;padding:12px;color:var(--muted);font-size:13.5px;cursor:pointer;}
+  .add-btn:hover{border-color:var(--primary);color:var(--primary);}
+
+  .cvs-group{border:1px solid var(--line);border-radius:10px;padding:12px;}
+  .cvs-group .g-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13.5px;font-weight:500;color:var(--text);}
+  .cvs-group .g-head span:first-child{flex:1;}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;font-size:12px;color:var(--text);cursor:pointer;}
+  .chip:hover{border-color:#cbd5e1;}
+  .chip.on{border-color:var(--primary);background:var(--primary-surface);color:var(--primary);font-weight:500;}
+  .picked{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);flex-wrap:wrap;}
+  .picked .re{border:none;background:none;color:var(--primary);font-size:12px;text-decoration:underline;cursor:pointer;padding:2px;}
+
+  .d-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+  .btn{border-radius:8px;padding:10px 22px;font-size:14px;cursor:pointer;min-height:44px;}
+  .btn.secondary{border:1px solid #cbd5e1;background:#fff;color:var(--text);}
+  .btn.primary{border:none;background:var(--primary);color:#fff;font-weight:500;}
+  .btn.primary:hover{background:var(--primary-hover);}
+
+  /* Coupon drawer */
+  .cp{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;margin-bottom:10px;background:#fff;}
+  .cp:hover{border-color:var(--primary);}
+  .cp.disabled{cursor:not-allowed;}
+  .cp .amt{width:110px;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--primary);background:var(--primary-surface);}
+  .cp.disabled .amt{background:#f1f5f9;color:#94a3b8;}
+  .cp .info{flex:1;padding:12px 14px;min-width:0;}
+  .cp .t{font-weight:500;font-size:14.5px;color:var(--text);}
+  .cp .d{font-size:13px;color:var(--muted);margin-top:2px;}
+  .cp .scope{display:inline-block;background:#fce7f3;color:#be185d;font-size:11px;border-radius:4px;padding:2px 8px;margin-top:6px;}
+  .cp .exp{font-size:12px;color:var(--muted);margin-top:6px;}
+  .cp .side{width:80px;flex:none;display:flex;align-items:center;justify-content:center;font-size:12.5px;color:var(--red);text-align:center;padding:4px;}
+
+  /* 付款衝突說明卡 */
+  .conflict-card{background:var(--amber-bg);border-radius:8px;padding:12px 14px;}
+  .cc-head{font-size:14px;font-weight:500;color:#633806;}
+  .cc-lines{font-size:13px;color:var(--amber);margin-top:6px;line-height:1.7;}
+  .cc-hint{font-size:13px;color:var(--amber);margin-top:4px;}
+  .cc-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .cc-btn{border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;}
+  .cc-btn.ghost{border:1px solid var(--amber);color:var(--amber);background:transparent;}
+  .cc-btn.primary{border:none;background:var(--primary);color:#fff;font-weight:500;}
+  .pay-btn:disabled{background:#f1f5f9;color:var(--faint);cursor:not-allowed;}
+  .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:opacity .25s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  /* 購物車頁:群組勾選框 / 進場攔截彈窗 */
+  .gchk{width:17px;height:17px;accent-color:var(--primary);margin-right:2px;cursor:pointer;}
+  .mb-overlay{position:fixed;inset:0;background:rgba(20,20,40,.45);display:none;align-items:center;justify-content:center;z-index:200;padding:16px;}
+  .mb-overlay.open{display:flex;}
+  .mb-modal{background:#fff;border-radius:12px;max-width:460px;width:100%;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.25);}
+  .mb-title{display:flex;gap:8px;align-items:center;font-size:16px;font-weight:700;color:var(--ink);}
+  .mb-body{font-size:13.5px;color:var(--muted);margin-top:12px;line-height:1.8;}
+  .mb-body b{color:var(--text);font-weight:500;}
+  .mb-foot{display:flex;justify-content:flex-end;margin-top:16px;}
+  /* 挑選規格彈窗 */
+  .spec-head{display:flex;align-items:center;justify-content:space-between;}
+  .spec-close{border:none;background:none;font-size:20px;color:var(--muted);cursor:pointer;line-height:1;padding:4px;min-width:44px;min-height:44px;}
+  .spec-name{font-size:14px;font-weight:500;color:var(--text);margin-top:10px;}
+  .spec-need{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .spec-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .spec-row select,.spec-row input{flex:1;min-width:90px;min-height:44px;border:1px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:13.5px;color:var(--text);background:#fff;}
+  .spec-add{height:44px;padding:0 14px;border:1px solid #c9aef5;background:transparent;color:#5b21b6;border-radius:8px;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;}
+  .spec-add:hover{background:#f4edfd;}
+  .spec-btn{height:34px;padding:0 14px;border:1px solid #c9aef5;background:transparent;color:#5b21b6;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;}
+  .spec-btn:hover{background:#f4edfd;}
+  .spec-warn{margin-top:12px;font-size:12.5px;color:#dc2626;font-weight:500;display:none;}
+  .spec-warn.show{display:block;}
+  .spec-row select option:disabled{color:#cbd5e1;}
+  .btn.primary:disabled{background:#f1f5f9;color:#94a3b8;cursor:not-allowed;}
+  .spec-sum{display:block;margin-top:14px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 12px;font-size:13px;color:#c2410c;font-weight:500;}
+  .spec-list{margin-top:8px;}
+  .spec-line{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--text);padding:8px 4px;border-bottom:1px solid var(--line);}
+  .spec-del{border:none;background:none;color:#ef4444;font-size:12.5px;cursor:pointer;min-height:24px;}
+  .spec-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+  .pay-btn:disabled{background:#f1f5f9;color:var(--faint);cursor:not-allowed;}
+  /* DEMO 情境切換(示意用) */
+  .demo-fab{position:fixed;left:24px;bottom:96px;z-index:60;display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
+  .demo-btn{height:40px;padding:0 16px;border-radius:20px;border:1.5px dashed var(--primary);background:#fff;color:var(--primary);font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.12);letter-spacing:.05em;}
+  .demo-btn:hover{background:var(--primary-surface);}
+  .demo-panel{display:none;width:320px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);padding:12px;}
+  .demo-panel.open{display:block;}
+  .demo-title{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 8px;}
+  .demo-item{display:block;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;cursor:pointer;margin-bottom:6px;}
+  .demo-item:hover{border-color:var(--primary);}
+  .demo-item.active{border-color:var(--primary);background:var(--primary-surface);}
+  .demo-item .t{font-size:13px;font-weight:500;color:var(--text);}
+  .demo-item .d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.55;}
+  .demo-item.reset .t{color:var(--primary);}
+  .fab-wrap{position:fixed;right:24px;bottom:96px;z-index:50;}
+  .fab-gear{width:48px;height:48px;border-radius:50%;border:none;background:var(--primary);box-shadow:0 4px 16px rgba(0,0,0,.2);font-size:19px;color:#fff;cursor:pointer;transition:transform .2s;}
+  .fab-gear:hover{transform:scale(1.1);}
+  .fab-x{position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15);line-height:1;}
+  .fab-x:hover{background:#f1f5f9;}
+
+
+  @media(max-width:768px){
+    .nav-right .txt{display:none;}
+    .subtotal .sv{font-size:20px;}
+    .pay-btn{padding:13px 24px;}
+    .cp .amt{width:76px;font-size:17px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- NavBar + CategoryTabs（復刻專案桌機版頁首） -->
+<div class="nav">
+  <div class="nav-inner">
+    <div class="logo"><img src="public/logo-xl.png" alt="xSmartLive" onerror="this.outerHTML='<b style=&quot;font-size:18px;&quot;>xSmartLive</b>'"></div>
+    <div class="search">
+      <input placeholder="快速搜尋您想找的商品">
+      <button class="go">搜尋</button>
+    </div>
+    <div class="nav-right">
+      <span class="itm">🌐 繁體中文</span>
+      <span class="itm"><span class="cart-ic">🛒<span class="cart-badge">9</span></span>購物車</span>
+      <span class="itm"><span class="avatar">P</span>訪客 ⌄</span>
+    </div>
+  </div>
+  <div class="keywords"><span>熱門關鍵字：</span><a>童裝男生</a><a>男生女生童裝</a><a>女童外套</a><a>皮衣外套女童</a><a>大童童裝</a></div>
+</div>
+<div class="tabs"><div class="tabs-inner"><span>大童童裝</span><span>小童童裝</span><span>寶寶包屁</span><span>親子裝</span><span>生鮮</span><span>廠商出清</span></div></div>
+
+<div class="wrap">
+
+  <!-- ═══════ 購物車頁（進場前；防線一的彈窗在此攔截） ═══════ -->
+  <div id="viewCart">
+    <div class="page-head"><button class="back" id="cartBack" onclick="goBackPage()">←</button><h1>購物車</h1></div>
+    <div class="stack">
+      <section class="card">
+        <div class="card-head">
+          <input type="checkbox" id="chk1" class="gchk" checked onchange="renderCart()">
+          07/09 廚娘小桂の直播廚房 <span class="tag info">冷凍</span><span class="tag secondary" id="cartCartTag1"></span>
+        </div>
+        <div class="item"><img class="pic" src="https://images.unsplash.com/photo-1485921325833-c519f76c4927?w=200&fit=crop" alt=""><div class="body"><div class="name">新春海陸雙享套組</div><div class="meta"><span>規格</span><span>雙人份</span></div><div class="meta"><span>數量</span><span>2</span></div></div><div class="price-col"><span class="price plain">$2,560</span></div></div>
+        <div class="item-divider"></div>
+        <div class="item"><img class="pic" src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&fit=crop" alt=""><div class="body"><div class="name">新手主廚三件組（固定組合）</div><div class="meta"><span>數量</span><span>1</span></div></div><div class="price-col"><span class="price plain">$899</span></div></div>
+        <div class="item-divider"></div>
+        <div class="item"><img class="pic" src="https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=200&fit=crop" alt=""><div class="body"><div class="name">挪威生鮮鮭魚切片 厚切真空包裝</div><div class="meta"><span>規格</span><span>500g</span></div><div class="meta"><span>數量</span><span>1</span></div></div><div class="price-col"><span class="price plain">$380</span></div></div>
+        <div class="item-divider"></div>
+        <div class="item"><img class="pic" src="https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=200&fit=crop" alt=""><div class="body"><div class="name">古早味手工冷凍水餃 高麗菜豬肉口味</div><div class="meta"><span>規格</span><span>60顆/盒</span></div><div class="meta"><span>數量</span><span>1</span></div></div><div class="price-col"><span class="price plain">$199</span></div></div>
+        <div class="subtotal"><span class="sk">訂單金額小計</span><span class="sv">$4,038</span></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <input type="checkbox" id="chk2" class="gchk" checked onchange="renderCart()">
+          07/08 妞妞ㄉ童裝小舖 <span class="tag secondary">常溫</span><span class="tag secondary" id="cartCartTag2"></span>
+        </div>
+        <div class="item"><img class="pic" src="https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=200&fit=crop" alt=""><div class="body"><div class="name">新款組合 包屁衣韓版小洋裝雙件組</div><div class="meta"><span>規格</span><span>66cm</span></div><div class="meta"><span>數量</span><span>1</span></div></div><div class="price-col"><span class="price plain">$290</span></div></div>
+        <div class="item-divider"></div>
+        <div class="item"><img class="pic" src="https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=200&fit=crop" alt=""><div class="body"><div class="name">限量 MM巧克力男寶寶搞怪包屁衣</div><div class="meta"><span>規格</span><span>66cm,藍色</span></div><div class="meta"><span>數量</span><span>1</span></div></div><div class="price-col"><span class="price plain">$300</span></div></div>
+        <div class="subtotal"><span class="sk">訂單金額小計</span><span class="sv">$590</span></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <input type="checkbox" id="chk3" class="gchk" checked onchange="renderCart()">
+          07/10 晚間直播搶購場 <span class="tag secondary">常溫</span><span class="tag danger">禁止棄標</span><span class="tag secondary" id="cartCartTag3"></span>
+        </div>
+        <div class="item">
+          <img class="pic" src="https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=200&fit=crop" alt="">
+          <div class="body">
+            <div class="name">寶寶連身包屁衣 有機棉長袖春秋款 0-18個月</div>
+            <div class="meta" style="align-items:center;gap:10px;"><span>數量</span><span style="min-width:32px;">100</span><button class="spec-btn" onclick="openSpec('s1')">☰ 挑選規格</button></div>
+            <div><span class="tag warn" id="specTag-s1">⚠ 待挑選規格（尚缺 100）</span></div>
+          </div>
+          <div class="price-col"><span class="price">$19,900</span></div>
+        </div>
+        <div class="item-divider"></div>
+        <div class="item">
+          <img class="pic" src="https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=200&fit=crop" alt="">
+          <div class="body">
+            <div class="name">女童牛仔短褲 夏季薄款休閒百搭</div>
+            <div class="meta" style="align-items:center;gap:10px;"><span>數量</span><span style="min-width:32px;">30</span><button class="spec-btn" onclick="openSpec('s2')">☰ 挑選規格</button></div>
+            <div><span class="tag warn" id="specTag-s2">⚠ 待挑選規格（尚缺 30）</span></div>
+          </div>
+          <div class="price-col"><span class="price">$6,600</span></div>
+        </div>
+        <div class="subtotal"><span class="sk">訂單金額小計</span><span class="sv">NT$26,500</span></div>
+      </section>
+
+      <section class="card">
+        <div class="card-body" style="display:flex;justify-content:flex-end;align-items:center;gap:18px;flex-wrap:wrap;">
+          <span id="cartSummary" style="font-size:14px;"></span>
+          <button class="pay-btn" id="goCheckoutBtn" onclick="goCheckout()">去結帳 (6)</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ═══════ 合併結帳頁 ═══════ -->
+  <div id="viewCheckout" style="display:none;">
+  <div class="page-head"><button class="back" onclick="showPage('cart')">←</button><h1>結帳</h1></div>
+
+  <!-- #1 合併結帳交集檢查:物流/金流白名單交集為空 → 擋下(實務上擋在購物車「去結帳」時,此處為結帳頁內的防線與示意) -->
+  <div class="conflict-card" id="mergeBlock" style="display:none;margin-bottom:16px;">
+    <div class="cc-head">⚠ 這些訂單無法合併結帳</div>
+    <div class="cc-lines" id="mergeBlockLines"></div>
+    <div class="cc-hint">請返回上一頁，將訂單分開結帳。</div>
+    <div class="cc-actions"><button class="cc-btn primary" onclick="goBackPage()">返回上一頁</button></div>
+  </div>
+
+  <div class="stack">
+
+    <!-- 配送資訊（置頂共用） -->
+    <section class="card">
+      <div class="card-head">配送資訊</div>
+      <div class="card-body">
+        <div class="k" style="margin-bottom:6px;">配送方式</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="methodLabel" style="color:var(--muted);">尚未選擇</span>
+          <button class="link-btn" onclick="openShip()">選擇運送方式 ›</button>
+        </div>
+        <div id="addrBlock" style="margin-top:12px;display:none;">
+          <div class="k" style="margin-bottom:6px;" id="addrKey">配送地址</div>
+          <div id="addrVal" style="font-size:14px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 訂單一 -->
+    <section class="card" id="orderCard1">
+      <div class="card-head">07/09 廚娘小桂の直播廚房 訂單明細 <span class="tag info" id="tempTag1">冷凍</span><span class="tag secondary" id="cartTag1"></span></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1485921325833-c519f76c4927?w=200&fit=crop" alt="">
+        <div class="body">
+          <div class="name">新春海陸雙享套組</div>
+          <div class="meta"><span>規格</span><span>雙人份</span></div>
+          <div class="combo"><b>組合商品內容：</b>挪威生鮮鮭魚切片 - 300g ×4、美國安格斯牛小排 - 500g ×4</div>
+          <div class="bulk">🏷 買 2 件以上每件 $1,080 · 已折抵 -$400</div>
+          <div class="meta"><span>數量</span><span>2</span></div>
+        </div>
+        <div class="price-col"><span class="price-old">$2,560</span><span class="price">$2,160</span></div>
+      </div>
+      <div class="item-divider"></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&fit=crop" alt="">
+        <div class="body">
+          <div class="name">新手主廚三件組（固定組合）</div>
+          <div class="combo"><b>組合商品內容：</b>北海道生食級帆立貝 - 12顆 ×1、法國頂級櫻桃鴨胸 - 300g ×1、西班牙伊比利豬肋排 - 500g ×1</div>
+          <div class="meta"><span>數量</span><span>1</span></div>
+        </div>
+        <div class="price-col"><span class="price plain">$899</span></div>
+      </div>
+      <div class="item-divider"></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=200&fit=crop" alt="">
+        <div class="body"><div class="name">挪威生鮮鮭魚切片 厚切真空包裝</div><div class="meta"><span>規格</span><span>500g</span></div><div class="meta"><span>數量</span><span>1</span></div></div>
+        <div class="price-col"><span class="price plain">$380</span></div>
+      </div>
+      <div class="item-divider"></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=200&fit=crop" alt="">
+        <div class="body"><div class="name">古早味手工冷凍水餃 高麗菜豬肉口味</div><div class="meta"><span>規格</span><span>60顆/盒</span></div><div class="meta"><span>數量</span><span>1</span></div></div>
+        <div class="price-col"><span class="price plain">$199</span></div>
+      </div>
+      <div class="note-box" id="note1"></div>
+      <div class="receipt" id="receipt1"></div>
+      <div class="subtotal"><span class="sk">訂單金額小計</span><span class="sv" id="sub1"></span></div>
+    </section>
+
+    <!-- 訂單二 -->
+    <section class="card" id="orderCard2">
+      <div class="card-head">07/08 妞妞ㄉ童裝小舖 訂單明細 <span class="tag secondary" id="tempTag2">常溫</span><span class="tag secondary" id="cartTag2"></span></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=200&fit=crop" alt="">
+        <div class="body"><div class="name">新款組合 包屁衣韓版小洋裝雙件組</div><div class="meta"><span>規格</span><span>66cm</span></div><div class="combo"><b>組合商品內容：</b>新款 包屁衣韓版小洋裝 秋冬刺繡款 - 黑-S ×1、白-S ×1</div><div class="meta"><span>數量</span><span>1</span></div></div>
+        <div class="price-col" id="i4price"><span class="price plain">$290</span></div>
+      </div>
+      <div class="item-divider"></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=200&fit=crop" alt="">
+        <div class="body"><div class="name">限量 MM巧克力男寶寶搞怪包屁衣</div><div class="meta"><span>規格</span><span>66cm,藍色</span></div><div class="meta"><span>數量</span><span>1</span></div></div>
+        <div class="price-col"><span class="price plain">$300</span></div>
+      </div>
+      <div class="note-box" id="note2"></div>
+      <div class="receipt" id="receipt2"></div>
+      <div class="subtotal"><span class="sk">訂單金額小計</span><span class="sv" id="sub2"></span></div>
+    </section>
+
+    <section class="card" id="orderCard3">
+      <div class="card-head">07/10 晚間直播搶購場 訂單明細 <span class="tag secondary" id="tempTag3">常溫</span><span class="tag danger">禁止棄標</span><span class="tag secondary" id="cartTag3"></span></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=200&fit=crop" alt="">
+        <div class="body"><div class="name">寶寶連身包屁衣 有機棉長袖春秋款 0-18個月</div><div class="meta"><span>規格</span><span>依挑選明細</span></div><div class="meta"><span>數量</span><span>100</span></div></div>
+        <div class="price-col"><span class="price plain">$19,900</span></div>
+      </div>
+      <div class="item-divider"></div>
+      <div class="item">
+        <img class="pic" src="https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=200&fit=crop" alt="">
+        <div class="body"><div class="name">女童牛仔短褲 夏季薄款休閒百搭</div><div class="meta"><span>規格</span><span>依挑選明細</span></div><div class="meta"><span>數量</span><span>30</span></div></div>
+        <div class="price-col"><span class="price plain">$6,600</span></div>
+      </div>
+      <div class="note-box" id="note3"></div>
+      <div class="receipt" id="receipt3"></div>
+      <div class="subtotal"><span class="sk">訂單金額小計</span><span class="sv" id="sub3"></span></div>
+    </section>
+
+    <!-- 發票資訊 -->
+    <section class="card">
+      <div class="card-head">發票資訊</div>
+      <div class="card-body">
+        <div class="field-group">
+          <div><label>發票類型</label>
+            <select><option>個人發票（紙本）</option><option>公司統編</option><option>捐贈</option><option>手機條碼</option><option>自然人憑證</option><option>會員載具</option></select>
+          </div>
+          <div><label>Email</label><input class="txt" type="email" value="abc@gmail.com"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 付款方式 -->
+    <section class="card">
+      <div class="card-head">付款方式</div>
+      <div class="card-body">
+        <!-- 正常：付款選單 =各訂單依生效物流允許付款的交集（render 時動態重建） -->
+        <div id="payNormal">
+          <div class="field-group">
+            <div><label>選擇付款方式</label>
+              <select id="paySelect" onchange="updateBank()"></select>
+            </div>
+          </div>
+          <div class="bank-info" id="bankInfo" style="display:none;">
+            <div class="bt">銀行戶頭資料</div>
+            <div class="br">銀行：台新008</div>
+            <div class="br">分行：13456-111333</div>
+          </div>
+          <p class="note" id="cashHint" style="display:none;">ⓘ 此方式以現金支付：貨到付款請於收貨時付款給物流士；自取請於門市取貨時付款。</p>
+        </div>
+        <!-- 衝突：交集為空 → 說明卡 + 兩條出路 -->
+        <div id="payConflict" style="display:none;">
+          <div class="conflict-card">
+            <div class="cc-head">⚠ 目前的配送組合沒有共同支援的付款方式</div>
+            <div class="cc-lines" id="conflictLines"></div>
+            <div class="cc-hint">您可以調整配送方式，或返回上一頁將訂單分開結帳。</div>
+            <div class="cc-actions">
+              <button class="cc-btn ghost" onclick="openShip()">調整配送方式</button>
+              <button class="cc-btn primary" onclick="showPage('cart')">返回上一頁</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  </div><!-- /viewCheckout -->
+</div>
+
+<!-- Sticky bar：總計可展開 -->
+<div class="paybar" id="payBar" style="display:none;">
+  <div class="pay-panel" id="payPanel">
+    <div class="pay-panel-inner">
+      <div class="pp-head">費用明細 <button class="pp-toggle" onclick="togglePanel()">收合 ⌄</button></div>
+      <div class="pp-line"><span class="pk">商品總金額</span><span class="pv" id="ppGoods"></span></div>
+      <div class="pp-line" id="ppShipRow" style="display:none;"><span class="pk">運費總金額</span><span class="pv" id="ppShip"></span></div>
+      <div class="pp-line"><span class="pk">多件優惠折抵</span><span class="pv red" id="ppBulk"></span></div>
+      <div class="pp-line" id="ppShipDiscRow" style="display:none;"><span class="pk">🚚 運費折抵（滿千免運）</span><span class="pv red" id="ppShipDisc"></span></div>
+      <div class="pp-line" id="ppCouponRow" style="display:none;"><span class="pk">🏷 優惠券折扣</span><span class="pv red" id="ppCoupon"></span></div>
+      <div class="pp-line" id="ppPointsRow" style="display:none;"><span class="pk">紅利點數折抵</span><span class="pv red" id="ppPoints"></span></div>
+      <div class="pp-line pp-total"><span class="pk">總付款金額</span><span class="pv" id="ppGrand"></span></div>
+    </div>
+  </div>
+  <div class="paybar-main">
+    <button class="pay-total" onclick="togglePanel()">
+      <span class="row1"><span class="tl">總付款金額</span><span class="tv" id="grand"></span><span class="caret" id="caret">⌃</span></span>
+      <span class="save" id="save"></span>
+    </button>
+    <button class="pay-btn" id="payBtn" onclick="placeOrder()">去付款</button>
+  </div>
+</div>
+
+<!-- 運送方式抽屜 -->
+<div class="backdrop" id="shipBackdrop" onclick="closeShip()"></div>
+<div class="drawer" id="shipDrawer">
+  <div class="drawer-inner">
+    <div class="d-head"><h3>選擇運送方式</h3><button class="d-close" onclick="closeShip()">✕</button></div>
+    <p class="k" id="shipTitleNote" style="margin:-8px 0 14px;"></p>
+    <div id="shipBody"></div>
+    <div class="d-foot"><button class="btn primary" onclick="closeShip()">完成</button></div>
+  </div>
+</div>
+
+<!-- 頁內衝突彈窗（結帳頁:個別調整物流導致付款交集歸零時跳出） -->
+<div class="mb-overlay" id="payConflictModal">
+  <div class="mb-modal">
+    <div class="mb-title">⚠ 目前的配送組合沒有共同支援的付款方式</div>
+    <div class="mb-body" id="payConflictModalLines"></div>
+    <div class="mb-body">您可以調整配送方式，或返回上一頁將訂單分開結帳。</div>
+    <div class="mb-foot" style="gap:8px;">
+      <button class="btn secondary" onclick="document.getElementById('payConflictModal').classList.remove('open');openShip()">調整配送方式</button>
+      <button class="btn primary" onclick="document.getElementById('payConflictModal').classList.remove('open');showPage('cart')">返回上一頁</button>
+    </div>
+  </div>
+</div>
+
+<!-- 付款自動修正彈窗（原選付款因物流調整不可用 → 自動改選並說明） -->
+<div class="mb-overlay" id="payFixModal">
+  <div class="mb-modal">
+    <div class="mb-title">ⓘ 付款方式已自動調整</div>
+    <div class="mb-body" id="payFixModalLines"></div>
+    <div class="mb-foot"><button class="btn primary" onclick="document.getElementById('payFixModal').classList.remove('open')">我知道了</button></div>
+  </div>
+</div>
+
+<!-- 進場攔截彈窗（購物車按「去結帳」時,交集為空 → 擋下,不進合併結帳頁） -->
+<div class="mb-overlay" id="mergeModal">
+  <div class="mb-modal">
+    <div class="mb-title">⚠ 這些訂單無法合併結帳</div>
+    <div class="mb-body" id="mergeModalLines"></div>
+    <div class="mb-body">請調整勾選的商品，將訂單分開結帳。</div>
+    <div class="mb-foot"><button class="btn primary" onclick="document.getElementById('mergeModal').classList.remove('open')">我知道了</button></div>
+  </div>
+</div>
+
+<!-- 挑選規格彈窗 -->
+<div class="mb-overlay" id="specModal">
+  <div class="mb-modal">
+    <div class="spec-head"><span class="mb-title">挑選規格</span><button class="spec-close" onclick="closeSpec(false)">✕</button></div>
+    <div class="spec-name" id="specName"></div>
+    <div class="spec-need">得標 <b id="specNeed"></b> 件</div>
+    <div class="spec-row">
+      <select id="specSize"></select>
+      <select id="specColor"></select>
+      <input type="number" id="specQty" min="1" value="1">
+      <button class="spec-add" onclick="addSpecRow()">＋ 加入</button>
+    </div>
+    <div class="spec-sum" id="specSum"></div>
+    <div class="spec-list" id="specList"></div>
+    <div class="spec-warn" id="specWarn"></div>
+    <div class="spec-foot">
+      <button class="btn secondary" onclick="closeSpec(false)">取消</button>
+      <button class="btn primary" id="specOk" onclick="closeSpec(true)">確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 優惠券抽屜 -->
+<div class="backdrop" id="cpBackdrop" onclick="closeCoupon()"></div>
+<div class="drawer" id="cpDrawer">
+  <div class="drawer-inner">
+    <div class="d-head"><h3>可使用優惠券</h3><button class="d-close" onclick="closeCoupon()">✕</button></div>
+    <p class="k" id="cpFor" style="margin:-8px 0 14px;"></p>
+    <div id="cpBody"></div>
+    <div class="d-foot">
+      <button class="btn secondary" onclick="clearCoupon()">不使用優惠券</button>
+      <button class="btn primary" onclick="confirmCoupon()">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEMO 情境切換(左下角;示意用,點選即套用對應衝突情境) -->
+<div class="demo-fab">
+  <div class="demo-panel" id="demoPanel">
+    <p class="demo-title">DEMO 情境（示意用，點選即套用）</p>
+    <button class="demo-item reset active" id="demo-reset" onclick="demoApply('reset')">
+      <div class="t">正常狀況</div>
+      <div class="d">預設狀態：未套用任何示範情境，購物車 → 合併結帳可正常走完，不會出現攔截彈窗</div>
+    </button>
+    <button class="demo-item" id="demo-ship" onclick="demoApply('ship')">
+      <div class="t">① 進場攔截：物流交集空</div>
+      <div class="d">廚娘小桂僅支援宅配、妞妞童裝僅支援超商 → 購物車按「去結帳」時彈窗擋下（自動觸發）</div>
+    </button>
+    <button class="demo-item" id="demo-pay" onclick="demoApply('pay')">
+      <div class="t">① 進場攔截：金流交集空</div>
+      <div class="d">廚娘小桂僅收轉帳匯款、妞妞童裝僅收 LINE Pay → 購物車按「去結帳」時彈窗擋下（自動觸發）</div>
+    </button>
+    <button class="demo-item" id="demo-rule" onclick="demoApply('rule')">
+      <div class="t">② 頁內衝突：超商 × 貨到付款</div>
+      <div class="d">兩車金流交集只剩貨到付款（現金），訂單一改走超商取貨 → 付款交集歸零，跳出衝突彈窗（付款區同步顯示衝突卡）</div>
+    </button>
+    <button class="demo-item" id="demo-autofix" onclick="demoApply('autofix')">
+      <div class="t">③ 付款自動修正</div>
+      <div class="d">已選貨到付款（現金）後，訂單一改超商 → 貨到不可用，系統自動改選並跳出彈窗說明</div>
+    </button>
+  </div>
+  <button class="demo-btn" onclick="document.getElementById('demoPanel').classList.toggle('open')">DEMO</button>
+</div>
+
+<!-- 右下角齒輪（復刻 FloatingControls FAB 外觀；完整功能在實際專案） -->
+<div class="fab-wrap">
+  <button class="fab-gear" title="更多設定（實際專案功能）" onclick="toast('此為佔位示意,完整「更多設定」請在 pnpm dev 的實際頁面使用')">⚙</button>
+  <button class="fab-x" title="暫時隱藏（重整後恢復）" onclick="this.parentElement.style.display='none'">✕</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const money = n => '$ ' + n.toLocaleString();
+let toastTimer;
+const toast = m => { $('toast').textContent = m; $('toast').classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('show'), 1800); };
+
+// ===== 資料（對應 pinia/cart demo）=====
+// shipOk / payOk = 該購物車(後台多購物車設定)支援的物流/金流白名單
+const ALL_SHIP_IDS = ['home', 'pickup', 'store', 'post'];
+const ALL_PAY_IDS = ['credit', 'credit-digital', 'apple-pay', 'atm', 'cvs-code', 'transfer', 'line-pay', 'ipass', 'cod', 'self-pickup'];
+const GROUPS = [
+  { id: 1, seller: '07/09 廚娘小桂の直播廚房', temp: '冷凍', goods: 4038, bulk: 400, shipOk: [...ALL_SHIP_IDS], payOk: [...ALL_PAY_IDS] },
+  { id: 2, seller: '07/08 妞妞ㄉ童裝小舖',   temp: '常溫', goods: 590,  bulk: 0,   shipOk: [...ALL_SHIP_IDS], payOk: [...ALL_PAY_IDS] },
+  { id: 3, seller: '07/10 晚間直播搶購場',   temp: '常溫', goods: 26500, bulk: 0,  shipOk: [...ALL_SHIP_IDS], payOk: [...ALL_PAY_IDS] },
+];
+// ===== #4 連動商家後台「多購物車設定」(車層設定優先於全域預設) =====
+// 各訂單對應的購物車名稱;嵌在物流整合時,父層會注入 __MULTICART_RULES(多購物車設定的即時資料)
+GROUPS[0].cartName = '廚娘小桂の直播廚房';
+GROUPS[1].cartName = '妞妞ㄉ童裝小舖';
+const LOGI_TO_ID = { '宅配': 'home', '超商配送': 'store', '自取': 'pickup', '商家自建（如郵局）': 'post' };
+const PAY_TO_ID = {
+  '線上信用卡（藍新）': 'credit', '線上信用卡（數位鎏）': 'credit-digital', '線上信用卡（數位鑑）': 'credit-digital',
+  'Apple Pay': 'apple-pay', 'ATM 繳費帳號': 'atm', '超商代碼繳費': 'cvs-code', '轉帳匯款': 'transfer',
+  'LINE Pay': 'line-pay', 'iPASS MONEY': 'ipass',
+  '貨到付款': 'cod', '貨到付款（現金）': 'cod', '自取': 'self-pickup', '自取付現': 'self-pickup',
+};
+(function applyMultiCartRules() {
+  let rules = null;
+  try { rules = window.__MULTICART_RULES || (window.parent !== window && window.parent.__multiCartData) || null; } catch (e) {}
+  if (!Array.isArray(rules)) return;
+  GROUPS.forEach(g => {
+    const cart = rules.find(c => c && c.name === g.cartName);
+    if (!cart) return;
+    if (Array.isArray(cart.logiList)) {
+      const ids = cart.logiList.map(l => LOGI_TO_ID[l]).filter(Boolean);
+      if (ids.length) g.shipOk = ids;
+    }
+    if (Array.isArray(cart.payList)) {
+      const ids = cart.payList.map(l => PAY_TO_ID[l]).filter(Boolean);
+      if (ids.length) g.payOk = ids;
+    }
+    g.cartOff = cart.on === false;   // 購物車停用結帳 → 攔截
+  });
+})();
+
+// 「正常狀況」基準 = 出廠預設(白名單全開),與後台暫時的測試設定無關,保證流程可走完
+const DEMO_BASELINE = GROUPS.map(() => ({ ship: [...ALL_SHIP_IDS], pay: [...ALL_PAY_IDS], off: false }));
+
+// Demo 參數:?demo=ship-conflict / ?demo=pay-conflict 可模擬交集為空的攔截情境
+(() => {
+  const q = new URLSearchParams(location.search).get('demo');
+  if (q === 'ship-conflict') { GROUPS[0].shipOk = ['home']; GROUPS[1].shipOk = ['store']; }
+  if (q === 'pay-conflict') { GROUPS[0].payOk = ['transfer']; GROUPS[1].payOk = ['line-pay']; }
+})();
+const FREE_SHIP_MIN = 1000;
+const POINT_POOL = 500;
+const HOME_FEES = { 冷凍: 150, 冷藏: 150, 常溫: 80 };
+const POST_FEES = { 冷凍: 100, 冷藏: 100, 常溫: 70 };
+const CVS = {
+  low:    [{ n: '7-11 冷凍取貨', f: 120, s: '7-11 信義冷凍門市' }, { n: '全家 冷凍取貨', f: 110, s: '全家 信義冷凍門市' }, { n: '7-11 黑貓低溫', f: 150, s: '7-11 信義冷凍門市' }],
+  normal: [{ n: '7-11', f: 60, s: '7-11 板橋門市' }, { n: '全家', f: 60, s: '全家 板橋門市' }],
+};
+const cvsListOf = g => g.temp === '常溫' ? CVS.normal : CVS.low;
+const METHODS = [
+  { k: 'home',   label: '宅配',     ic: '🚚' },
+  { k: 'pickup', label: '自取',     ic: '🏪' },
+  { k: 'store',  label: '超商取貨', ic: '🛍️' },
+  { k: 'post',   label: '郵局宅配', ic: '📮' },
+];
+const ADDRESSES = [
+  { name: '王小明', phone: '+886 912****56', addr: '台北市信義區忠孝東路五段 100 號 10 樓', def: true },
+  { name: '王小明', phone: '+886 912****56', addr: '高雄市前鎮區中山路一段 50 號 8 樓', bad: true },
+];
+const PICKUPS = [
+  { name: '台北門市', addr: '台北市信義區忠孝東路五段 100 號 · 11:00–21:00' },
+  { name: '板橋門市', addr: '新北市板橋區文化路一段 25 號 · 12:00–21:00' },
+];
+const COUPONS = [
+  { id: 'cp1', amount: '折100', title: '滿千折百優惠券（滿1000元使用）', desc: '活動訂單滿 $1000 現折 $100', scope: '適用範圍（直播場次）', exp: '有效期限至 2026.01.20 23:00', min: 1000, calc: () => 100 },
+  { id: 'cp5', amount: '折80',  title: '組合商品專屬折80（限單一商品）', desc: '指定組合商品現折 $80', scope: '適用商品：包屁衣韓版小洋裝雙件組', exp: '有效期限至 2026.01.20 23:00', onlyGroup: 2, calc: () => 80 },
+  { id: 'cp3', amount: '折300', title: '滿三千折三百（滿3000元使用）', desc: '常客單筆滿 $3000 現折 $300', scope: '適用範圍：全站', exp: '有效期限至 2026.01.20 23:00', min: 3000, calc: () => 300 },
+];
+
+// ===== 狀態 =====
+let method = null;            // 共同區配送方式（同步帶入各訂單）
+const methodBy = { 1: null, 2: null, 3: null };   // 各訂單覆寫；null = 跟隨共同區
+let drawerTarget = null;                 // 抽屜目標訂單 id；null = 共同區入口
+const effM = g => methodBy[g.id] || method;   // 該訂單實際生效方式
+const isMixed = () => AG().some(g => effM(g) !== method);
+let addrIdx = 0, pickupIdx = 0;
+const cvsPick = { 1: -1, 2: -1, 3: -1 };
+const couponBy = { 1: null, 2: null, 3: null };
+const points = { 1: 0, 2: 0, 3: 0 };
+let drawerCouponGroup = null, drawerCouponSel = null;
+
+// ===== 物流 × 付款規則 =====
+// 金流以「各車白名單交集」為準;物流只加真實限制:
+// 超商取貨不收貨到付款、自取不收貨到付款(改自取付現)、自取付現僅限自取
+const ONLINE_PAYS = ['credit', 'credit-digital', 'apple-pay', 'atm', 'cvs-code', 'transfer', 'line-pay', 'ipass'];
+const SHIP_PAY_RULES = {
+  home: [...ONLINE_PAYS, 'cod'],
+  post: [...ONLINE_PAYS, 'cod'],
+  pickup: [...ONLINE_PAYS, 'self-pickup'],
+  store: [...ONLINE_PAYS],
+};
+const PAY_LABELS = {
+  credit: '線上信用卡（藍新）', 'credit-digital': '線上信用卡（數位鑑）', 'apple-pay': 'Apple Pay',
+  atm: 'ATM 繳費帳號', 'cvs-code': '超商代碼繳費', transfer: '轉帳匯款',
+  'line-pay': 'LINE Pay', ipass: 'iPASS MONEY', cod: '貨到付款（現金）', 'self-pickup': '自取付現',
+};
+const SHIP_PAY_NOTES = { home: '', post: '', store: '不支援貨到付款', pickup: '不支援貨到付款' };
+// ===== 參與合併結帳的購物車(與購物車頁勾選連動) =====
+const activeIds = { 1: true, 2: true, 3: true };
+const AG = () => GROUPS.filter(g => activeIds[g.id]);   // active groups
+
+const allMethodsChosen = () => AG().every(g => !!effM(g));
+// ===== 合併結帳前的交集檢查(#1):參與購物車的物流/金流白名單交集,任一為空 → 擋下 =====
+const shipIntersection = () => ALL_SHIP_IDS.filter(k => AG().every(g => (g.shipOk || ALL_SHIP_IDS).includes(k)));
+const basePayIntersection = () => ALL_PAY_IDS.filter(p => AG().every(g => (g.payOk || ALL_PAY_IDS).includes(p)));
+const mergeBlockReason = () =>
+  AG().some(g => g.cartOff) ? 'off'
+  : shipIntersection().length === 0 ? 'ship'
+  : (basePayIntersection().length === 0 ? 'pay' : null);
+// 可選付款 = 參與購物車金流白名單交集,再依各訂單生效物流的規則過濾
+const allowedPays = () => {
+  let list = basePayIntersection();
+  AG().forEach(g => { const m = effM(g); if (m) list = list.filter(p => SHIP_PAY_RULES[m].includes(p)); });
+  return list;
+};
+function goBackPage() {
+  if (window.parent !== window) { parent.postMessage({ __checkoutNav: 'back' }, '*'); }
+  else { history.back(); }
+}
+
+// ===== 頁面切換:購物車(進場前) → 合併結帳 =====
+let page = 'cart';
+function showPage(p) {
+  page = p;
+  $('viewCart').style.display = p === 'cart' ? 'block' : 'none';
+  $('viewCheckout').style.display = p === 'checkout' ? 'block' : 'none';
+  $('payBar').style.display = p === 'checkout' ? 'block' : 'none';
+  window.scrollTo({ top: 0 });
+}
+const CART_INFO = { 1: { items: 4, total: 4038 }, 2: { items: 2, total: 590 }, 3: { items: 2, total: 26500 } };
+// ── 挑選規格(07/10 晚間直播搶購場) ──
+const SPEC_ITEMS = {
+  s1: { name: '寶寶連身包屁衣 有機棉長袖春秋款 0-18個月', need: 100, rows: [], sizes: ['60cm', '70cm', '80cm', '90cm'], colors: ['米白', '奶茶', '淺粉', '鵝黃'], soldOut: { sizes: ['80cm'], colors: [] } },
+  s2: { name: '女童牛仔短褲 夏季薄款休閒百搭', need: 30, rows: [], sizes: ['100cm', '110cm', '120cm', '130cm'], colors: ['淺藍', '深藍'], soldOut: { sizes: [], colors: ['深藍'] } },
+};
+let specCurrent = null, specSnapshot = null;
+const specPickedOf = k => SPEC_ITEMS[k].rows.reduce((s, r) => s + r.qty, 0);
+function openSpec(key) {
+  specCurrent = key;
+  const it = SPEC_ITEMS[key];
+  specSnapshot = JSON.parse(JSON.stringify(it.rows));
+  $('specName').textContent = it.name;
+  $('specNeed').textContent = it.need;
+  const opt = (v, out) => `<option value="${v}"${out ? ' disabled' : ''}>${v}${out ? '（已售完）' : ''}</option>`;
+  $('specSize').innerHTML = it.sizes.map(v => opt(v, it.soldOut.sizes.includes(v))).join('');
+  $('specColor').innerHTML = it.colors.map(v => opt(v, it.soldOut.colors.includes(v))).join('');
+  $('specSize').value = it.sizes.find(v => !it.soldOut.sizes.includes(v));
+  $('specColor').value = it.colors.find(v => !it.soldOut.colors.includes(v));
+  $('specQty').value = 1;
+  specWarnTried = false;
+  renderSpecList();
+  $('specModal').classList.add('open');
+}
+let specWarnTried = false;
+function renderSpecList() {
+  const it = SPEC_ITEMS[specCurrent];
+  const picked = specPickedOf(specCurrent), left = it.need - picked;
+  $('specSum').innerHTML = `請挑選並加入規格，已挑選 <b>${picked}</b> 件，剩餘 <b>${left}</b> 件`;
+  $('specWarn').textContent = `⚠ 尚有 ${left} 件未挑選，選滿 ${it.need} 件才能確定送出`;
+  $('specWarn').classList.toggle('show', specWarnTried && left > 0);
+  $('specList').innerHTML = it.rows.length
+    ? it.rows.map((r, i) => `<div class="spec-line"><span>${r.size} / ${r.color} × ${r.qty} 件</span><button class="spec-del" onclick="removeSpecRow(${i})">刪除</button></div>`).join('')
+    : '<div class="spec-line" style="color:var(--faint);">尚未加入任何規格</div>';
+}
+function addSpecRow() {
+  const it = SPEC_ITEMS[specCurrent];
+  const qty = parseInt($('specQty').value, 10) || 0;
+  if (qty <= 0) { toast('數量需大於 0'); return; }
+  if (specPickedOf(specCurrent) + qty > it.need) { toast(`超過得標數量(${it.need} 件),請調整`); return; }
+  const size = $('specSize').value, color = $('specColor').value;
+  if (it.soldOut.sizes.includes(size) || it.soldOut.colors.includes(color)) { toast('此規格已售完,請改選其他規格'); return; }
+  const dup = it.rows.find(r => r.size === size && r.color === color);
+  if (dup) dup.qty += qty; else it.rows.push({ size, color, qty });
+  $('specQty').value = 1;
+  renderSpecList();
+}
+function removeSpecRow(i) { SPEC_ITEMS[specCurrent].rows.splice(i, 1); renderSpecList(); }
+function closeSpec(save) {
+  if (save && specPickedOf(specCurrent) < SPEC_ITEMS[specCurrent].need) {
+    specWarnTried = true;
+    renderSpecList();
+    return;
+  }
+  if (!save) SPEC_ITEMS[specCurrent].rows = specSnapshot;
+  $('specModal').classList.remove('open');
+  updateSpecTags();
+}
+function updateSpecTags() {
+  Object.keys(SPEC_ITEMS).forEach(k => {
+    const it = SPEC_ITEMS[k], el = $('specTag-' + k);
+    if (!el) return;
+    const left = it.need - specPickedOf(k);
+    if (left > 0) { el.className = 'tag warn'; el.textContent = `⚠ 待挑選規格(尚缺 ${left})`; }
+    else { el.className = 'tag success'; el.textContent = '✔ 已完成挑選'; }
+  });
+}
+const specIncompleteCount = () => Object.keys(SPEC_ITEMS).reduce((s, k) => s + Math.max(0, SPEC_ITEMS[k].need - specPickedOf(k)), 0);
+const checkedGroups = () => GROUPS.filter(g => $('chk' + g.id) && $('chk' + g.id).checked);
+function renderCart() {
+  const parts = checkedGroups();
+  const items = parts.reduce((s, g) => s + CART_INFO[g.id].items, 0);
+  const total = parts.reduce((s, g) => s + CART_INFO[g.id].total, 0);
+  $('cartSummary').innerHTML = `已選 ${items} 件，總計 <b style="color:var(--primary);font-size:18px;">$${total.toLocaleString()}</b>`;
+  $('goCheckoutBtn').textContent = `去結帳 (${items})`;
+  $('goCheckoutBtn').disabled = parts.length === 0;
+  GROUPS.forEach(g => { const t = $('cartCartTag' + g.id); if (t) t.textContent = g.cartName ? `套用:${g.cartName}` : ''; });
+}
+// 防線一:按「去結帳」時檢查交集,為空 → 彈窗擋下(單台購物車無交集問題,直接放行)
+function syncCheckoutVisibility() {
+  GROUPS.forEach(g => {
+    const el = $('orderCard' + g.id);
+    if (el) el.style.display = activeIds[g.id] ? 'block' : 'none';
+  });
+}
+function goCheckout() {
+  // 與購物車勾選連動:只結帳有勾選的購物車
+  GROUPS.forEach(g => { activeIds[g.id] = !!($('chk' + g.id) && $('chk' + g.id).checked); });
+  const parts = checkedGroups();
+  if (!parts.length) return;
+  if (activeIds[3] && specIncompleteCount() > 0) {
+    toast(`「07/10 晚間直播搶購場」尚有 ${specIncompleteCount()} 件待挑選規格,請先完成挑選或取消勾選該筆`);
+    return;
+  }
+  if (parts.length >= 2) {
+    const reason = mergeBlockReason();
+    if (reason) {
+      const ml0 = { home: '宅配', pickup: '自取', store: '超商取貨', post: '郵局宅配' };
+      $('mergeModalLines').innerHTML = reason === 'off'
+        ? AG().filter(g => g.cartOff).map(g => `<b>${g.seller}</b>：所屬購物車「${g.cartName}」已停用結帳`).join('<br>')
+        : reason === 'ship'
+          ? '各筆訂單沒有共同支援的配送方式：<br>' + AG().map(g => `<b>${g.seller}</b>：僅支援 ${(g.shipOk || []).map(k => ml0[k]).join('、')}`).join('<br>')
+          : '各筆訂單沒有共同支援的付款方式：<br>' + AG().map(g => `<b>${g.seller}</b>：僅支援 ${(g.payOk || []).map(p => PAY_LABELS[p]).join('、')}`).join('<br>');
+      $('mergeModal').classList.add('open');
+      return;
+    }
+  }
+  syncCheckoutVisibility();
+  render();
+  showPage('checkout');
+}
+
+const afterBulk = g => g.goods - g.bulk;
+const feeOf = g => {
+  const m = effM(g);
+  if (!m) return null;
+  if (m === 'home') return HOME_FEES[g.temp];
+  if (m === 'post') return POST_FEES[g.temp];
+  if (m === 'pickup') return 0;
+  const i = cvsPick[g.id]; return i < 0 ? null : cvsListOf(g)[i].f;
+};
+const freeShip = g => afterBulk(g) >= FREE_SHIP_MIN;
+const shipDisc = g => { const f = feeOf(g); return f !== null && f > 0 && freeShip(g) ? f : 0; };
+const couponOf = g => COUPONS.find(c => c.id === couponBy[g.id]) || null;
+const couponDisc = g => { const c = couponOf(g); return c ? c.calc(g) : 0; };
+const shipLabelOf = g => {
+  const m = effM(g);
+  if (m === 'home') return g.temp + '宅配';
+  if (m === 'post') return g.temp + '郵局宅配';
+  if (m === 'pickup') return '自取 · ' + PICKUPS[pickupIdx].name;
+  const i = cvsPick[g.id];
+  return g.temp + '超商取貨' + (i >= 0 ? ' · ' + cvsListOf(g)[i].s : '（尚未選門市）');
+};
+const subOf = g => Math.max(0, afterBulk(g) + (feeOf(g) ?? 0) - shipDisc(g) - couponDisc(g) - points[g.id]);
+
+// ===== 收據式明細 =====
+function renderReceipt(g) {
+  const fee = feeOf(g);
+  const remain = POINT_POOL - points[1] - points[2];
+  const row = (label, ctl, hint, amt) => `<div class="r-row">
+    <span class="r-label">${label}</span>
+    ${ctl ? `<span class="r-ctl">${ctl}</span>` : ''}
+    ${hint ? `<span class="r-hint">${hint}</span>` : ''}
+    ${amt}
+  </div>`;
+  let h = row('商品金額', '', '', `<span class="r-amt">${money(g.goods)}</span>`);
+  if (g.bulk > 0) h += row('多件優惠折抵', '', '', `<span class="r-amt red">- ${money(g.bulk)}</span>`);
+  const m = effM(g);
+  const notTag = (m && fee !== null && fee > 0 && !freeShip(g)) ? ' <span class="tag off">未達免運門檻</span>' : '';
+  h += row('運費',
+    `<button class="r-btn" onclick="openShip(${g.id})">${m ? '變更' : '選擇配送方式'}</button>`,
+    m ? `<span class="lk">${shipLabelOf(g)}</span>${notTag}` : '',
+    `<span class="r-amt${fee === null ? ' dash' : ''}">${fee === null ? '—' : (fee === 0 ? '免運' : money(fee))}</span>`);
+  if (shipDisc(g) > 0) h += row('運費折抵',
+    `<span class="r-tag-cell">達免運門檻</span>`, '',
+    `<span class="r-amt red">- ${money(shipDisc(g))}</span>`);
+  const c = couponOf(g);
+  h += row('優惠券',
+    `<button class="r-btn" onclick="openCoupon(${g.id})">${c ? '變更' : '選擇優惠券'}</button>`,
+    c ? `<span class="lk">${c.title}</span>` : '',
+    `<span class="r-amt${c ? ' red' : ' dash'}">${c ? '- ' + money(couponDisc(g)) : '—'}</span>`);
+  const p = points[g.id];
+  h += row('紅利點數',
+    `<span class="stepper"><button onclick="chgPt(${g.id},-1)" ${p === 0 ? 'disabled' : ''}>−</button><span class="n">${p}</span><button onclick="chgPt(${g.id},1)" ${remain === 0 ? 'disabled' : ''}>＋</button></span>`,
+    `尚有 <b>${remain}</b> 點`,
+    `<span class="r-amt${p > 0 ? ' red' : ' dash'}">${p > 0 ? '- ' + money(p) : '—'}</span>`);
+  $('receipt' + g.id).innerHTML = h;
+  $('sub' + g.id).textContent = '$' + subOf(g).toLocaleString();
+}
+
+function render() {
+  AG().forEach(renderReceipt);
+  const goods = AG().reduce((s, g) => s + g.goods, 0);
+  const bulk = AG().reduce((s, g) => s + g.bulk, 0);
+  const ship = AG().reduce((s, g) => s + (feeOf(g) ?? 0), 0);
+  const sd = AG().reduce((s, g) => s + shipDisc(g), 0);
+  const cd = AG().reduce((s, g) => s + couponDisc(g), 0);
+  const pt = AG().reduce((s, g) => s + (points[g.id] || 0), 0);
+  const grand = AG().reduce((s, g) => s + subOf(g), 0);
+  $('ppGoods').textContent = money(goods);
+  $('ppShipRow').style.display = method ? 'flex' : 'none';
+  $('ppShip').textContent = money(ship);
+  $('ppBulk').textContent = '- ' + money(bulk);
+  $('ppShipDiscRow').style.display = sd > 0 ? 'flex' : 'none';
+  $('ppShipDisc').textContent = '- ' + money(sd);
+  $('ppCouponRow').style.display = cd > 0 ? 'flex' : 'none';
+  $('ppCoupon').textContent = '- ' + money(cd);
+  $('ppPointsRow').style.display = pt > 0 ? 'flex' : 'none';
+  $('ppPoints').textContent = '- ' + money(pt);
+  $('ppGrand').textContent = money(grand);
+  $('grand').textContent = '$' + grand.toLocaleString();
+  const saved = bulk + sd + cd + pt;
+  $('save').textContent = saved > 0 ? `共省下 -$${saved.toLocaleString()}` : '';
+  // 訂單卡標頭的溫層 tag（可由右下角浮動控制切換）
+  GROUPS.forEach(g => {
+    const el = $('tempTag' + g.id);
+    if (el) { el.textContent = g.temp; el.className = 'tag ' + (g.temp === '常溫' ? 'secondary' : g.temp === '冷藏' ? 'success' : 'info'); }
+    const ct = $('cartTag' + g.id);
+    if (ct) ct.textContent = g.cartName ? `套用:${g.cartName}` : '';
+  });
+  // #1 合併結帳交集檢查:白名單交集為空 → 頂部攔截卡,鎖定去付款
+  const blockReason = mergeBlockReason();
+  $('mergeBlock').style.display = blockReason ? 'block' : 'none';
+  if (blockReason) {
+    const ml0 = { home: '宅配', pickup: '自取', store: '超商取貨', post: '郵局宅配' };
+    $('mergeBlockLines').innerHTML = blockReason === 'off'
+      ? AG().filter(g => g.cartOff).map(g => `${g.seller}：所屬購物車「${g.cartName}」已停用結帳`).join('<br>')
+      : blockReason === 'ship'
+        ? '各筆訂單沒有共同支援的配送方式：<br>' + AG().map(g => `${g.seller}：僅支援 ${(g.shipOk || []).map(k => ml0[k]).join('、')}`).join('<br>')
+        : '各筆訂單沒有共同支援的付款方式：<br>' + AG().map(g => `${g.seller}：僅支援 ${(g.payOk || []).map(p => PAY_LABELS[p]).join('、')}`).join('<br>');
+    $('payBtn').disabled = true;
+    $('payNormal').style.display = 'none';
+    $('payConflict').style.display = 'none';
+  }
+
+  // 付款區：可選付款 = 交集;交集為空 → 衝突卡 + 去付款鎖定
+  const pays = allowedPays();
+  if (!blockReason) {
+    const conflict = allMethodsChosen() && pays.length === 0;
+    currentPayConflict = conflict;
+    if (!conflict) payConflictNotified = false;   // 衝突解除 → 下次再發生會重新提醒
+    $('payNormal').style.display = conflict ? 'none' : 'block';
+    $('payConflict').style.display = conflict ? 'block' : 'none';
+    $('payBtn').disabled = conflict;
+    if (conflict) {
+      // 逐單列出「該單在其物流下實際可用的金流」,讓使用者看懂交集為何為空
+      const ml0 = { home: '宅配', post: '郵局宅配', pickup: '自取', store: '超商取貨' };
+      $('conflictLines').innerHTML = AG().map(g => {
+        const m = effM(g);
+        const eff = (g.payOk || ALL_PAY_IDS).filter(p => SHIP_PAY_RULES[m].includes(p));
+        const note = SHIP_PAY_NOTES[m] ? `（${SHIP_PAY_NOTES[m]}）` : '';
+        return `${g.seller}（${ml0[m]}${note}）：可用 ${eff.length ? eff.map(p => PAY_LABELS[p]).join('、') : '無'}`;
+      }).join('<br>');
+    } else {
+      const sel = $('paySelect');
+      const prev = sel.value;
+      sel.innerHTML = pays.map(p => `<option value="${p}">${PAY_LABELS[p]}</option>`).join('');
+      if (pays.includes(prev)) sel.value = prev;
+      else if (prev) toastPayReset(prev, pays);
+      updateBank();
+    }
+  }
+
+  // 配送資訊卡（混合模式：各段獨立判斷、可同時顯示）
+  const ml = { home: '宅配', pickup: '自取', store: '超商取貨', post: '郵局宅配' };
+  $('methodLabel').textContent = (method ? ml[method] : '尚未選擇') + (isMixed() ? '（各訂單不同）' : '');
+  $('methodLabel').style.color = method ? 'var(--text)' : 'var(--muted)';
+  const ab = $('addrBlock');
+  const effs = AG().map(effM);
+  const hasHomeLike = effs.some(m => m === 'home' || m === 'post');
+  const hasPickup = effs.some(m => m === 'pickup');
+  const storeGroups = AG().filter(g => effM(g) === 'store');
+  if (!hasHomeLike && !hasPickup && storeGroups.length === 0 && !isMixed()) {
+    ab.style.display = 'none';
+  } else {
+    ab.style.display = 'block';
+    $('addrKey').textContent = '';
+    let hv = '';
+    if (isMixed()) {
+      hv += AG().map(g => `<div style="margin:3px 0;"><span class="k">${g.seller}</span>　${effM(g) ? ml[effM(g)] : '<span style="color:var(--muted);">尚未選擇</span>'}</div>`).join('');
+    }
+    if (hasHomeLike) {
+      const a = ADDRESSES[addrIdx];
+      hv += `<div style="margin:6px 0 3px;" class="k">配送地址</div><div>${a.name}　${a.phone}　${a.addr}</div>`;
+    }
+    if (hasPickup) {
+      hv += `<div style="margin:6px 0 3px;" class="k">自取門市</div><div>${PICKUPS[pickupIdx].name}　${PICKUPS[pickupIdx].addr}</div>`;
+    }
+    if (storeGroups.length) {
+      hv += `<div style="margin:6px 0 3px;" class="k">取貨門市（各訂單）</div>` + storeGroups.map(g => {
+        const i = cvsPick[g.id];
+        return `<div style="margin:3px 0;"><span class="k">${g.seller}</span>　${i >= 0 ? cvsListOf(g)[i].s : '<span style="color:var(--red);">尚未選門市</span>'}</div>`;
+      }).join('');
+    }
+    $('addrVal').innerHTML = hv;
+  }
+}
+// ===== DEMO 情境切換(示意用) =====
+function demoResetState() {
+  GROUPS.forEach((g, i) => {
+    g.shipOk = [...DEMO_BASELINE[i].ship];
+    g.payOk = [...DEMO_BASELINE[i].pay];
+    g.cartOff = DEMO_BASELINE[i].off;
+    methodBy[g.id] = null;
+    cvsPick[g.id] = -1;
+  });
+  method = null;
+  lastPayResetKey = '';
+  pendingPayFix = null;
+  GROUPS.forEach(g => { activeIds[g.id] = true; const c = $('chk' + g.id); if (c) c.checked = true; });
+  syncCheckoutVisibility();
+  payConflictNotified = false;
+  currentPayConflict = false;
+  ['mergeModal', 'payConflictModal', 'payFixModal'].forEach(id => $(id).classList.remove('open'));
+}
+function demoApply(kind) {
+  demoResetState();
+  if (kind === 'ship') {
+    GROUPS[0].shipOk = ['home']; GROUPS[1].shipOk = ['store'];
+  } else if (kind === 'pay') {
+    GROUPS[0].payOk = ['transfer']; GROUPS[1].payOk = ['line-pay'];
+  } else if (kind === 'rule') {
+    GROUPS[0].payOk = ['cod']; GROUPS[1].payOk = ['cod', 'transfer'];
+    method = 'home';           // 共同區宅配
+    methodBy[1] = 'store';     // 訂單一個別改超商 → 貨到被排除,交集歸零
+    cvsPick[1] = 0;
+  } else if (kind === 'autofix') {
+    method = 'home';
+    render();
+    $('paySelect').value = 'cod';   // 先選貨到付款(現金)
+    methodBy[1] = 'store';          // 訂單一改超商 → 貨到不可用 → 自動改選+提示
+    cvsPick[1] = 0;
+  }
+  render();
+  document.querySelectorAll('.demo-item').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('demo-' + kind);
+  if (el) el.classList.add('active');
+  if (kind === 'ship' || kind === 'pay') {
+    // 防線一發生在購物車頁 → 切到購物車並自動按「去結帳」觸發彈窗(情境聚焦前兩車,第三車不參與)
+    if ($('chk1')) $('chk1').checked = true;
+    if ($('chk2')) $('chk2').checked = true;
+    if ($('chk3')) $('chk3').checked = false;
+    renderCart();
+    showPage('cart');
+    goCheckout();
+  } else if (kind === 'rule' || kind === 'autofix') {
+    if ($('chk3')) $('chk3').checked = false;
+    activeIds[3] = false;
+    syncCheckoutVisibility();
+    render();
+    showPage('checkout');
+    flushPayNotices();
+  } else {
+    renderCart();
+    showPage('cart');
+    toast('已回到正常狀況');
+  }
+}
+
+// 原本選的付款因物流調整而不可用 → 換成清單第一項;彈窗說明(抽屜關閉後才跳,避免疊窗)
+let lastPayResetKey = '';
+let pendingPayFix = null;
+function toastPayReset(prev, pays) {
+  const key = prev + '>' + pays.join(',');
+  if (key === lastPayResetKey) return;
+  lastPayResetKey = key;
+  if (PAY_LABELS[prev]) pendingPayFix = { prev, next: pays[0] };
+}
+// 頁內衝突/自動修正的彈窗提醒:時機 = 狀態改變完成後(關閉抽屜或 DEMO 套用當下)
+let payConflictNotified = false;
+let currentPayConflict = false;
+function flushPayNotices() {
+  if (page !== 'checkout') return;
+  if (currentPayConflict && !payConflictNotified) {
+    payConflictNotified = true;
+    $('payConflictModalLines').innerHTML = $('conflictLines').innerHTML;
+    $('payConflictModal').classList.add('open');
+    return;
+  }
+  if (pendingPayFix) {
+    $('payFixModalLines').innerHTML =
+      `因配送方式調整，「<b>${PAY_LABELS[pendingPayFix.prev]}</b>」已不可用，已為您改選「<b>${PAY_LABELS[pendingPayFix.next] ?? '－'}</b>」。`;
+    $('payFixModal').classList.add('open');
+    pendingPayFix = null;
+  }
+}
+function chgPt(id, d) {
+  const remain = POINT_POOL - points[1] - points[2];
+  if (d > 0 && remain > 0) points[id]++;
+  if (d < 0 && points[id] > 0) points[id]--;
+  render();
+}
+
+// ===== 運送方式抽屜 =====
+const feeHint = m => {
+  if (m === 'pickup') return '$0';
+  const fees = AG().map(g => m === 'home' ? HOME_FEES[g.temp] : m === 'post' ? POST_FEES[g.temp] : Math.min(...cvsListOf(g).map(b => b.f)));
+  return '$' + Math.min(...fees) + ' 起';
+};
+// 抽屜選擇方式：共同區入口 → 設共同並清除全部覆寫（同步帶入）；
+// 個別訂單入口 → 只覆寫該訂單，不影響其他訂單
+function selectShipMethod(k) {
+  if (drawerTarget == null) {
+    method = k;
+    GROUPS.forEach(g => { methodBy[g.id] = null; });
+  } else {
+    methodBy[drawerTarget] = k;
+  }
+  renderShip(); render();
+}
+function renderShip() {
+  const drawerSel = drawerTarget != null ? (methodBy[drawerTarget] || method) : method;
+  const targetGroups = drawerTarget != null ? AG().filter(g => g.id === drawerTarget) : AG();
+  const shipOk = shipIntersection();
+  const visibleMethods = METHODS.filter(mo => shipOk.includes(mo.k));
+  $('shipTitleNote').textContent = (drawerTarget != null
+    ? `僅套用於:${GROUPS.find(g => g.id === drawerTarget).seller}`
+    : '套用於全部訂單(各訂單可再個別變更)')
+    + (visibleMethods.length < METHODS.length ? '；部分方式因各訂單不共同支援已隱藏' : '');
+  $('shipBody').innerHTML = visibleMethods.map(mo => {
+    const on = drawerSel === mo.k;
+    let body = '';
+    if (on && (mo.k === 'home' || mo.k === 'post')) {
+      body = ADDRESSES.map((a, i) => `
+        <button class="addr${addrIdx === i ? ' on' : ''}${a.bad ? ' disabled' : ''}" ${a.bad ? '' : `onclick="addrIdx=${i};renderShip();render()"`}>
+          <span class="a1">${a.name} <span>${a.phone}</span>${a.def ? ' <span class="badge">預設</span>' : ''}</span>
+          <div class="a2">📍 ${a.addr}</div>${a.bad ? '<div class="warn">目前不提供配送至此地區</div>' : ''}
+        </button>`).join('') + `<button class="add-btn">＋ 新增宅配地址</button>`;
+    } else if (on && mo.k === 'pickup') {
+      body = PICKUPS.map((p, i) => `
+        <button class="addr${pickupIdx === i ? ' on' : ''}" onclick="pickupIdx=${i};renderShip();render()">
+          <span class="a1">${p.name}</span><div class="a2">🏪 ${p.addr}</div>
+        </button>`).join('');
+    } else if (on && mo.k === 'store') {
+      body = `<p class="k" style="margin:0 0 4px;">點選超商品牌即帶出門市（依溫層）：</p>` + targetGroups.map(g => {
+        const list = cvsListOf(g), pi = cvsPick[g.id];
+        return `<div class="cvs-group">
+          <div class="g-head"><span>${g.seller}</span><span class="tag ${g.temp === '常溫' ? 'secondary' : 'info'}">${g.temp}</span></div>
+          <div class="chips">${list.map((b, i) => `<button class="chip${pi === i ? ' on' : ''}" onclick="cvsPick[${g.id}]=${i};renderShip();render()">${b.n} $${b.f}</button>`).join('')}</div>
+          ${pi >= 0 ? `<div class="picked">📍 門市：<b>${list[pi].s}</b><button class="re" onclick="cvsPick[${g.id}]=-1;renderShip();render()">更換</button></div>` : ''}
+        </div>`;
+      }).join('');
+    }
+    return `<div class="m-card${on ? ' active' : ''}">
+      <button class="m-head" onclick="selectShipMethod('${mo.k}')">
+        <span class="radio"></span><span class="m-ic">${mo.ic}</span><span class="m-name">${mo.label}</span><span class="m-fee">${feeHint(mo.k)}</span>
+      </button>
+      ${body ? `<div class="m-body">${body}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+function openShip(target) { drawerTarget = target ?? null; renderShip(); $('shipBackdrop').classList.add('open'); $('shipDrawer').classList.add('open'); }
+function closeShip() { $('shipBackdrop').classList.remove('open'); $('shipDrawer').classList.remove('open'); render(); flushPayNotices(); }
+
+// ===== 優惠券抽屜 =====
+function couponState(g, c) {
+  if (c.onlyGroup && c.onlyGroup !== g.id) return '本訂單無適用商品';
+  if (GROUPS.some(x => x.id !== g.id && couponBy[x.id] === c.id)) return '已用於其他訂單';
+  if (c.min && afterBulk(g) < c.min) return '金額未達門檻';
+  return '';
+}
+function renderCoupon() {
+  const g = GROUPS.find(x => x.id === drawerCouponGroup);
+  $('cpFor').textContent = '套用於：' + g.seller;
+  $('cpBody').innerHTML = COUPONS.map(c => {
+    const reason = couponState(g, c);
+    const usable = !reason;
+    return `<div class="cp${usable ? '' : ' disabled'}" ${usable ? `onclick="drawerCouponSel='${c.id}';renderCoupon()"` : ''}>
+      <div class="amt">${c.amount}</div>
+      <div class="info"><div class="t">${c.title}</div><div class="d">${c.desc}</div><span class="scope">${c.scope}</span><div class="exp">${c.exp}</div></div>
+      <div class="side">${usable ? `<span class="radio${drawerCouponSel === c.id ? ' on' : ''}"></span>` : reason}</div>
+    </div>`;
+  }).join('');
+}
+function openCoupon(gid) { drawerCouponGroup = gid; drawerCouponSel = couponBy[gid]; renderCoupon(); $('cpBackdrop').classList.add('open'); $('cpDrawer').classList.add('open'); }
+function closeCoupon() { $('cpBackdrop').classList.remove('open'); $('cpDrawer').classList.remove('open'); }
+function confirmCoupon() { couponBy[drawerCouponGroup] = drawerCouponSel; closeCoupon(); render(); toast('已套用選擇的優惠券'); }
+function clearCoupon() { drawerCouponSel = null; confirmCoupon(); }
+
+// ===== 其他 =====
+function togglePanel() {
+  const open = !$('payPanel').classList.contains('open');
+  $('payPanel').classList.toggle('open', open);
+  $('caret').style.transform = open ? 'rotate(180deg)' : '';
+}
+function updateBank() {
+  const v = $('paySelect').value;
+  $('bankInfo').style.display = v === 'transfer' ? 'block' : 'none';
+  $('cashHint').style.display = (v === 'cod' || v === 'self-pickup') ? 'block' : 'none';
+}
+
+// ===== 訂單備註（每台購物車訂單一則，選填；預設收合）=====
+const NOTE_MAX = 100;
+const notes = { 1: '', 2: '', 3: '' };
+const noteOpen = { 1: false, 2: false, 3: false };
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function renderNote(id) {
+  const el = $('note' + id), val = notes[id];
+  if (noteOpen[id]) {
+    el.innerHTML = `<div class="note-edit"><span class="nl">訂單備註</span><div>
+      <textarea rows="2" maxlength="${NOTE_MAX}" placeholder="給賣家的留言（選填），例如：出貨前請電話聯絡"
+        oninput="notes[${id}]=this.value;document.getElementById('noteCnt${id}').textContent=this.value.length">${esc(val)}</textarea>
+      <div class="nf"><span class="k"><span id="noteCnt${id}">${val.length}</span> / ${NOTE_MAX}</span>
+      <button class="note-link" onclick="noteOpen[${id}]=false;renderNote(${id})">完成</button></div>
+    </div></div>`;
+    el.querySelector('textarea').focus();
+  } else if (val.trim()) {
+    el.innerHTML = `<div class="note-row"><span class="nl">訂單備註</span><span class="nv">${esc(val.trim())}</span>
+      <button class="note-link" onclick="noteOpen[${id}]=true;renderNote(${id})">編輯</button></div>`;
+  } else {
+    el.innerHTML = `<button class="note-link add" onclick="noteOpen[${id}]=true;renderNote(${id})">＋ 新增訂單備註</button>`;
+  }
+}
+
+function placeOrder() {
+  if (AG().some(g => !effM(g))) { toast('請先選擇配送方式'); openShip(); return; }
+  const missing = AG().find(g => effM(g) === 'store' && cvsPick[g.id] < 0);
+  if (missing) { toast('請為各訂單選擇取貨門市'); openShip(missing.id); return; }
+  toast('付款成功（示意）→ 導向付款成功頁');
+}
+render();
+renderNote(1); renderNote(2); renderNote(3);
+updateSpecTags();
+renderCart();
+showPage('cart');
+// 帶 ?demo= 參數載入時,自動按「去結帳」讓進場攔截彈窗直接展示
+if (new URLSearchParams(location.search).get('demo')) goCheckout();
+</script>
+</body>
+</html>
