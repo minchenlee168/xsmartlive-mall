@@ -905,4 +905,49 @@ export const products: Product[] = [
       },
     ],
   },
+  // ─── 商城商品（非直播場次；從此分類加入 → 進「自選結帳 pickable」的商城車）─────
+  {
+    id: 400,
+    name: '北歐風棉麻抱枕套 45×45cm',
+    price: 199,
+    original: 350,
+    stock: 50,
+    category: '商城商品',
+    image:
+      'https://images.unsplash.com/photo-1584100936595-c0654b55a2e6?w=600&fit=crop',
+    hasVariant: true,
+    sizes: ['米白', '灰藍', '墨綠'],
+  },
+  {
+    id: 401,
+    name: '玻尿酸保濕精華液 30ml',
+    price: 590,
+    original: 880,
+    stock: 30,
+    category: '商城商品',
+    image:
+      'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&fit=crop',
+  },
+  {
+    id: 402,
+    name: '無線藍牙耳機 降噪入耳式',
+    price: 1290,
+    original: 1990,
+    stock: 20,
+    category: '商城商品',
+    image:
+      'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&fit=crop',
+    hasVariant: true,
+    sizes: ['黑', '白'],
+  },
+  {
+    id: 403,
+    name: '冷萃咖啡濃縮液 6 入組',
+    price: 349,
+    original: 480,
+    stock: 40,
+    category: '商城商品',
+    image:
+      'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600&fit=crop',
+  },
 ];

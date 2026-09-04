@@ -34,6 +34,7 @@ export const useCartStore = defineStore('cart', () => {
       // 直播下標車：default 模式（整台一起結、禁止棄標）；下標當下未選規格，需在車內後選 SKU
       id: 6,
       sellerName: '07/10 晚間直播搶購場',
+      sessionName: '晚間搶購場 EP.128',
       tags: [{ label: '常溫', type: 'secondary' }],
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
@@ -104,6 +105,7 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 1,
       sellerName: '07/09 廚娘小桂の直播廚房',
+      sessionName: '小桂廚房 EP.56',
       tags: [{ label: '冷凍', type: 'info' }],
       // 冷凍商品四種物流皆支援（超商走冷凍取貨），但不收貨到付款 / 自取付款
       shippingMethods: ['home', 'store', 'pickup', 'post'],
@@ -118,7 +120,8 @@ export const useCartStore = defineStore('cart', () => {
       ],
       checkoutMode: 'pickable',
       // 直播商品加購區：這台推薦的加購商品 id（對應 CartPage 的 ADD_ON_PRODUCTS）
-      addOnProductIds: [9001, 9002, 9003],
+      // 16＝任選組合加購（點加入會跳任選組合彈窗）
+      addOnProductIds: [16, 9001, 9002, 9003],
       items: [
         {
           id: 'i1',
@@ -190,11 +193,56 @@ export const useCartStore = defineStore('cart', () => {
           checked: false,
           note: '料理方式：滾水下鍋煮 8 分鐘即可食用。全程冷凍配送。',
         },
+        {
+          // 加購商品：從加購區加入，顯示於清單最底「-加購區-」下、與一般商品同呈現。
+          // 模擬同一台車的加購商品來自不同直播場次（各列標示來源 sessionName）。
+          id: 'i-addon-1',
+          productId: 9002,
+          name: '寶寶柔嫩濕紙巾 80 抽 / 包',
+          image:
+            'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400&fit=crop',
+          spec: '預設',
+          qty: 1,
+          price: 49,
+          original: 80,
+          checked: true,
+          isAddOn: true,
+          sessionName: '小桂廚房 EP.56',
+        },
+        {
+          id: 'i-addon-2',
+          productId: 9001,
+          name: '寶寶嬰兒紗布手帕 5 入組',
+          image:
+            'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
+          spec: '粉色/M',
+          qty: 1,
+          price: 89,
+          original: 150,
+          checked: true,
+          isAddOn: true,
+          sessionName: '妞妞童裝 EP.23',
+        },
+        {
+          id: 'i-addon-3',
+          productId: 9003,
+          name: '不鏽鋼防滑安撫奶嘴',
+          image:
+            'https://images.unsplash.com/photo-1517242810446-cc8951b2be40?w=400&fit=crop',
+          spec: 'M',
+          qty: 1,
+          price: 129,
+          original: 200,
+          checked: false,
+          isAddOn: true,
+          sessionName: '女王選物 EP.41',
+        },
       ],
     },
     {
       id: 2,
       sellerName: '07/08 妞妞ㄉ童裝小舖',
+      sessionName: '妞妞童裝 EP.23',
       // 「禁止棄標」語意已由 checkoutMode: 'default' 表達，tag 只保留溫層資訊
       tags: [{ label: '常溫', type: 'secondary' }],
       shippingMethods: ['home', 'store', 'pickup', 'post'],
@@ -228,6 +276,7 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 3,
       sellerName: '07/07 春日童樂繪本社',
+      sessionName: '春日繪本 EP.09',
       tags: [{ label: '常溫', type: 'secondary' }],
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
@@ -261,6 +310,7 @@ export const useCartStore = defineStore('cart', () => {
     },
     {
       id: 4,
+      // 商城來源（非直播場次）：不設 sessionName → 標題列右側不顯示場次名
       sellerName: '07/06 家家好物優選',
       tags: [{ label: '常溫', type: 'secondary' }],
       shippingMethods: ['home', 'store'],
@@ -285,6 +335,7 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 5,
       sellerName: '07/05 女王的優雅',
+      sessionName: '女王選物 EP.41',
       tags: [{ label: '常溫', type: 'secondary' }],
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
@@ -304,10 +355,59 @@ export const useCartStore = defineStore('cart', () => {
         },
       ],
     },
+    {
+      // 商城來源購物車：非直播場次（無 sessionName）；從「商城商品」分類加入的商品
+      // 依 routingRules 進這台，且為「自選結帳（pickable）」模式。
+      id: 7,
+      sellerName: 'xsmartlive 商城嚴選',
+      tags: [{ label: '常溫', type: 'secondary' }],
+      shippingMethods: ['home', 'store', 'pickup', 'post'],
+      paymentMethods: [
+        'credit',
+        'apple-pay',
+        'atm',
+        'cvs-code',
+        'transfer',
+        'line-pay',
+        'ipass',
+      ],
+      checkoutMode: 'pickable',
+      items: [
+        {
+          id: 'm1',
+          productId: 400,
+          name: '北歐風棉麻抱枕套 45×45cm',
+          image: products.find((p) => p.id === 400)?.image,
+          spec: '米白',
+          qty: 1,
+          price: 199,
+          original: 350,
+          checked: true,
+        },
+        {
+          id: 'm2',
+          productId: 402,
+          name: '無線藍牙耳機 降噪入耳式',
+          image: products.find((p) => p.id === 402)?.image,
+          spec: '黑',
+          qty: 1,
+          price: 1290,
+          original: 1990,
+          checked: false,
+        },
+      ],
+    },
   ]);
 
   /** 分派規則：加入商品時，第一條命中的規則決定進哪台購物車；沒命中走 fallback。 */
-  const routingRules = ref<RoutingRule[]>([]);
+  const routingRules = ref<RoutingRule[]>([
+    {
+      // 「商城商品」分類 → 進商城車（id 7，自選結帳 pickable）
+      id: 'route_mall_products',
+      condition: { type: 'category', value: '商城商品' },
+      targetCartId: 7,
+    },
+  ]);
 
   /** 多件優惠規則：綁定商品 id，可設多個階梯（滿 N 件折 M 元），取最高達標階折抵一次。 */
   const bulkDiscountRules = ref<BulkDiscountRule[]>([

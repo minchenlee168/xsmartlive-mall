@@ -40,6 +40,17 @@ interface AddOnProduct {
 // 加價購：商城分類頁沒有、僅在購物車推薦的加價商品
 const ADD_ON_PRODUCTS: AddOnProduct[] = [
   {
+    // 任選組合加購：id 對應目錄任選組合商品（products id 16），
+    // 點加入時改開任選組合彈窗（見 handleAddOnClick / isAddOnPickBundle）。
+    id: 16,
+    name: '任選 4 件 寶寶配件超值組合',
+    price: 599,
+    original: 980,
+    image:
+      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&fit=crop',
+    stock: 10,
+  },
+  {
     id: 9001,
     name: '寶寶嬰兒紗布手帕 5 入組',
     price: 89,
@@ -234,6 +245,21 @@ const visibleGroups = computed(() =>
   groups.value.filter((g) => g.items.length > 0),
 );
 const isEmpty = computed(() => visibleGroups.value.length === 0);
+
+/**
+ * 各群組商品顯示順序：一般商品在前、加購商品集中排在最後（清單最底、小計上方），
+ * 讓「從加購區加入」的商品與其他商品一樣呈現，並以「-加購區-」分隔。
+ */
+const orderedGroupItems = computed<Record<number, CartItem[]>>(() => {
+  const map: Record<number, CartItem[]> = {};
+  for (const g of groups.value) {
+    map[g.id] = [
+      ...g.items.filter((i) => !i.isAddOn),
+      ...g.items.filter((i) => i.isAddOn),
+    ];
+  }
+  return map;
+});
 
 // 圖片放大預覽
 const isImagePreviewOpen = ref(false);
@@ -686,6 +712,13 @@ const dlgRowMax = (skuId: string): number => {
 const pickDialogItem = ref<CartItem | null>(null);
 // pickDialogList 為編輯中的草稿已選，按「確定」才寫回 item.bundleItems。
 const pickDialogList = ref<CartBundleItem[]>([]);
+/**
+ * 加購任選組合的暫存上下文：從加購區點加入時「先開彈窗挑選、驗證通過才真的加入車」。
+ * 非 null 代表這次挑選是要「新增一筆加購」，而非編輯車內既有列。
+ */
+const pendingAddOnPick = ref<{ cartId: number; product: AddOnProduct } | null>(
+  null,
+);
 
 /** 取任選組合的商品目錄資料。 */
 const pickCatOf = (item: CartItem) =>
@@ -699,6 +732,7 @@ const openPickDialog = (item: CartItem) => {
 };
 const closePickDialog = () => {
   pickDialogItem.value = null;
+  pendingAddOnPick.value = null;
 };
 
 /** 需挑總數 = pickCount * item.qty（item.qty 為購買組數）。 */
@@ -724,6 +758,16 @@ const pdOptionUsed = (optionName: string): number =>
   pickDialogList.value
     .filter((b) => b.name === optionName)
     .reduce((s, b) => s + (b.qty || 0), 0);
+/** 找出「單一選項超過限購（maxQty）」的選項；沒有 → null。 */
+const pdOverOption = (): PickOption | null => {
+  const item = pickDialogItem.value;
+  if (!item) return null;
+  return (
+    (pickCatOf(item)?.pickOptions ?? []).find(
+      (opt) => opt.maxQty != null && pdOptionUsed(opt.name) > pdOptionMax(opt),
+    ) ?? null
+  );
+};
 
 // ── 逐選項列（比照商品分類頁任選4件彈窗）：各選項的規格 / 數量草稿（key = option.id）──
 const pickOptSpecDraft = ref<Record<number, string>>({});
@@ -773,8 +817,42 @@ const removePdRow = (idx: number) => {
 const confirmPickDialog = () => {
   const item = pickDialogItem.value;
   if (!item) return;
+  // 超出限購 → 不可加入：先擋單一選項限購，再擋總需挑數
+  const overOption = pdOverOption();
+  if (overOption) {
+    ui.toast(
+      `「${overOption.name}」已超過限購 ${pdOptionMax(overOption)} 個，請調整`,
+      'warn',
+    );
+    return;
+  }
   if (pdTotal() > pdNeed()) {
     ui.toast(`挑選數量已超過 ${pdNeed()} 件，請調整`, 'warn');
+    return;
+  }
+  const ctx = pendingAddOnPick.value;
+  if (ctx) {
+    // 加購任選組合：挑選驗證通過才真的加入車（帶「加購」標記，置頂）
+    cart.addItem(
+      {
+        id: ctx.product.id,
+        name: ctx.product.name,
+        price: ctx.product.price,
+        original: ctx.product.original,
+        image: ctx.product.image,
+      },
+      '預設',
+      1,
+      {
+        targetCartId: ctx.cartId,
+        prepend: true,
+        isAddOn: true,
+        customBundleItems: pickDialogList.value.map((b) => ({ ...b })),
+      },
+    );
+    flashAddedFor(addOnKey(ctx.cartId, ctx.product.id));
+    ui.toast(`已加入「${ctx.product.name}」`);
+    closePickDialog();
     return;
   }
   item.bundleItems = pickDialogList.value.map((b) => ({ ...b }));
@@ -826,16 +904,53 @@ const combinedSpecOptions = (p: AddOnProduct): string[] => {
 
 /** Dialog 狀態：目前正在挑規格的加購商品；null 表示 Dialog 關閉。 */
 const addOnDialog = ref<AddOnProduct | null>(null);
-const addOnDialogSpec = ref<string>('');
+/** 無規格商品的單一數量。 */
 const addOnDialogQty = ref<number>(1);
+/** 有規格商品：各規格的數量草稿（key = 合併規格字串），確認時 qty>0 的各自成列加入。 */
+const addOnSpecQty = ref<Record<string, number>>({});
 /** 加購 Dialog 對應的購物車 id — 決定確認後加到哪台車。 */
 const addOnDialogCartId = ref<number | null>(null);
 
 const handleOpenAddOnDialog = (p: AddOnProduct, cartId: number) => {
   addOnDialog.value = p;
   addOnDialogCartId.value = cartId;
-  addOnDialogSpec.value = combinedSpecOptions(p)[0] ?? p.spec ?? '預設';
   addOnDialogQty.value = 1;
+  // 有規格：每個規格各給一個數量草稿（預設 0，使用者自行加）
+  const specQty: Record<string, number> = {};
+  for (const spec of combinedSpecOptions(p)) specQty[spec] = 0;
+  addOnSpecQty.value = specQty;
+};
+
+/** 加購商品是否為任選組合（id 對應目錄的 isPickBundle 商品）。 */
+const isAddOnPickBundle = (p: AddOnProduct): boolean =>
+  !!products.find((pr) => pr.id === p.id)?.isPickBundle;
+
+/**
+ * 任選組合加購：先開任選組合彈窗挑選內容，「確定」時驗證未超限才真的加入車
+ * （見 confirmPickDialog 的 pendingAddOnPick 分支）；取消則不加入。
+ * 用一筆暫存（未進車）的 item 供彈窗計算需挑數 / 限購。
+ */
+const handleAddOnPickBundle = (p: AddOnProduct, cartId: number) => {
+  pendingAddOnPick.value = { cartId, product: p };
+  openPickDialog({
+    id: '__addon_pending__',
+    productId: p.id,
+    name: p.name,
+    image: p.image,
+    spec: '預設',
+    qty: 1,
+    price: p.price,
+    original: p.original,
+    checked: true,
+    isBundle: true,
+    bundleItems: [],
+  } as CartItem);
+};
+
+/** 加購卡「加入購物車」：任選組合 → 挑選彈窗；一般加購 → 規格 / 數量彈窗。 */
+const handleAddOnClick = (p: AddOnProduct, cartId: number) => {
+  if (isAddOnPickBundle(p)) handleAddOnPickBundle(p, cartId);
+  else handleOpenAddOnDialog(p, cartId);
 };
 
 // 加購區流程：先按「更多加購商品 N 件」→ 彈窗列出全商城購物車 → 選一台顯示該 cart 的加購區
@@ -945,23 +1060,33 @@ const handleGoReplay = (r: LiveReplay) => {
 const handleConfirmAddOn = (e: MouseEvent) => {
   const p = addOnDialog.value;
   if (!p) return;
-  const spec = addOnDialogSpec.value || p.spec || '預設';
-  const qty = Math.max(1, addOnDialogQty.value || 1);
-  cart.addItem(
-    {
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      original: p.original,
-      image: p.image,
-    },
-    spec,
-    qty,
-    // 加購區：進「該商品所屬那台車」（Dialog 開啟時記錄）且置頂；沒有才走預設分派
+  const base = {
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    original: p.original,
+    image: p.image,
+  };
+  // 加購區：進「該商品所屬那台車」（Dialog 開啟時記錄）且置頂；沒有才走預設分派
+  const opts =
     addOnDialogCartId.value != null
       ? { targetCartId: addOnDialogCartId.value, prepend: true, isAddOn: true }
-      : { isAddOn: true },
-  );
+      : { isAddOn: true };
+  if (p.specs?.length) {
+    // 有規格：qty>0 的各規格各自成列加入；一件都沒選則提示
+    const picks = combinedSpecOptions(p).filter(
+      (s) => (addOnSpecQty.value[s] ?? 0) > 0,
+    );
+    if (!picks.length) {
+      ui.toast('請選擇至少一個規格的數量', 'warn');
+      return;
+    }
+    for (const spec of picks) {
+      cart.addItem(base, spec, addOnSpecQty.value[spec], opts);
+    }
+  } else {
+    cart.addItem(base, p.spec ?? '預設', Math.max(1, addOnDialogQty.value || 1), opts);
+  }
   burstAddToCartFromEvent(e);
   flashAddedFor(addOnKey(addOnDialogCartId.value ?? -1, p.id));
   addOnDialog.value = null;
@@ -1144,6 +1269,14 @@ const handleGoProduct = (productId?: number) => {
               class="!py-0.5 !text-xs"
             />
           </div>
+          <!-- 直播場次名稱：靠最右；商城來源（無 sessionName）不顯示 -->
+          <span
+            v-if="group.sessionName"
+            class="ml-auto flex shrink-0 items-center gap-1 text-xs text-slate-500"
+          >
+            <i class="pi pi-video" style="font-size: 12px"></i>
+            {{ group.sessionName }}
+          </span>
         </div>
 
         <!-- 模式提示 banner：paused / abandon 額外補說明；default 由「禁止棄標」tag 表達 -->
@@ -1162,11 +1295,27 @@ const handleGoProduct = (productId?: number) => {
           <span>直播 / 團購棄標流程：可放棄先前喊下的品項以釋出庫存。</span>
         </div>
 
-        <!-- Items -->
-        <div
-          v-for="(item, ii) in group.items"
+        <!-- Items：一般商品在前、加購商品集中排最後，加購前插入「-加購區-」分隔 -->
+        <template
+          v-for="(item, ii) in orderedGroupItems[group.id]"
           :key="item.id"
-          :class="ii !== group.items.length - 1 ? 'cart-divider' : ''"
+        >
+          <!-- -加購區- 分隔：第一個加購商品之前 -->
+          <div
+            v-if="item.isAddOn && !orderedGroupItems[group.id][ii - 1]?.isAddOn"
+            class="flex items-center gap-3 px-[var(--card-pad)] pt-3 text-sm font-medium text-slate-400"
+          >
+            <span class="h-px flex-1 bg-slate-200"></span>
+            <span class="shrink-0">加購區</span>
+            <span class="h-px flex-1 bg-slate-200"></span>
+          </div>
+        <div
+          :class="
+            ii !== orderedGroupItems[group.id].length - 1 &&
+            !(!item.isAddOn && orderedGroupItems[group.id][ii + 1]?.isAddOn)
+              ? 'cart-divider'
+              : ''
+          "
         >
           <!-- Item row（有備註時收窄底內距，讓備註貼齊所屬商品；下方間距改由備註 mb 提供，統一節奏） -->
           <div
@@ -1272,7 +1421,7 @@ const handleGoProduct = (productId?: number) => {
                     :max="itemStockMax(item)"
                     :max-fraction-digits="0"
                     :allow-empty="false"
-                    :disabled="isQtyLocked(group)"
+                    :disabled="isQtyLocked(group) && !item.isAddOn"
                     show-buttons
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"
@@ -1344,6 +1493,15 @@ const handleGoProduct = (productId?: number) => {
                 </div>
               </div>
 
+              <!-- 加購商品來源直播場次：同一台車的加購商品可能來自不同場次 -->
+              <p
+                v-if="item.isAddOn && item.sessionName"
+                class="flex items-center gap-1 text-xs text-slate-400"
+              >
+                <i class="pi pi-video" style="font-size: 11px"></i>
+                {{ item.sessionName }}
+              </p>
+
               <!-- 規格：加入購物車前已選定，車內僅顯示文字。
                    後選規（標單必結 / 批次下標）走上方 isBidBatch 分支的「挑選規格」按鈕，不在此處 -->
               <div
@@ -1365,7 +1523,7 @@ const handleGoProduct = (productId?: number) => {
                     :max="itemStockMax(item)"
                     :max-fraction-digits="0"
                     :allow-empty="false"
-                    :disabled="isQtyLocked(group)"
+                    :disabled="isQtyLocked(group) && !item.isAddOn"
                     show-buttons
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"
@@ -1373,8 +1531,9 @@ const handleGoProduct = (productId?: number) => {
                     class="qty-stepper qty-keep-stepper"
                   />
                 </div>
+                <!-- 加購商品不受結帳模式限制：一律可刪除（禁止棄標車也能移除加購品） -->
                 <Button
-                  v-if="!isDefaultMode(group)"
+                  v-if="!isDefaultMode(group) || item.isAddOn"
                   label="刪除"
                   icon="pi pi-trash"
                   severity="secondary"
@@ -1554,6 +1713,7 @@ const handleGoProduct = (productId?: number) => {
             </div>
           </div>
         </div>
+        </template>
 
         <!-- Group subtotal -->
         <div
@@ -1650,84 +1810,15 @@ const handleGoProduct = (productId?: number) => {
           <div
             class="grid auto-rows-fr grid-cols-3 gap-1.5 @3xl:grid-cols-[repeat(auto-fill,minmax(120px,1fr))] @5xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))]"
           >
-            <div
+            <AddOnCard
               v-for="{ product: p, cartId } in visibleAddOnCards"
               :key="addOnKey(cartId, p.id)"
-              class="flex h-full min-w-0 flex-col gap-1 rounded-lg p-1"
-            >
-              <div
-                class="aspect-square w-full shrink-0 overflow-hidden rounded-lg bg-slate-200"
-              >
-                <ProductImage :src="p.image" :alt="p.name" size="md" />
-              </div>
-              <p
-                class="line-clamp-2 min-h-[2lh] text-sm leading-snug text-slate-950 @7xl:text-base"
-              >
-                {{ p.name }}
-              </p>
-              <span
-                class="text-base font-bold @7xl:text-lg"
-                style="color: var(--primary)"
-              >
-                {{ money(p.price) }}
-              </span>
-
-              <!-- 加入購物車：外觀對齊分類頁 ProductCard 的 CTA；點按跳 Dialog 選規格 + 數量 -->
-              <button
-                class="add-cart-btn mt-auto flex w-full items-center justify-center font-medium whitespace-nowrap transition-all duration-200"
-                :class="[
-                  isPC
-                    ? 'gap-2 rounded-lg px-1 py-3 text-base'
-                    : 'min-h-11 gap-1 rounded-lg px-3 py-2 text-sm',
-                  justAddedMap[addOnKey(cartId, p.id)] ? 'added-pop' : '',
-                ]"
-                :style="
-                  justAddedMap[addOnKey(cartId, p.id)]
-                    ? {
-                        background: 'var(--success)',
-                        border: '1px solid var(--success-border)',
-                        color: '#fff',
-                      }
-                    : {
-                        background: 'var(--primary-bg)',
-                        border: '1px solid var(--primary)',
-                        color: '#fff',
-                      }
-                "
-                :disabled="justAddedMap[addOnKey(cartId, p.id)]"
-                @mouseover="
-                  (e) => {
-                    if (justAddedMap[addOnKey(cartId, p.id)]) return;
-                    (e.currentTarget as HTMLElement).style.background =
-                      'var(--primary-hover-bg)';
-                  }
-                "
-                @mouseleave="
-                  (e) => {
-                    if (justAddedMap[addOnKey(cartId, p.id)]) return;
-                    (e.currentTarget as HTMLElement).style.background =
-                      'var(--primary-bg)';
-                  }
-                "
-                @click="handleOpenAddOnDialog(p, cartId)"
-              >
-                <i
-                  :class="[
-                    justAddedMap[addOnKey(cartId, p.id)]
-                      ? 'pi pi-check-circle'
-                      : 'pi pi-cart-plus',
-                    'text-xl',
-                  ]"
-                />
-                <span v-if="isPC">
-                  {{
-                    justAddedMap[addOnKey(cartId, p.id)]
-                      ? '已加入購物車'
-                      : '加入購物車'
-                  }}
-                </span>
-              </button>
-            </div>
+              :product="p"
+              :cart-id="cartId"
+              :is-pc="isPC"
+              :just-added="!!justAddedMap[addOnKey(cartId, p.id)]"
+              @add="() => handleAddOnClick(p, cartId)"
+            />
           </div>
         </div>
       </section>
@@ -1899,22 +1990,50 @@ const handleGoProduct = (productId?: number) => {
           </div>
         </div>
 
-        <!-- 規格：多維度合併成單一下拉（例：'粉色, S'） -->
-        <div v-if="addOnDialog.specs?.length" class="flex flex-col gap-1.5">
+        <!-- 有規格：逐規格列出，後面各自帶數量調整（可一次加多個規格）。
+             規格超過 5 個時，容器固定約 5 列高、其餘捲動。 -->
+        <div v-if="addOnDialog.specs?.length" class="flex flex-col gap-2">
           <label class="text-sm font-medium text-slate-700">
             {{
               addOnDialog.specs.length > 1 ? '規格' : addOnDialog.specs[0].label
             }}
           </label>
-          <Select
-            v-model="addOnDialogSpec"
-            :options="combinedSpecOptions(addOnDialog)"
-            class="w-full"
-          />
+          <div
+            class="flex flex-col gap-2"
+            :class="
+              combinedSpecOptions(addOnDialog).length > 5
+                ? 'max-h-[16.5rem] overflow-y-auto pr-1'
+                : ''
+            "
+          >
+            <div
+              v-for="spec in combinedSpecOptions(addOnDialog)"
+              :key="spec"
+              class="flex items-center justify-between gap-3"
+            >
+              <span class="min-w-0 flex-1 truncate text-sm text-slate-700">
+                {{ spec }}
+              </span>
+              <InputNumber
+                :model-value="addOnSpecQty[spec] ?? 0"
+                :min="0"
+                :max="addOnDialog.stock"
+                :max-fraction-digits="0"
+                :allow-empty="false"
+                show-buttons
+                button-layout="horizontal"
+                increment-button-icon="pi pi-plus"
+                decrement-button-icon="pi pi-minus"
+                class="qty-stepper qty-keep-stepper shrink-0"
+                @update:model-value="(v) => (addOnSpecQty[spec] = v ?? 0)"
+              />
+            </div>
+          </div>
+          <span class="text-xs text-slate-500">庫存 {{ addOnDialog.stock }} 件</span>
         </div>
 
-        <!-- 數量 -->
-        <div class="flex items-center gap-3">
+        <!-- 無規格：單一數量 -->
+        <div v-else class="flex items-center gap-3">
           <label class="w-14 shrink-0 text-sm font-medium text-slate-700">
             數量
           </label>

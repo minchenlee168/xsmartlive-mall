@@ -39,6 +39,8 @@ export interface CartItem {
   note?: string;
   /** 由加購區加入：購物車列顯示「加購」標記。 */
   isAddOn?: boolean;
+  /** 加購商品來源直播場次名稱；同一台車的加購商品可能來自不同場次（顯示於加購商品列）。 */
+  sessionName?: string;
   /** 直播下標後尚未選規格：購物車需補選 SKU 才能結帳（見 [[live-bid-deferred-spec-plan]]）。 */
   specPending?: boolean;
   /** 後選規格選定的 SKU id（對應 products.ts 的 skus[].id / 庫存）。 */
@@ -96,6 +98,8 @@ export interface CartGroup {
   checkoutMode: CheckoutMode;
   /** 該台的加購推薦商品 ID 清單；空 / undefined 表示該台沒有加購區 */
   addOnProductIds?: number[];
+  /** 直播場次名稱；有值＝來自直播場次（標題列右側顯示），undefined＝商城來源（不顯示） */
+  sessionName?: string;
 }
 
 /** 分派規則條件：目前支援分類、單一商品 id 兩種。 */

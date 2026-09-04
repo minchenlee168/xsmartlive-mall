@@ -12,7 +12,15 @@ import { useViewportStore } from '../pinia/viewport';
 import { useThemeStore } from '../pinia/theme';
 import { useAppModeStore } from '../pinia/appMode';
 
-const tabs = ['大童童裝', '小童童裝', '寶寶包屁', '親子裝', '生鮮', '廠商出清'];
+const tabs = [
+  '大童童裝',
+  '小童童裝',
+  '寶寶包屁',
+  '親子裝',
+  '生鮮',
+  '廠商出清',
+  '商城商品',
+];
 
 const themeStoreCT = useThemeStore();
 const isAurora = computed(() => themeStoreCT.current.id === 'aurora');
