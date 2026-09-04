@@ -85,9 +85,14 @@ const appliedDateRange = ref<Array<Date | null>>([
   dateRange.value[1],
 ]);
 const appliedKeyword = ref('');
+// 付款 / 配送狀態同樣採「按查詢才套用」：payFilter/shipFilter 為 draft，applied 才驅動篩選
+const appliedPayFilter = ref<PayFilter>('all');
+const appliedShipFilter = ref<StatusTab>('all');
 const handleApplyQuery = (): void => {
   appliedDateRange.value = [dateRange.value[0], dateRange.value[1]];
   appliedKeyword.value = keyword.value;
+  appliedPayFilter.value = payFilter.value;
+  appliedShipFilter.value = shipFilter.value;
 };
 
 // 商品列子 tab（訂單提問已依規劃移除：智能客服尚未開發）
@@ -207,6 +212,19 @@ const OVERRIDE_KEYS: OverrideStatus[] = [
   'cancelled',
 ];
 
+/** 配送步驟：待付款（unpaid）在配送語意上視為「待出貨」(to_ship)——付款狀態另有欄位。 */
+const deliveryStepOf = (step: TimelineStepKey): TimelineStepKey =>
+  step === 'unpaid' ? 'to_ship' : step;
+
+/** 是否已配箱：備貨中（to_receive）起才有包裹編號；待付款 / 待出貨顯示「尚未配箱」。 */
+const BOXED_STEPS: TimelineStepKey[] = [
+  'to_receive',
+  'shipped',
+  'delivered',
+  'completed',
+];
+const isBoxed = (step: TimelineStepKey): boolean => BOXED_STEPS.includes(step);
+
 /** 單筆訂單是否符合某配送狀態 key（沿用原進度 / 終點貨態判定）。 */
 const matchesStatusKey = (o: OrderRecord, key: StatusTab): boolean => {
   if (key === 'all') return true;
@@ -217,7 +235,7 @@ const matchesStatusKey = (o: OrderRecord, key: StatusTab): boolean => {
     return (
       !o.overrideStatus &&
       o.items.some((it) =>
-        it.packages.some((p) => p.currentStep === timelineStep),
+        it.packages.some((p) => deliveryStepOf(p.currentStep) === timelineStep),
       )
     );
   }
@@ -231,13 +249,17 @@ const matchesPay = (o: OrderRecord, pf: PayFilter): boolean => {
   return pf === 'unpaid' ? unpaid : !unpaid;
 };
 
-/** 依付款篩選後的清單（配送狀態選項計數的母體）。 */
+/** 依「已套用」付款篩選後的清單（配送狀態選項計數的母體）。 */
 const payFilteredOrders = computed(() =>
-  dateKeywordFilteredOrders.value.filter((o) => matchesPay(o, payFilter.value)),
+  dateKeywordFilteredOrders.value.filter((o) =>
+    matchesPay(o, appliedPayFilter.value),
+  ),
 );
-/** 最終清單：付款 AND 配送。 */
+/** 最終清單：已套用的付款 AND 配送（按查詢才更新）。 */
 const filteredOrders = computed(() =>
-  payFilteredOrders.value.filter((o) => matchesStatusKey(o, shipFilter.value)),
+  payFilteredOrders.value.filter((o) =>
+    matchesStatusKey(o, appliedShipFilter.value),
+  ),
 );
 
 const payCount = (pf: PayFilter) =>
@@ -271,7 +293,10 @@ const stepStatus = (
   pkg: PackageInfo,
   stepKey: TimelineStep['key'],
 ): 'done' | 'current' | 'pending' => {
-  const order = TIMELINE_STEPS.findIndex((s) => s.key === pkg.currentStep);
+  // 待付款在配送語意上視為待出貨 → 時間軸亮到待出貨
+  const order = TIMELINE_STEPS.findIndex(
+    (s) => s.key === deliveryStepOf(pkg.currentStep),
+  );
   const idx = TIMELINE_STEPS.findIndex((s) => s.key === stepKey);
   if (idx < order) return 'done';
   if (idx === order) return 'current';
@@ -305,7 +330,8 @@ const OVERRIDE_TONE_CLASS: Record<OverrideStatus, string> = {
 /** 訂單狀態：終點貨態優先；否則看包裹 currentStep（不同階段 → 處理中）。 */
 const orderDisplayStatus = (order: OrderRecord): string => {
   if (order.overrideStatus) return OVERRIDE_LABEL[order.overrideStatus];
-  const steps = allPackageSteps(order);
+  // 待付款在配送語意上視為待出貨
+  const steps = allPackageSteps(order).map(deliveryStepOf);
   const uniq = new Set(steps);
   if (uniq.size === 0) return '—';
   if (uniq.size > 1) return '處理中';
@@ -461,7 +487,10 @@ const timelineFor = (pkg: PackageInfo, order?: OrderRecord): TimelineRow[] => {
 const pkgDisplayLabel = (pkg: PackageInfo, order: OrderRecord): string => {
   if (order.overrideStatus && order.overrideStatus !== 'cancelled')
     return OVERRIDE_LABEL[order.overrideStatus];
-  return TIMELINE_STEPS.find((s) => s.key === pkg.currentStep)?.label ?? '—';
+  return (
+    TIMELINE_STEPS.find((s) => s.key === deliveryStepOf(pkg.currentStep))
+      ?.label ?? '—'
+  );
 };
 
 // ── 更換配送地址 / 更換門市 dialog ──
@@ -675,9 +704,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
   <div class="flex flex-col gap-4">
     <!-- 篩選卡：頁籤 + 日期/搜尋 + 結果摘要（購物權益與售後說明區塊已依規劃移除） -->
     <div class="shadow-card flex flex-col gap-4 rounded-xl bg-white p-4">
-      <!-- 狀態篩選：付款狀態 + 配送狀態（可各自選、兩者 AND）；面板全展開不卷軸 -->
-      <div class="flex flex-col gap-3 sm:flex-row">
-        <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <!-- 查詢條件：PC 版一排（付款 / 配送 / 日期 / 搜尋 / 查詢）；手機堆疊。
+           所有條件皆為 draft，按「查詢」才套用篩選（下方清單才更新）。 -->
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div class="flex min-w-0 flex-col gap-1 lg:w-40">
           <label class="text-xs text-slate-500">付款狀態</label>
           <Select
             v-model="payFilter"
@@ -688,7 +718,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             :pt="{ listContainer: { style: 'max-height: none' } }"
           />
         </div>
-        <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <div class="flex min-w-0 flex-col gap-1 lg:w-40">
           <label class="text-xs text-slate-500">配送狀態</label>
           <Select
             v-model="shipFilter"
@@ -699,18 +729,8 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             :pt="{ listContainer: { style: 'max-height: none' } }"
           />
         </div>
-      </div>
-
-      <!-- 日期 + 搜尋 -->
-      <div
-        class="flex gap-3"
-        :class="isMobile ? 'flex-col' : 'flex-row items-center'"
-      >
-        <div
-          class="flex flex-col gap-1.5"
-          :class="isMobile ? 'w-full' : 'w-[420px]'"
-        >
-          <span class="text-sm font-medium text-slate-700">訂單日期</span>
+        <div class="flex min-w-0 flex-col gap-1 lg:w-[260px]">
+          <label class="text-xs text-slate-500">訂單日期</label>
           <DatePicker
             v-model="dateRange"
             selection-mode="range"
@@ -720,20 +740,20 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             class="w-full"
           />
         </div>
-        <div class="flex flex-1 flex-col gap-1.5">
-          <span v-if="!isMobile" class="text-sm font-medium text-slate-700"
-            >&nbsp;</span
-          >
-          <div class="flex gap-2">
-            <InputText
-              v-model="keyword"
-              placeholder="請輸入訂單ID或商品名稱"
-              class="min-w-0 flex-1"
-              @keyup.enter="handleApplyQuery"
-            />
-            <Button label="查詢" class="shrink-0" @click="handleApplyQuery" />
-          </div>
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <label class="text-xs text-slate-500">訂單 ID / 商品名稱</label>
+          <InputText
+            v-model="keyword"
+            placeholder="請輸入訂單ID或商品名稱"
+            class="w-full"
+            @keyup.enter="handleApplyQuery"
+          />
         </div>
+        <Button
+          label="查詢"
+          class="shrink-0"
+          @click="handleApplyQuery"
+        />
       </div>
 
       <!-- 結果摘要 -->
@@ -1201,13 +1221,11 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 class="rounded-[10px] px-4 py-2"
                 style="background: var(--surface-100)"
               >
-                <!-- Package header：待付款階段尚未配箱，不顯示包裹編號 -->
+                <!-- Package header：備貨中（配箱）後才有包裹編號；待付款 / 待出貨顯示尚未配箱 -->
                 <div class="mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5 text-sm text-slate-700">
                     <i class="pi pi-box" style="font-size: 14px"></i>
-                    <span
-                      v-if="pkg.currentStep !== 'unpaid'"
-                      class="font-medium"
+                    <span v-if="isBoxed(pkg.currentStep)" class="font-medium"
                       >包裹編號：{{ pkg.no }}</span
                     >
                     <span v-else class="text-slate-500">尚未配箱</span>
@@ -1230,7 +1248,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                         style="background: var(--primary)"
                       >
                         <i
-                          :class="`pi ${stepIcon(pkg.currentStep)}`"
+                          :class="`pi ${stepIcon(deliveryStepOf(pkg.currentStep))}`"
                           style="font-size: 14px"
                         ></i>
                       </span>
@@ -1242,30 +1260,27 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                           {{ pkgDisplayLabel(pkg, order) }}
                         </p>
                         <p class="mt-0.5 text-xs leading-tight text-slate-500">
-                          {{ pkg.stepTimes?.[pkg.currentStep] ?? '—' }}
+                          {{ pkg.stepTimes?.[deliveryStepOf(pkg.currentStep)] ?? '—' }}
                         </p>
                       </div>
                     </div>
                     <span
-                      v-if="pkg.currentStep !== 'unpaid'"
                       class="shrink-0 text-xs font-bold"
                       style="color: var(--primary)"
                     >
-                      {{ stepIndex(pkg.currentStep) }} /
+                      {{ stepIndex(deliveryStepOf(pkg.currentStep)) }} /
                       {{ PROGRESS_STEPS.length }}
                     </span>
                   </div>
-                  <div
-                    v-if="pkg.currentStep !== 'unpaid'"
-                    class="h-1.5 overflow-hidden rounded-full bg-slate-200"
-                  >
+                  <div class="h-1.5 overflow-hidden rounded-full bg-slate-200">
                     <div
                       class="h-full rounded-full transition-all"
                       :style="{
                         width:
                           (order.overrideStatus
                             ? 100
-                            : stepProgressPct(pkg.currentStep)) + '%',
+                            : stepProgressPct(deliveryStepOf(pkg.currentStep))) +
+                          '%',
                         background: 'var(--primary)',
                       }"
                     ></div>
