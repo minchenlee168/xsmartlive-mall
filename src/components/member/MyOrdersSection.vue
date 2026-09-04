@@ -10,6 +10,8 @@ import type {
   TimelineStepKey,
   DetailTab,
   OrderStatus,
+  OverrideStatus,
+  PayStatus,
 } from '../../types/order';
 import { parseSlashDate, formatDateRange } from '../../utils/date';
 import ChangeAddressDialog from './ChangeAddressDialog.vue';
@@ -19,18 +21,12 @@ const { money } = useMoney();
 
 /**
  * 我的訂單 section（會員中心右側內容）。
- * - 上方「購物權益與售後說明」 — 桌機可收合 Panel、手機是單行 + info icon → Dialog
- * - 標題 + 多 tab + 日期區間 + 搜尋 + 查詢結果摘要
- * - 訂單卡（header table + 子 tab + 商品列 + timeline）
+ * - 狀態分頁 + 日期區間 + 搜尋 + 查詢結果摘要（購物權益說明區塊已依規劃移除）
+ * - 訂單卡（header table + 權益膠囊 + 子 tab + 商品列 + timeline）
  */
 
 const vp = computed(() => useViewportStore().current.id);
 const isMobile = computed(() => vp.value === 'mobile');
-
-// 上下兩個說明面板狀態
-const isTopInfoOpen = ref(false);
-/** 手機版「購物權益與售後說明」點 info icon 開的 dialog。 */
-const isTopInfoDialogVisible = ref(false);
 
 const ordersStore = useOrdersStore();
 const ui = useUiStore();
@@ -41,7 +37,8 @@ const ui = useUiStore();
  * - 出貨中、待收貨：兩個 tab 都顯示「任一包裹 currentStep === 'shipped'」的訂單（賣家 / 買家觀點）
  * - 已送達：任一包裹 currentStep === 'delivered'
  */
-type StatusTab = 'all' | OrderStatus | 'shipped' | 'to_receive' | 'delivered';
+type StatusTab =
+  'all' | OrderStatus | 'shipped' | 'to_receive' | 'delivered' | OverrideStatus;
 const statusTabs: Array<{ key: StatusTab; label: string }> = [
   { key: 'all', label: '所有訂單' },
   { key: 'unpaid', label: '待付款' },
@@ -50,6 +47,13 @@ const statusTabs: Array<{ key: StatusTab; label: string }> = [
   { key: 'shipped', label: '已出貨' },
   { key: 'delivered', label: '已送達' },
   { key: 'completed', label: '已完成' },
+];
+/** 尾巴狀態分頁：退貨中 / 已退貨 / 已換貨 / 已取消 —— 有這種訂單才出現，沒有就不佔位。 */
+const OVERRIDE_TABS: Array<{ key: StatusTab; label: string }> = [
+  { key: 'returning', label: '退貨中' },
+  { key: 'returned', label: '已退貨' },
+  { key: 'exchanged', label: '已換貨' },
+  { key: 'cancelled', label: '已取消' },
 ];
 const activeTab = ref<StatusTab>('all');
 /**
@@ -83,11 +87,9 @@ const handleApplyQuery = (): void => {
   appliedKeyword.value = keyword.value;
 };
 
-// 商品列子 tab
-// 取消訂單 / 退換貨改由私訊聯絡、後台手動處理，前台不提供操作，也不再有「取消 / 已退貨」訂單狀態
+// 商品列子 tab（訂單提問已依規劃移除：智能客服尚未開發）
 const detailTabs: Array<{ key: DetailTab; label: string }> = [
   { key: 'progress', label: '配送進度/明細' },
-  { key: 'inquiry', label: '訂單提問' },
   { key: 'address', label: '更換地址' },
   { key: 'payment', label: '訂購/付款資訊' },
 ];
@@ -195,25 +197,44 @@ const dateKeywordFilteredOrders = computed(() => {
   return list;
 });
 
+const OVERRIDE_KEYS: OverrideStatus[] = [
+  'returning',
+  'returned',
+  'exchanged',
+  'cancelled',
+];
+
 /** 給定 tab key，回傳對應訂單列表（不含 status tab 過濾）→ 該 tab 的訂單。 */
 const ordersForTab = (key: StatusTab) => {
   const list = dateKeywordFilteredOrders.value;
   if (key === 'all') return list;
+  // 終點貨態分頁：只看 overrideStatus；有終點貨態的訂單也不落入其他進度分頁
+  if (OVERRIDE_KEYS.includes(key as OverrideStatus)) {
+    return list.filter((o) => o.overrideStatus === key);
+  }
   const timelineStep = TIMELINE_TABS[key];
   if (timelineStep) {
-    return list.filter((o) =>
-      o.items.some((it) =>
-        it.packages.some((p) => p.currentStep === timelineStep),
-      ),
+    return list.filter(
+      (o) =>
+        !o.overrideStatus &&
+        o.items.some((it) =>
+          it.packages.some((p) => p.currentStep === timelineStep),
+        ),
     );
   }
-  return list.filter((o) => o.status === key);
+  return list.filter((o) => !o.overrideStatus && o.status === key);
 };
 
 const filteredOrders = computed(() => ordersForTab(activeTab.value));
 
 /** 各 tab 的訂單數量（受日期 + 關鍵字篩選影響，但不受 activeTab 影響）。 */
 const tabCount = (key: StatusTab) => ordersForTab(key).length;
+
+/** 顯示中的狀態分頁：固定 7 個 + 有資料才出現的終點貨態分頁。 */
+const visibleStatusTabs = computed(() => [
+  ...statusTabs,
+  ...OVERRIDE_TABS.filter((t) => tabCount(t.key) > 0),
+]);
 
 const stepStatus = (
   pkg: PackageInfo,
@@ -235,14 +256,71 @@ const allPackageSteps = (order: OrderRecord): TimelineStep['key'][] => {
   return steps;
 };
 
-/** 訂單狀態：看包裹 currentStep（不同階段 → 處理中）。 */
+/** 終點貨態顯示文字。 */
+const OVERRIDE_LABEL: Record<OverrideStatus, string> = {
+  returning: '退貨中',
+  returned: '已退貨',
+  exchanged: '已換貨',
+  cancelled: '已取消',
+};
+/** 終點貨態語意色（配送狀態欄 / 權益膠囊用）。 */
+const OVERRIDE_TONE_CLASS: Record<OverrideStatus, string> = {
+  returning: 'text-orange-600',
+  returned: 'text-slate-500',
+  exchanged: 'text-emerald-600',
+  cancelled: 'text-red-500',
+};
+
+/** 訂單狀態：終點貨態優先；否則看包裹 currentStep（不同階段 → 處理中）。 */
 const orderDisplayStatus = (order: OrderRecord): string => {
+  if (order.overrideStatus) return OVERRIDE_LABEL[order.overrideStatus];
   const steps = allPackageSteps(order);
   const uniq = new Set(steps);
   if (uniq.size === 0) return '—';
   if (uniq.size > 1) return '處理中';
   return TIMELINE_STEPS.find((s) => s.key === steps[0])?.label ?? '—';
 };
+/** 配送狀態欄的語意色 class；一般進度狀態回傳空字串（沿用主色樣式）。 */
+const orderStatusToneClass = (order: OrderRecord): string =>
+  order.overrideStatus ? OVERRIDE_TONE_CLASS[order.overrideStatus] : '';
+
+// ── 付款狀態（與商家後台同一套用字；取代發票欄位，緊接付款方式之後）──
+const PAY_STATUS_LABEL: Record<PayStatus, string> = {
+  unpaid: '待付款',
+  paying: '付款中',
+  paid: '已付款',
+  failed: '付款失敗',
+  refund_pending: '待退款',
+  refunded: '已退款',
+};
+const PAY_STATUS_CLASS: Record<PayStatus, string> = {
+  unpaid: 'text-amber-600',
+  paying: 'text-violet-600',
+  paid: 'text-emerald-600',
+  failed: 'text-red-500',
+  refund_pending: 'text-amber-600',
+  refunded: 'text-slate-500',
+};
+/** 付款狀態：未指定時依貨態推預設（待付款 → unpaid，其餘視為已付款）。 */
+const payStatusOf = (order: OrderRecord): PayStatus =>
+  order.payStatus ?? (order.status === 'unpaid' ? 'unpaid' : 'paid');
+
+// ── 權益膠囊：展開後顯示「狀態 · 可退/可取消/可換」對照文案 ──
+const RIGHTS_BANNER: Record<string, string> = {
+  待付款: '可取消，不可退換貨',
+  待出貨: '可取消，不可退換貨',
+  備貨中: '不可取消、不可退換貨',
+  已出貨: '可退貨，不可取消、不可換貨',
+  已送達: '可退貨、可換貨，不可取消',
+  已完成: '不可取消，如需退換貨請洽賣家',
+  處理中: '各包裹階段不同，權益依各包裹狀態判斷',
+  退貨中: '退貨處理中，請洽賣家',
+  已退貨: '這筆訂單已退貨結案',
+  已換貨: '換貨已完成',
+  已取消: '訂單已由賣家取消',
+};
+const rightsBannerOf = (order: OrderRecord): string =>
+  RIGHTS_BANNER[orderDisplayStatus(order)] ?? '';
 
 /** 商品狀態：同 item 所有包裹同階段 → 顯示該階段；不同 → 「處理中」。 */
 const itemDisplayStatus = (item: OrderItem): string => {
@@ -281,12 +359,13 @@ const returnReasonText = (order: OrderRecord): string => {
   return `${orderDisplayStatus(order)}訂單，無法退換貨`;
 };
 
-/** 更換配送地址階段：進入備貨中（to_receive）就不能改（已在備貨），僅待付款 / 待出貨可改。 */
+/** 更換配送地址階段：僅「待付款」可改；待出貨（含）起即進入出貨流程鎖定。 */
 const canChangeAddressStep = (step: TimelineStep['key']): boolean => {
-  return step === 'unpaid' || step === 'to_ship';
+  return step === 'unpaid';
 };
-/** 整筆訂單是否可更換地址：所有包裹都要在備貨中以前。 */
+/** 整筆訂單是否可更換地址：無終點貨態、且所有包裹都還在待付款。 */
 const orderCanChangeAddress = (order: OrderRecord): boolean => {
+  if (order.overrideStatus) return false;
   const steps = allPackageSteps(order);
   return steps.length > 0 && steps.every(canChangeAddressStep);
 };
@@ -319,8 +398,8 @@ interface TimelineRow {
   time: string;
   status: 'done' | 'current' | 'pending';
 }
-const timelineFor = (pkg: PackageInfo): TimelineRow[] => {
-  return PROGRESS_STEPS.map((s) => {
+const timelineFor = (pkg: PackageInfo, order?: OrderRecord): TimelineRow[] => {
+  const rows = PROGRESS_STEPS.map((s) => {
     const status = stepStatus(pkg, s.key);
     return {
       key: s.key,
@@ -331,6 +410,27 @@ const timelineFor = (pkg: PackageInfo): TimelineRow[] => {
       status,
     };
   });
+  // 退貨中 / 已退貨 / 已換貨：前四格保持已達成（貨確實送到過），
+  // 最後一格換成該終點貨態 —— 與商家後台的呈現一致。
+  const ov = order?.overrideStatus;
+  if (ov && ov !== 'cancelled') {
+    rows.forEach((r) => {
+      r.status = 'done';
+      if (!r.time) r.time = pkg.stepTimes?.[r.key] ?? '—';
+    });
+    const last = rows[rows.length - 1];
+    last.label = OVERRIDE_LABEL[ov];
+    last.icon = 'pi-sync';
+    last.status = 'current';
+  }
+  return rows;
+};
+
+/** 手機版緊湊卡的階段名稱：終點貨態優先顯示。 */
+const pkgDisplayLabel = (pkg: PackageInfo, order: OrderRecord): string => {
+  if (order.overrideStatus && order.overrideStatus !== 'cancelled')
+    return OVERRIDE_LABEL[order.overrideStatus];
+  return TIMELINE_STEPS.find((s) => s.key === pkg.currentStep)?.label ?? '—';
 };
 
 // ── 更換配送地址 / 更換門市 dialog ──
@@ -445,10 +545,8 @@ const handleCompleteOrder = (order: OrderRecord): void => {
   ui.toast('訂單已完成');
 };
 
-// ── 訂單提問 drawer（右側抽出，內容為 AI 客服待開發提示） ──
-const isInquiryDrawerVisible = ref(false);
 /**
- * 手機版 Select 用：選到攔截型 tab（inquiry / payment）後要把 Select 視覺重置回原本選項。
+ * 手機版 Select 用：選到攔截型 tab（payment）後要把 Select 視覺重置回原本選項。
  * PrimeVue Select 即使 :model-value 為單向綁定，內部仍可能 cache 顯示值；
  * bump 這個 key 強制 remount 才會重讀 model-value。
  */
@@ -528,16 +626,10 @@ const handleOpenShippingProgress = (pkg: PackageInfo): void => {
 
 /**
  * 攔截 detail tab 切換：
- * - 'inquiry' → 不切換 tab，改開右側 drawer
  * - 'payment' → 不切換 tab，改開訂購/付款資訊 dialog
  * - 其他 tab → 正常切換
  */
 const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
-  if (key === 'inquiry') {
-    isInquiryDrawerVisible.value = true;
-    inquirySelectKey.value++;
-    return;
-  }
   if (key === 'payment') {
     paymentInfoTargetOrder.value = order;
     isPaymentInfoDialogVisible.value = true;
@@ -550,110 +642,13 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
 
 <template>
   <div class="flex flex-col gap-4">
-    <!-- 上方：購物權益與售後說明 -->
-    <!-- 手機版：單行標題 + info icon，點按開 Dialog 顯示完整內容 -->
-    <div
-      v-if="isMobile"
-      class="shadow-card flex items-center justify-between gap-2 rounded-xl bg-white px-4 py-3"
-    >
-      <span class="text-sm font-semibold text-slate-700">
-        購物權益與售後說明
-        <span class="ml-1 text-xs font-normal text-red-500">（待提供）</span>
-      </span>
-      <button
-        class="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
-        aria-label="顯示購物權益與售後說明"
-        @click="isTopInfoDialogVisible = true"
-      >
-        <i class="pi pi-info-circle" style="font-size: 18px" />
-      </button>
-    </div>
-    <!-- 桌機版：原本可收合 Panel -->
-    <Panel
-      v-else
-      toggleable
-      :collapsed="!isTopInfoOpen"
-      :pt="{
-        header: {
-          style:
-            'background: #ffffff; border-radius: 8px 8px 0 0; padding: 8px 16px',
-        },
-        title: {
-          style: 'font-size: 14px; font-weight: 600; color: var(--surface-700)',
-        },
-        content: {
-          style:
-            'padding: 14px 16px; font-size: 12.5px; line-height: 1.7; color: #475569',
-        },
-      }"
-      @update:collapsed="(v) => (isTopInfoOpen = !v)"
-    >
-      <template #header>
-        <span class="text-sm font-semibold text-slate-700">
-          購物權益與售後說明
-          <span class="ml-1 text-xs font-normal" style="color: var(--danger)"
-            >（待提供）</span
-          >
-        </span>
-      </template>
-      <p class="mb-2">
-        產品均享有 10
-        天猶豫期之權益（注意！猶豫期非試用期），若回退產品非全新狀態且包裝完整，將影響您的權益及需負擔回復原狀責任。
-      </p>
-      <p class="mb-2">
-        ※
-        依「通訊交易解除權合理例外情事適用準則」，部分特殊商品不適用十天猶豫期之規定。
-      </p>
-      <p class="mb-2">
-        ※ 食品因有保存期限問題，一經拆封食用後，將會影響退貨權限。
-      </p>
-      <p class="mb-2">
-        ※
-        商品請保持完整(含主商品、配件、贈品與原廠外箱)，若有缺件、毀損等個人因素，將保留接受退換貨與否之權力。
-      </p>
-      <p class="mb-2">※ 若商品已過猶豫期限，則無法線上申請銷退。</p>
-      <p class="mb-2">
-        若無法線上操作，請您利用聯絡客服功能，將有專人盡速為您處理。
-      </p>
-
-      <p class="mt-3 font-bold text-slate-700">相關事項說明：</p>
-      <p class="mb-2">
-        &lt; 配送服務 &gt;
-        除特殊商品外(如:材積過大等)須另行約定送貨時間外，其餘商品皆如網頁中所查詢的配送進度中顯示之日期進行配送。
-      </p>
-      <p class="mb-2">
-        &lt; 折價券 &gt;
-        折價券使用後，若取消訂單或辦理退貨時，折價券仍在有效期限內，將歸還至會員帳戶；若折價券已過期，則失效無法再次使用。
-      </p>
-      <p class="mb-2">
-        &lt; 退款方式 &gt;
-        付款方式為貨到付款、超商取貨付款、IBON付款及ATM付款之訂單，確認退貨後將款項以匯款方式退還訂購人。付款方式為信用卡者，確認退貨方式將款項退至原信用卡帳戶中。
-      </p>
-
-      <p class="mt-3 font-bold text-slate-700">關於發票開立與寄送：</p>
-      <p class="mb-2">
-        &lt; 個人發票 &gt;
-        本公司已全面採用電子發票，客戶購買商品並於付款完成、商品出貨後，將所開立的發票以
-        E-mail 方式通知客戶。
-      </p>
-      <p class="mb-2">
-        &lt; 法人發票 &gt;
-        訂購時選擇「公司用發票(線上列印)」者，您可於發票開立後點選訂單查詢頁面，可直接下載列印「電子發票證明聯」作為報帳使用。
-      </p>
-      <p class="mt-3 text-xs text-slate-400">
-        ※若有任何問題，歡迎您隨時利用網站
-        FAQ/連絡客服留下您要詢問的問題，將有專人為您服務。
-      </p>
-    </Panel>
-
-    <!-- 標題 -->
-    <!-- 篩選卡：頁籤 + 日期/搜尋 + 結果摘要 -->
+    <!-- 篩選卡：頁籤 + 日期/搜尋 + 結果摘要（購物權益與售後說明區塊已依規劃移除） -->
     <div class="shadow-card flex flex-col gap-4 rounded-xl bg-white p-4">
       <!-- Status filter：手機版用 pill button、桌機保留 tab 樣式；label 後面顯示符合查詢條件的訂單數量 -->
       <div v-if="isMobile" class="-mx-4 -mt-4 px-4 pt-3 pb-2">
         <div class="flex flex-wrap gap-2">
           <Button
-            v-for="t in statusTabs"
+            v-for="t in visibleStatusTabs"
             :key="t.key"
             :label="`${t.label} (${tabCount(t.key)})`"
             size="small"
@@ -667,7 +662,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       <div v-else class="-mx-4 -mt-4 border-b border-slate-200 px-4 pt-1">
         <div class="flex scrollbar-none items-center gap-1 overflow-x-auto">
           <button
-            v-for="t in statusTabs"
+            v-for="t in visibleStatusTabs"
             :key="t.key"
             class="-mb-px border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors"
             :style="
@@ -761,18 +756,18 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
           <div>
             <p class="text-xs text-slate-500">訂單總額</p>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1">
               <p class="font-bold" style="color: var(--danger)">
                 {{ money(order.total) }}
               </p>
+              <!-- 金額明細：眼睛圖示（與金額同列） -->
               <Button
                 v-if="order.amounts"
-                label="明細"
-                icon="pi pi-external-link"
-                icon-pos="right"
-                outlined
+                icon="pi pi-eye"
+                text
+                rounded
                 size="small"
-                class="!py-1"
+                aria-label="金額明細"
                 @click="handleOpenAmountDialog(order)"
               />
             </div>
@@ -782,26 +777,27 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             <p class="font-medium text-slate-700">{{ order.payment }}</p>
           </div>
           <div>
-            <p class="text-xs text-slate-500">配送方式</p>
-            <p class="font-medium text-slate-700">{{ order.delivery }}</p>
-          </div>
-          <div v-if="order.invoiceStatus !== 'none'">
-            <p class="text-xs text-slate-500">發票</p>
-            <Button
-              v-if="order.invoiceStatus === 'issued' && !isPaperInvoice(order)"
-              label="線上列印"
-              outlined
-              size="small"
-              class="!py-1"
-              @click="handleOpenInvoice(order)"
-            />
-            <p v-else class="font-medium text-slate-500">
-              {{ invoiceLabelDisplay(order) }}
+            <p class="text-xs text-slate-500">付款狀態</p>
+            <p
+              class="font-medium"
+              :class="PAY_STATUS_CLASS[payStatusOf(order)]"
+            >
+              {{ PAY_STATUS_LABEL[payStatusOf(order)] }}
             </p>
           </div>
           <div>
-            <p class="text-xs text-slate-500">狀態</p>
-            <p class="font-medium" style="color: var(--primary)">
+            <p class="text-xs text-slate-500">配送方式</p>
+            <p class="font-medium text-slate-700">{{ order.delivery }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-500">配送狀態</p>
+            <p
+              class="font-medium"
+              :class="orderStatusToneClass(order)"
+              :style="
+                order.overrideStatus ? undefined : 'color: var(--primary)'
+              "
+            >
               {{ orderDisplayStatus(order) }}
             </p>
           </div>
@@ -828,7 +824,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               </th>
               <th
                 class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 175px"
+                style="width: 150px"
               >
                 訂單總額
               </th>
@@ -840,21 +836,21 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               </th>
               <th
                 class="px-3 py-2.5 text-left font-medium text-slate-700"
+                style="width: 90px"
+              >
+                付款狀態
+              </th>
+              <th
+                class="px-3 py-2.5 text-left font-medium text-slate-700"
                 style="width: 95px"
               >
                 配送方式
               </th>
               <th
-                class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 115px"
-              >
-                發票
-              </th>
-              <th
                 class="py-2.5 pr-4 pl-3 text-left font-medium text-slate-700"
                 style="width: 95px"
               >
-                狀態
+                配送狀態
               </th>
             </tr>
           </thead>
@@ -864,46 +860,36 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               <td class="px-3 py-3 text-slate-700">{{ order.orderNo }}</td>
               <td class="px-3 py-3 text-slate-700">{{ order.qty }}</td>
               <td class="px-3 py-3">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
                   <span class="font-bold" style="color: var(--danger)">
                     {{ money(order.total) }}
                   </span>
+                  <!-- 金額明細：眼睛圖示（與金額同列） -->
                   <Button
                     v-if="order.amounts"
-                    label="明細"
-                    icon="pi pi-external-link"
-                    icon-pos="right"
-                    outlined
+                    icon="pi pi-eye"
+                    text
+                    rounded
                     size="small"
-                    class="!py-1"
+                    aria-label="金額明細"
                     @click="handleOpenAmountDialog(order)"
                   />
                 </div>
               </td>
               <td class="px-3 py-3 text-slate-700">{{ order.payment }}</td>
-              <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
-              <td class="px-3 py-3">
-                <Button
-                  v-if="
-                    order.invoiceStatus === 'issued' && !isPaperInvoice(order)
-                  "
-                  label="線上列印"
-                  outlined
-                  size="small"
-                  class="!py-1"
-                  @click="handleOpenInvoice(order)"
-                />
-                <!-- 不開立(none) 直接不顯示；紙本 issued 顯示「已開立」；其餘顯示狀態文字 -->
-                <span
-                  v-else-if="order.invoiceStatus !== 'none'"
-                  class="text-slate-500"
-                >
-                  {{ invoiceLabelDisplay(order) }}
-                </span>
+              <td
+                class="px-3 py-3 font-medium"
+                :class="PAY_STATUS_CLASS[payStatusOf(order)]"
+              >
+                {{ PAY_STATUS_LABEL[payStatusOf(order)] }}
               </td>
+              <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
               <td
                 class="py-3 pr-4 pl-3 font-medium"
-                style="color: var(--primary)"
+                :class="orderStatusToneClass(order)"
+                :style="
+                  order.overrideStatus ? undefined : 'color: var(--primary)'
+                "
               >
                 {{ orderDisplayStatus(order) }}
               </td>
@@ -1031,6 +1017,49 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
 
         <!-- 商品列 + 多包裹 timeline；收合時整段隱藏 -->
         <div v-if="order.expanded" class="flex flex-col">
+          <!-- 權益膠囊：狀態 · 可退 / 可取消 / 可換 對照文案 -->
+          <div v-if="rightsBannerOf(order)" class="px-4 pt-3">
+            <span
+              class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs"
+              :class="
+                order.overrideStatus === 'cancelled'
+                  ? 'border-red-200 bg-red-50'
+                  : 'border-slate-200 bg-slate-50'
+              "
+            >
+              <span
+                class="font-medium"
+                :class="orderStatusToneClass(order)"
+                :style="
+                  order.overrideStatus ? undefined : 'color: var(--primary)'
+                "
+                >{{ orderDisplayStatus(order) }}</span
+              >
+              <span class="text-slate-300">·</span>
+              <span class="text-slate-600">{{ rightsBannerOf(order) }}</span>
+            </span>
+          </div>
+
+          <!-- 已取消：取消說明卡（時間 / 原因），不再顯示包裹進度 -->
+          <div
+            v-if="order.overrideStatus === 'cancelled'"
+            class="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm"
+          >
+            <p class="flex items-center gap-1.5 font-medium text-red-600">
+              <i class="pi pi-exclamation-triangle" style="font-size: 13px" />
+              此訂單已取消
+            </p>
+            <p class="mt-1.5 text-slate-700">
+              取消時間：{{ order.cancelTime ?? '—' }}
+            </p>
+            <p class="text-slate-700">
+              取消原因：{{ order.cancelReason ?? '—' }}
+            </p>
+            <p class="mt-2 border-t border-red-200 pt-2 text-xs text-slate-500">
+              此訂單不再出貨；若已付款，賣家將另行為您辦理退款。
+            </p>
+          </div>
+
           <!-- 退換貨 tab：不可退/換貨時顯示原因 -->
           <div
             v-if="order.detailTab === 'return' && returnReasonText(order)"
@@ -1131,9 +1160,12 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
               </div>
             </div>
 
-            <!-- 包裹卡（一或多個）— 僅在「配送進度/明細」tab 顯示 -->
+            <!-- 包裹卡（一或多個）— 僅在「配送進度/明細」tab 顯示；已取消訂單改顯示取消說明卡 -->
             <div
-              v-if="order.detailTab === 'progress'"
+              v-if="
+                order.detailTab === 'progress' &&
+                order.overrideStatus !== 'cancelled'
+              "
               class="flex flex-col gap-3"
             >
               <div
@@ -1152,6 +1184,12 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                       >包裹編號：{{ pkg.no }}</span
                     >
                     <span v-else class="text-slate-500">尚未配箱</span>
+                    <!-- 換貨後的第二次出貨標籤 -->
+                    <Tag
+                      v-if="pkg.exchangeTag"
+                      :value="pkg.exchangeTag"
+                      class="!border !border-emerald-300 !bg-emerald-50 !py-[1px] !text-xs !font-normal !text-emerald-700"
+                    />
                   </div>
                   <span class="text-sm text-slate-700">{{ pkg.qty }}件</span>
                 </div>
@@ -1174,11 +1212,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                           class="text-sm leading-tight font-bold"
                           style="color: var(--primary)"
                         >
-                          {{
-                            TIMELINE_STEPS.find(
-                              (s) => s.key === pkg.currentStep,
-                            )?.label ?? '—'
-                          }}
+                          {{ pkgDisplayLabel(pkg, order) }}
                         </p>
                         <p class="mt-0.5 text-xs leading-tight text-slate-500">
                           {{ pkg.stepTimes?.[pkg.currentStep] ?? '—' }}
@@ -1201,7 +1235,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                     <div
                       class="h-full rounded-full transition-all"
                       :style="{
-                        width: stepProgressPct(pkg.currentStep) + '%',
+                        width:
+                          (order.overrideStatus
+                            ? 100
+                            : stepProgressPct(pkg.currentStep)) + '%',
                         background: 'var(--primary)',
                       }"
                     ></div>
@@ -1224,7 +1261,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <!-- 非手機橫式（PrimeVue Timeline） -->
                 <div v-else>
                   <Timeline
-                    :value="timelineFor(pkg)"
+                    :value="timelineFor(pkg, order)"
                     layout="horizontal"
                     align="top"
                     class="my-order-timeline"
@@ -1284,8 +1321,8 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                       <span
                         class="block h-0.5 w-full"
                         :style="
-                          (timelineFor(pkg)[index + 1]?.status ?? 'pending') ===
-                          'pending'
+                          (timelineFor(pkg, order)[index + 1]?.status ??
+                            'pending') === 'pending'
                             ? 'background: #cbd5e1'
                             : 'background: var(--primary)'
                         "
@@ -1305,73 +1342,6 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       v-model:visible="isChangeAddressVisible"
       :mode="changeAddressMode"
     />
-
-    <!-- 購物權益與售後說明 dialog（手機版用） -->
-    <Dialog
-      v-model:visible="isTopInfoDialogVisible"
-      modal
-      :draggable="false"
-      header="購物權益與售後說明"
-      :breakpoints="{ '768px': '90vw' }"
-      :style="{ width: '480px' }"
-    >
-      <div class="flex flex-col gap-3 text-sm leading-relaxed text-slate-600">
-        <p>
-          產品均享有 10
-          天猶豫期之權益（注意！猶豫期非試用期），若回退產品非全新狀態且包裝完整，將影響您的權益及需負擔回復原狀責任。
-        </p>
-        <p>
-          ※
-          依「通訊交易解除權合理例外情事適用準則」，部分特殊商品不適用十天猶豫期之規定。
-        </p>
-        <p>※ 食品因有保存期限問題，一經拆封食用後，將會影響退貨權限。</p>
-        <p>
-          ※
-          商品請保持完整(含主商品、配件、贈品與原廠外箱)，若有缺件、毀損等個人因素，將保留接受退換貨與否之權力。
-        </p>
-        <p>※ 若商品已過猶豫期限，則無法線上申請銷退。</p>
-        <p>若無法線上操作，請您利用聯絡客服功能，將有專人盡速為您處理。</p>
-
-        <p class="mt-1 font-bold text-slate-700">相關事項說明：</p>
-        <p>
-          &lt; 配送服務 &gt;
-          除特殊商品外(如:材積過大等)須另行約定送貨時間外，其餘商品皆如網頁中所查詢的配送進度中顯示之日期進行配送。
-        </p>
-        <p>
-          &lt; 折價券 &gt;
-          折價券使用後，若取消訂單或辦理退貨時，折價券仍在有效期限內，將歸還至會員帳戶；若折價券已過期，則失效無法再次使用。
-        </p>
-        <p>
-          &lt; 退款方式 &gt;
-          付款方式為貨到付款、超商取貨付款、IBON付款及ATM付款之訂單，確認退貨後將款項以匯款方式退還訂購人。付款方式為信用卡者，確認退貨方式將款項退至原信用卡帳戶中。
-        </p>
-
-        <p class="mt-1 font-bold text-slate-700">關於發票開立與寄送：</p>
-        <p>
-          &lt; 個人發票 &gt;
-          本公司已全面採用電子發票，客戶購買商品並於付款完成、商品出貨後，將所開立的發票以
-          E-mail 方式通知客戶。
-        </p>
-        <p>
-          &lt; 法人發票 &gt;
-          訂購時選擇「公司用發票(線上列印)」者，您可於發票開立後點選訂單查詢頁面，可直接下載列印「電子發票證明聯」作為報帳使用。
-        </p>
-        <p class="text-xs text-slate-400">
-          ※若有任何問題，歡迎您隨時利用網站
-          FAQ/連絡客服留下您要詢問的問題，將有專人為您服務。
-        </p>
-      </div>
-      <template #footer>
-        <div class="flex w-full justify-end">
-          <Button
-            label="關閉"
-            severity="secondary"
-            outlined
-            @click="isTopInfoDialogVisible = false"
-          />
-        </div>
-      </template>
-    </Dialog>
 
     <!-- 退換貨申請 dialog -->
     <Dialog
@@ -1594,6 +1564,32 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <span class="text-slate-950">
             {{ paymentInfoTargetOrder?.invoice ?? '個人發票（紙本）' }}
           </span>
+        </div>
+        <!-- 發票（列表的發票欄已由付款狀態取代，線上列印入口移到這裡） -->
+        <div
+          v-if="
+            paymentInfoTargetOrder &&
+            paymentInfoTargetOrder.invoiceStatus !== 'none'
+          "
+          class="flex flex-col gap-1"
+        >
+          <span class="text-xs text-slate-500">發票</span>
+          <div>
+            <Button
+              v-if="
+                paymentInfoTargetOrder.invoiceStatus === 'issued' &&
+                !isPaperInvoice(paymentInfoTargetOrder)
+              "
+              label="線上列印"
+              outlined
+              size="small"
+              class="!py-1"
+              @click="handleOpenInvoice(paymentInfoTargetOrder)"
+            />
+            <span v-else class="text-slate-500">
+              {{ invoiceLabelDisplay(paymentInfoTargetOrder) }}
+            </span>
+          </div>
         </div>
         <div class="flex flex-col gap-1">
           <span class="text-xs text-slate-500">付款方式</span>
@@ -1818,88 +1814,6 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </template>
     </Dialog>
 
-    <!-- 訂單提問 drawer：從右側滑入，點遮罩關閉。
-         Teleport 到 body 以脫離 App.vue 的 @container（同 Checkout 抽屜處理方式）。 -->
-    <Teleport to="body">
-      <Transition name="inquiry-fade">
-        <div
-          v-if="isInquiryDrawerVisible"
-          class="inquiry-backdrop"
-          @click="isInquiryDrawerVisible = false"
-        />
-      </Transition>
-      <Transition name="inquiry-slide">
-        <aside v-if="isInquiryDrawerVisible" class="inquiry-drawer">
-          <header
-            class="flex items-center justify-between border-b border-slate-200 px-5 py-4"
-          >
-            <h3 class="text-lg font-bold text-slate-950">訂單提問</h3>
-            <Button
-              icon="pi pi-times"
-              severity="secondary"
-              text
-              rounded
-              class="!min-h-11 !min-w-11"
-              @click="isInquiryDrawerVisible = false"
-            />
-          </header>
-          <div
-            class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10 text-center"
-          >
-            <div
-              class="flex h-32 w-32 items-center justify-center rounded-full bg-slate-100"
-            >
-              <i class="pi pi-headphones text-6xl text-slate-400" />
-            </div>
-            <p class="text-base font-medium text-slate-700">
-              導入 AI 智能客服
-              <span class="block text-slate-500">（待開發）</span>
-            </p>
-          </div>
-        </aside>
-      </Transition>
-    </Teleport>
+    <!-- 訂單提問 drawer 已依規劃移除（智能客服尚未開發） -->
   </div>
 </template>
-
-<style scoped>
-/* ===== 訂單提問 Drawer =====
- * 右側滑入式抽屜；遮罩鋪滿視窗，抽屜寬度手機 100vw、桌機 420px。
- */
-.inquiry-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 100;
-}
-.inquiry-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(420px, 100vw);
-  z-index: 110;
-  display: flex;
-  flex-direction: column;
-  background: white;
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
-}
-
-.inquiry-fade-enter-active,
-.inquiry-fade-leave-active {
-  transition: opacity 0.25s ease;
-}
-.inquiry-fade-enter-from,
-.inquiry-fade-leave-to {
-  opacity: 0;
-}
-
-.inquiry-slide-enter-active,
-.inquiry-slide-leave-active {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.inquiry-slide-enter-from,
-.inquiry-slide-leave-to {
-  transform: translateX(100%);
-}
-</style>

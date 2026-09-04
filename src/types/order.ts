@@ -1,20 +1,25 @@
 export type TimelineStepKey =
-  | 'unpaid'
-  | 'to_ship'
-  | 'shipped'
-  | 'to_receive'
-  | 'delivered'
-  | 'completed';
+  'unpaid' | 'to_ship' | 'shipped' | 'to_receive' | 'delivered' | 'completed';
 
 export type DetailTab =
-  | 'progress'
-  | 'cancel'
-  | 'return'
-  | 'inquiry'
-  | 'address'
-  | 'payment';
+  'progress' | 'cancel' | 'return' | 'inquiry' | 'address' | 'payment';
 
 export type OrderStatus = 'unpaid' | 'to_ship' | 'completed';
+
+/**
+ * 終點貨態（由商家後台標記後同步，前台只呈現結果、無自助申請入口）：
+ * - returning: 退貨中
+ * - returned:  已退貨（結案）
+ * - exchanged: 已換貨（結案）
+ * - cancelled: 已取消（顯示取消時間與原因）
+ * 有值時整筆訂單以此狀態呈現，不再依包裹階段推算。
+ */
+export type OverrideStatus =
+  'returning' | 'returned' | 'exchanged' | 'cancelled';
+
+/** 付款狀態（與商家後台同一套用字，六值一一對應）。 */
+export type PayStatus =
+  'unpaid' | 'paying' | 'paid' | 'failed' | 'refund_pending' | 'refunded';
 
 /**
  * 發票狀態（對應後台分類）：
@@ -31,6 +36,8 @@ export interface PackageInfo {
   qty: number;
   currentStep: TimelineStepKey;
   stepTimes?: Partial<Record<TimelineStepKey, string>>;
+  /** 換貨後的第二次出貨包裹標籤（如「換貨 · 第 2 次出貨」）。 */
+  exchangeTag?: string;
 }
 
 export type ReturnRequestStatus = 'pending' | 'approved' | 'rejected';
@@ -101,6 +108,14 @@ export interface OrderRecord {
   buyerNote?: string;
   /** 金額明細（優惠券 / 紅利 / 運費折抵等）；下單時從結帳頁帶入，顯示於訂購/付款資訊。 */
   amounts?: OrderAmountBreakdown;
+  /** 終點貨態（退貨中 / 已退貨 / 已換貨 / 已取消）；由商家後台標記後同步。 */
+  overrideStatus?: OverrideStatus;
+  /** 付款狀態；未提供時依貨態推預設（待付款 → unpaid，其餘 paid）。 */
+  payStatus?: PayStatus;
+  /** 已取消訂單：取消時間（由商家後台帶入）。 */
+  cancelTime?: string;
+  /** 已取消訂單：取消原因（由商家後台帶入）。 */
+  cancelReason?: string;
 }
 
 export interface Transaction {
