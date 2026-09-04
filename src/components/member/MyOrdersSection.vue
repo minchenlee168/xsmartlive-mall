@@ -55,8 +55,8 @@ const OVERRIDE_TABS: Array<{ key: StatusTab; label: string }> = [
   { key: 'exchanged', label: '已換貨' },
   { key: 'cancelled', label: '已取消' },
 ];
-// 狀態篩選改為兩個下拉：付款狀態（全部/待付款/已付款）+ 配送狀態，兩者獨立 AND
-type PayFilter = 'all' | 'unpaid' | 'paid';
+// 狀態篩選改為兩個下拉：付款狀態（全部 + 六態，精確比對）+ 配送狀態，兩者獨立 AND
+type PayFilter = 'all' | PayStatus;
 const payFilter = ref<PayFilter>('all');
 const shipFilter = ref<StatusTab>('all');
 /**
@@ -216,14 +216,18 @@ const OVERRIDE_KEYS: OverrideStatus[] = [
 const deliveryStepOf = (step: TimelineStepKey): TimelineStepKey =>
   step === 'unpaid' ? 'to_ship' : step;
 
-/** 是否已配箱：備貨中（to_receive）起才有包裹編號；待付款 / 待出貨顯示「尚未配箱」。 */
+/**
+ * 是否已配箱（顯示包裹編號）：備貨中（to_receive）起才有；待付款 / 待出貨顯示「尚未配箱」。
+ * 例外：換貨第 2 次出貨的包裹（帶 exchangeTag）是重新出貨已知包裹，即使待出貨也保留包裹編號。
+ */
 const BOXED_STEPS: TimelineStepKey[] = [
   'to_receive',
   'shipped',
   'delivered',
   'completed',
 ];
-const isBoxed = (step: TimelineStepKey): boolean => BOXED_STEPS.includes(step);
+const isBoxed = (pkg: PackageInfo): boolean =>
+  !!pkg.exchangeTag || BOXED_STEPS.includes(pkg.currentStep);
 
 /** 單筆訂單是否符合某配送狀態 key（沿用原進度 / 終點貨態判定）。 */
 const matchesStatusKey = (o: OrderRecord, key: StatusTab): boolean => {
@@ -242,12 +246,9 @@ const matchesStatusKey = (o: OrderRecord, key: StatusTab): boolean => {
   return !o.overrideStatus && o.status === key;
 };
 
-/** 付款狀態是否符合（已付款＝非待付款，含 paying / paid / refund…）。 */
-const matchesPay = (o: OrderRecord, pf: PayFilter): boolean => {
-  if (pf === 'all') return true;
-  const unpaid = payStatusOf(o) === 'unpaid';
-  return pf === 'unpaid' ? unpaid : !unpaid;
-};
+/** 付款狀態是否符合：全部或與該訂單付款狀態精確相符（待付款/已付款/待退款/已退款…各自獨立）。 */
+const matchesPay = (o: OrderRecord, pf: PayFilter): boolean =>
+  pf === 'all' || payStatusOf(o) === pf;
 
 /** 依「已套用」付款篩選後的清單（配送狀態選項計數的母體）。 */
 const payFilteredOrders = computed(() =>
@@ -268,7 +269,7 @@ const payCount = (pf: PayFilter) =>
 const shipCount = (key: StatusTab) =>
   payFilteredOrders.value.filter((o) => matchesStatusKey(o, key)).length;
 
-/** 付款狀態下拉選項：全部 / 待付款 / 已付款。 */
+/** 付款狀態下拉選項：全部 / 待付款 / 已付款 / 待退款 / 已退款（各自獨立）。 */
 const paymentFilterOptions = computed(() => [
   {
     label: `全部 (${dateKeywordFilteredOrders.value.length})`,
@@ -276,6 +277,11 @@ const paymentFilterOptions = computed(() => [
   },
   { label: `待付款 (${payCount('unpaid')})`, value: 'unpaid' as PayFilter },
   { label: `已付款 (${payCount('paid')})`, value: 'paid' as PayFilter },
+  {
+    label: `待退款 (${payCount('refund_pending')})`,
+    value: 'refund_pending' as PayFilter,
+  },
+  { label: `已退款 (${payCount('refunded')})`, value: 'refunded' as PayFilter },
 ]);
 /** 配送狀態下拉選項：全部 + 進度狀態（待出貨…已完成）+ 有資料的終點貨態。 */
 const deliveryFilterOptions = computed(() => [
@@ -1225,7 +1231,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <div class="mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5 text-sm text-slate-700">
                     <i class="pi pi-box" style="font-size: 14px"></i>
-                    <span v-if="isBoxed(pkg.currentStep)" class="font-medium"
+                    <span v-if="isBoxed(pkg)" class="font-medium"
                       >包裹編號：{{ pkg.no }}</span
                     >
                     <span v-else class="text-slate-500">尚未配箱</span>

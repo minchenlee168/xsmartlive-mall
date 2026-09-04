@@ -48,6 +48,41 @@ export interface LastPaymentSummary {
 export const useOrdersStore = defineStore('orders', () => {
   const orders = ref<OrderRecord[]>([
     {
+      id: '25',
+      date: '2026/02/03 14:20',
+      orderNo: '1000000025',
+      qty: 1,
+      total: 690,
+      amounts: { goodsTotal: 690, shippingFee: 80, shippingDiscount: 80 },
+      payment: '線上信用卡',
+      delivery: '宅配',
+      invoice: '會員載具',
+      invoiceStatus: 'pending',
+      status: 'to_ship',
+      payStatus: 'paid',
+      detailTab: 'progress',
+      expanded: false,
+      items: [
+        {
+          image: IMG_HAT,
+          name: '兒童防風連帽外套',
+          spec: '綠/120cm（原 110cm 尺寸不合換貨）',
+          price: 690,
+          qty: 1,
+          returnStatus: 'approved',
+          packages: [
+            {
+              no: 'F2026020311',
+              qty: 1,
+              currentStep: 'to_ship',
+              stepTimes: SAMPLE_TIMES,
+              exchangeTag: '換貨 · 第 2 次出貨',
+            },
+          ],
+        },
+      ],
+    },
+    {
       id: '11',
       date: '2026/02/02 10:15',
       orderNo: '1000000021',
