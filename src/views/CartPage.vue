@@ -390,6 +390,12 @@ const removeItem = (group: CartGroup, id: string) => {
 const sessionOfItem = (group: CartGroup, item: CartItem): string | undefined =>
   item.sessionName ?? group.sessionName;
 
+/** 場次 icon：直播收單用影片（pi-video）；貼文 / 社團收單用留言泡泡（pi-comment）。 */
+const sessionIconOf = (group: CartGroup, item: CartItem): string =>
+  (item.sessionType ?? group.sessionType ?? 'live') === 'live'
+    ? 'pi-video'
+    : 'pi-comment';
+
 // ---- 結帳模式衍生行為 ------------------------------------------------------
 const isDefaultMode = (g: CartGroup) => g.checkoutMode === 'default';
 const isPickableMode = (g: CartGroup) => g.checkoutMode === 'pickable';
@@ -1348,7 +1354,10 @@ const handleGoProduct = (productId?: number) => {
                 v-if="sessionOfItem(group, item)"
                 class="flex items-center gap-1 text-xs text-slate-400"
               >
-                <i class="pi pi-video" style="font-size: 11px"></i>
+                <i
+                  :class="['pi', sessionIconOf(group, item)]"
+                  style="font-size: 11px"
+                ></i>
                 {{ sessionOfItem(group, item) }}
               </p>
               <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
@@ -1470,7 +1479,10 @@ const handleGoProduct = (productId?: number) => {
                 v-if="sessionOfItem(group, item)"
                 class="flex items-center gap-1 text-xs text-slate-400"
               >
-                <i class="pi pi-video" style="font-size: 11px"></i>
+                <i
+                  :class="['pi', sessionIconOf(group, item)]"
+                  style="font-size: 11px"
+                ></i>
                 {{ sessionOfItem(group, item) }}
               </p>
               <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->

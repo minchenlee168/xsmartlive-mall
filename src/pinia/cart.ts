@@ -100,6 +100,22 @@ export const useCartStore = defineStore('cart', () => {
           bundleExpanded: true,
           bundleItems: [],
         },
+        {
+          // 加購商品：示範禁止棄標(default)車也能有加購品且可刪除；來源為貼文收單場（💬）
+          id: 'i-addon-c6',
+          productId: 9006,
+          name: '媽咪保溫水壺 500ml',
+          image:
+            'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&fit=crop',
+          spec: '珍珠白',
+          qty: 1,
+          price: 290,
+          original: 480,
+          checked: true,
+          isAddOn: true,
+          sessionName: '週末貼文快閃',
+          sessionType: 'post',
+        },
       ],
     },
     {
@@ -235,7 +251,8 @@ export const useCartStore = defineStore('cart', () => {
           original: 200,
           checked: false,
           isAddOn: true,
-          sessionName: '女王選物 EP.41',
+          sessionName: '女王社團團購',
+          sessionType: 'group',
         },
       ],
     },
@@ -276,7 +293,8 @@ export const useCartStore = defineStore('cart', () => {
     {
       id: 3,
       sellerName: '07/07 春日童樂繪本社',
-      sessionName: '春日繪本 EP.09',
+      sessionName: '春日團購貼文場',
+      sessionType: 'post',
       tags: [{ label: '常溫', type: 'secondary' }],
       shippingMethods: ['home', 'store'],
       paymentMethods: ['credit', 'atm', 'cod'],
