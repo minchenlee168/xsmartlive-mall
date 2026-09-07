@@ -383,6 +383,13 @@ const removeItem = (group: CartGroup, id: string) => {
   cart.removeItem(group.id, id);
 };
 
+/**
+ * 商品所屬直播場次：加購商品用自身來源場次，一般商品沿用該台車的場次；
+ * 商城來源（車與商品皆無場次）則回傳 undefined → 不顯示。
+ */
+const sessionOfItem = (group: CartGroup, item: CartItem): string | undefined =>
+  item.sessionName ?? group.sessionName;
+
 // ---- 結帳模式衍生行為 ------------------------------------------------------
 const isDefaultMode = (g: CartGroup) => g.checkoutMode === 'default';
 const isPickableMode = (g: CartGroup) => g.checkoutMode === 'pickable';
@@ -1269,14 +1276,6 @@ const handleGoProduct = (productId?: number) => {
               class="!py-0.5 !text-xs"
             />
           </div>
-          <!-- 直播場次名稱：靠最右；商城來源（無 sessionName）不顯示 -->
-          <span
-            v-if="group.sessionName"
-            class="ml-auto flex shrink-0 items-center gap-1 text-xs text-slate-500"
-          >
-            <i class="pi pi-video" style="font-size: 12px"></i>
-            {{ group.sessionName }}
-          </span>
         </div>
 
         <!-- 模式提示 banner：paused / abandon 額外補說明；default 由「禁止棄標」tag 表達 -->
@@ -1344,6 +1343,14 @@ const handleGoProduct = (productId?: number) => {
               v-if="item.isBidBatch"
               class="flex min-w-0 flex-1 flex-col gap-1.5"
             >
+              <!-- 商品所屬直播場次：放在商品名稱上方（商城來源不顯示） -->
+              <p
+                v-if="sessionOfItem(group, item)"
+                class="flex items-center gap-1 text-xs text-slate-400"
+              >
+                <i class="pi pi-video" style="font-size: 11px"></i>
+                {{ sessionOfItem(group, item) }}
+              </p>
               <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
               <div class="flex items-start justify-between gap-3">
                 <p
@@ -1378,6 +1385,11 @@ const handleGoProduct = (productId?: number) => {
                   </span>
                 </div>
               </div>
+
+              <!-- 後選規：金額為參考價，實際依所選規格結帳（靠右貼齊金額） -->
+              <p class="text-right text-xs leading-tight text-slate-500">
+                參考價，實際金額以選規格後結帳為準
+              </p>
 
               <!-- 已挑選規格摘要（規格 ×數量，太多列可展開） -->
               <div
@@ -1453,6 +1465,14 @@ const handleGoProduct = (productId?: number) => {
 
             <!-- 非批次下標：全寬兩排（名稱↔金額 / 數量↔刪除），左右邊界一致 -->
             <div v-else class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <!-- 商品所屬直播場次：放在商品名稱上方（商城來源不顯示） -->
+              <p
+                v-if="sessionOfItem(group, item)"
+                class="flex items-center gap-1 text-xs text-slate-400"
+              >
+                <i class="pi pi-video" style="font-size: 11px"></i>
+                {{ sessionOfItem(group, item) }}
+              </p>
               <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
               <div class="flex items-start justify-between gap-3">
                 <p
@@ -1464,11 +1484,6 @@ const handleGoProduct = (productId?: number) => {
                   "
                   @click="handleGoProduct(item.productId)"
                 >
-                  <Tag
-                    v-if="item.isAddOn"
-                    value="加購"
-                    class="!mr-1.5 !border !border-slate-300 !bg-transparent !py-[1px] !align-middle !text-xs !font-normal !text-slate-500"
-                  />
                   {{ item.name }}
                 </p>
                 <div class="flex shrink-0 items-center gap-1.5">
@@ -1492,15 +1507,6 @@ const handleGoProduct = (productId?: number) => {
                   </span>
                 </div>
               </div>
-
-              <!-- 加購商品來源直播場次：同一台車的加購商品可能來自不同場次 -->
-              <p
-                v-if="item.isAddOn && item.sessionName"
-                class="flex items-center gap-1 text-xs text-slate-400"
-              >
-                <i class="pi pi-video" style="font-size: 11px"></i>
-                {{ item.sessionName }}
-              </p>
 
               <!-- 規格：加入購物車前已選定，車內僅顯示文字。
                    後選規（標單必結 / 批次下標）走上方 isBidBatch 分支的「挑選規格」按鈕，不在此處 -->
