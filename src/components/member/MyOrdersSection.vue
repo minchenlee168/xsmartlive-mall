@@ -38,7 +38,12 @@ const ui = useUiStore();
  * - 已送達：任一包裹 currentStep === 'delivered'
  */
 type StatusTab =
-  'all' | OrderStatus | 'shipped' | 'to_receive' | 'delivered' | OverrideStatus;
+  | 'all'
+  | OrderStatus
+  | 'shipped'
+  | 'to_receive'
+  | 'delivered'
+  | OverrideStatus;
 const statusTabs: Array<{ key: StatusTab; label: string }> = [
   { key: 'all', label: '所有訂單' },
   { key: 'unpaid', label: '待付款' },
@@ -94,7 +99,6 @@ const handleApplyQuery = (): void => {
 // 商品列子 tab（訂單提問已依規劃移除：智能客服尚未開發）
 const detailTabs: Array<{ key: DetailTab; label: string }> = [
   { key: 'progress', label: '配送進度/明細' },
-  { key: 'address', label: '更換地址' },
   { key: 'payment', label: '訂購/付款資訊' },
 ];
 
@@ -117,54 +121,9 @@ const PROGRESS_STEPS = TIMELINE_STEPS.filter((s) => s.key !== 'unpaid');
 
 const orders = computed(() => ordersStore.orders);
 
-// ---- 電子發票證明聯 Dialog（點「線上列印」開啟） ---------------------------
-const invoicePreviewOrder = ref<OrderRecord | null>(null);
-const handleOpenInvoice = (order: OrderRecord): void => {
-  invoicePreviewOrder.value = order;
-};
-
-// 發票狀態對應前台顯示：只有 issued 顯示「線上列印」按鈕，其餘顯示文字
-const INVOICE_STATUS_LABEL: Record<
-  Exclude<OrderRecord['invoiceStatus'], 'issued'>,
-  string
-> = {
-  pending: '尚未開立',
-  voided: '已作廢',
-  none: '不開立',
-};
-const invoiceLabelOf = (order: OrderRecord): string =>
-  INVOICE_STATUS_LABEL[
-    order.invoiceStatus as Exclude<OrderRecord['invoiceStatus'], 'issued'>
-  ] ?? '';
-/** 是否為紙本發票（紙本無電子證明聯，開立後只顯示「已開立」文字，不提供線上列印）。 */
-const isPaperInvoice = (order: OrderRecord): boolean =>
-  order.invoice.includes('紙本');
-/** 發票狀態顯示文字：issued → 已開立；其餘依 INVOICE_STATUS_LABEL。 */
-const invoiceLabelDisplay = (order: OrderRecord): string =>
-  order.invoiceStatus === 'issued' ? '已開立' : invoiceLabelOf(order);
-/** 依訂單編號 hash 出一個看起來像發票號碼的字串（AB-12345678）。 */
-const mockInvoiceNoOf = (order: OrderRecord): string => {
-  const letters = 'ABCDEFGHJKLMNPRSTUV';
-  const seed = Array.from(order.orderNo).reduce(
-    (s, c) => s + c.charCodeAt(0),
-    0,
-  );
-  const l1 = letters[seed % letters.length];
-  const l2 = letters[(seed >> 3) % letters.length];
-  const nums = String(100000000 + ((seed * 173) % 89999999)).slice(-8);
-  return `${l1}${l2}-${nums}`;
-};
-/** 隨機碼 4 位（demo）。 */
-const mockRandomCodeOf = (order: OrderRecord): string => {
-  const seed = Array.from(order.orderNo).reduce(
-    (s, c) => s + c.charCodeAt(0),
-    0,
-  );
-  return String(1000 + ((seed * 47) % 9000));
-};
-const handlePrintInvoice = (): void => {
-  window.print();
-};
+/** 發票類型顯示：類型後以括號標註開立狀態（issued → 已開立；其餘 → 尚未開立）。不開立則整欄隱藏。 */
+const invoiceTypeDisplay = (order: OrderRecord): string =>
+  `${order.invoice}（${order.invoiceStatus === 'issued' ? '已開立' : '尚未開立'}）`;
 
 /** 套用日期區間 + 關鍵字後的訂單（不含 status tab 過濾）— 給 tab 數字 + filteredOrders 共用 */
 const dateKeywordFilteredOrders = computed(() => {
@@ -251,13 +210,16 @@ const filteredOrders = computed(() =>
 
 /** 配送各狀態數量（在日期/搜尋範圍內計）。 */
 const shipCount = (key: StatusTab) =>
-  dateKeywordFilteredOrders.value.filter((o) => matchesStatusKey(o, key)).length;
+  dateKeywordFilteredOrders.value.filter((o) => matchesStatusKey(o, key))
+    .length;
 
 /** 配送狀態下拉選項：全部 + 實際有訂單（count>0）的配送狀態。 */
 const deliveryFilterOptions = computed(() => [
   { label: `全部 (${shipCount('all')})`, value: 'all' as StatusTab },
   ...statusTabs
-    .filter((t) => t.key !== 'all' && t.key !== 'unpaid' && shipCount(t.key) > 0)
+    .filter(
+      (t) => t.key !== 'all' && t.key !== 'unpaid' && shipCount(t.key) > 0,
+    )
     .map((t) => ({ label: `${t.label} (${shipCount(t.key)})`, value: t.key })),
   ...OVERRIDE_TABS.filter((t) => shipCount(t.key) > 0).map((t) => ({
     label: `${t.label} (${shipCount(t.key)})`,
@@ -714,11 +676,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             @keyup.enter="handleApplyQuery"
           />
         </div>
-        <Button
-          label="查詢"
-          class="shrink-0"
-          @click="handleApplyQuery"
-        />
+        <Button label="查詢" class="shrink-0" @click="handleApplyQuery" />
       </div>
 
       <!-- 結果摘要 -->
@@ -965,13 +923,12 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 class="w-full"
                 @update:model-value="(key) => handleSelectDetailTab(order, key)"
               />
-              <!-- 更換地址 tab：全寬「更換配送地址」按鈕；備貨中之後不可改 -->
+              <!-- 可更換地址時才顯示：全寬「更換配送地址」按鈕（備貨後不可改則整顆隱藏） -->
               <Button
-                v-if="order.detailTab === 'address'"
+                v-if="orderCanChangeAddress(order)"
                 label="更換配送地址"
                 outlined
                 class="w-full"
-                :disabled="!orderCanChangeAddress(order)"
                 @click="handleOpenChangeAddress(order)"
               />
             </div>
@@ -1010,14 +967,13 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 </button>
               </div>
             </div>
-            <!-- 更換地址 tab：右側「更換配送地址」按鈕；備貨中之後不可改 -->
+            <!-- 可更換地址時才顯示：頁籤列右側「更換配送地址」按鈕（備貨後不可改則整顆隱藏） -->
             <Button
-              v-if="order.detailTab === 'address'"
+              v-if="orderCanChangeAddress(order)"
               label="更換配送地址"
               outlined
               size="small"
               class="shrink-0"
-              :disabled="!orderCanChangeAddress(order)"
               @click="handleOpenChangeAddress(order)"
             />
           </div>
@@ -1225,7 +1181,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                           {{ pkgDisplayLabel(pkg, order) }}
                         </p>
                         <p class="mt-0.5 text-xs leading-tight text-slate-500">
-                          {{ pkg.stepTimes?.[deliveryStepOf(pkg.currentStep)] ?? '—' }}
+                          {{
+                            pkg.stepTimes?.[deliveryStepOf(pkg.currentStep)] ??
+                            '—'
+                          }}
                         </p>
                       </div>
                     </div>
@@ -1244,8 +1203,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                         width:
                           (order.overrideStatus
                             ? 100
-                            : stepProgressPct(deliveryStepOf(pkg.currentStep))) +
-                          '%',
+                            : stepProgressPct(
+                                deliveryStepOf(pkg.currentStep),
+                              )) + '%',
                         background: 'var(--primary)',
                       }"
                     ></div>
@@ -1566,13 +1526,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <span class="text-xs text-slate-500">收件地址</span>
           <span class="text-slate-950">高雄市三民區北平一街103號</span>
         </div>
-        <div class="flex flex-col gap-1">
-          <span class="text-xs text-slate-500">發票類型</span>
-          <span class="text-slate-950">
-            {{ paymentInfoTargetOrder?.invoice ?? '個人發票（紙本）' }}
-          </span>
-        </div>
-        <!-- 發票（列表的發票欄已由付款狀態取代，線上列印入口移到這裡） -->
+        <!-- 發票類型：不開立則整欄隱藏；開立狀態以括號標註（已開立 / 尚未開立） -->
         <div
           v-if="
             paymentInfoTargetOrder &&
@@ -1580,23 +1534,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           "
           class="flex flex-col gap-1"
         >
-          <span class="text-xs text-slate-500">發票</span>
-          <div>
-            <Button
-              v-if="
-                paymentInfoTargetOrder.invoiceStatus === 'issued' &&
-                !isPaperInvoice(paymentInfoTargetOrder)
-              "
-              label="線上列印"
-              outlined
-              size="small"
-              class="!py-1"
-              @click="handleOpenInvoice(paymentInfoTargetOrder)"
-            />
-            <span v-else class="text-slate-500">
-              {{ invoiceLabelDisplay(paymentInfoTargetOrder) }}
-            </span>
-          </div>
+          <span class="text-xs text-slate-500">發票類型</span>
+          <span class="text-slate-950">
+            {{ invoiceTypeDisplay(paymentInfoTargetOrder) }}
+          </span>
         </div>
         <div class="flex flex-col gap-1">
           <span class="text-xs text-slate-500">付款方式</span>
@@ -1706,119 +1647,6 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </table>
         </div>
       </div>
-    </Dialog>
-
-    <!-- 電子發票證明聯 Dialog：點「線上列印」開啟 -->
-    <Dialog
-      :visible="!!invoicePreviewOrder"
-      modal
-      :draggable="false"
-      dismissable-mask
-      header="電子發票證明聯"
-      :style="{ width: '480px' }"
-      :breakpoints="{ '768px': '92vw' }"
-      @update:visible="(v) => !v && (invoicePreviewOrder = null)"
-    >
-      <div v-if="invoicePreviewOrder" class="flex flex-col gap-4">
-        <!-- 發票標頭 -->
-        <div
-          class="rounded-lg border border-dashed border-slate-400 bg-slate-50 px-4 py-3"
-        >
-          <p class="text-center text-xs text-slate-500">
-            財政部電子發票整合服務平台
-          </p>
-          <p
-            class="mt-1 text-center text-2xl font-bold tracking-widest text-slate-900"
-          >
-            {{ mockInvoiceNoOf(invoicePreviewOrder) }}
-          </p>
-          <p class="mt-0.5 text-center text-xs text-slate-500">
-            發票日期：{{ invoicePreviewOrder.date }}
-          </p>
-        </div>
-
-        <!-- 賣 / 買方 -->
-        <div class="grid grid-cols-2 gap-3 text-xs text-slate-700">
-          <div>
-            <p class="text-slate-500">賣方統編</p>
-            <p class="font-medium">12345678</p>
-            <p class="text-slate-500">直播管家 xSmartLive 股份有限公司</p>
-          </div>
-          <div>
-            <p class="text-slate-500">發票類型</p>
-            <p class="font-medium">
-              {{ invoicePreviewOrder.invoice || '個人發票（紙本）' }}
-            </p>
-          </div>
-        </div>
-
-        <!-- 明細 -->
-        <div class="rounded-lg border border-slate-200">
-          <div
-            class="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600"
-          >
-            <span>品名</span>
-            <span class="text-right">數量</span>
-            <span class="text-right">單價</span>
-            <span class="text-right">小計</span>
-          </div>
-          <div
-            v-for="(it, idx) in invoicePreviewOrder.items"
-            :key="idx"
-            class="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 border-b border-slate-100 px-3 py-2 text-xs text-slate-700 last:border-b-0"
-          >
-            <span class="truncate" :title="it.name">{{ it.name }}</span>
-            <span class="text-right">{{ it.qty }}</span>
-            <span class="text-right"> {{ money(it.price) }} </span>
-            <span class="text-right">
-              {{ money(it.price * it.qty) }}
-            </span>
-          </div>
-        </div>
-
-        <!-- 金額 -->
-        <div class="flex justify-end gap-6 text-sm">
-          <div class="text-right text-slate-500">
-            <p>銷售額（未稅）</p>
-            <p>營業稅（5%）</p>
-            <p class="font-bold text-slate-900">總計</p>
-          </div>
-          <div class="text-right text-slate-700">
-            <p>
-              {{ money(Math.round(invoicePreviewOrder.total / 1.05)) }}
-            </p>
-            <p>
-              {{
-                money(
-                  invoicePreviewOrder.total -
-                    Math.round(invoicePreviewOrder.total / 1.05),
-                )
-              }}
-            </p>
-            <p class="font-bold" style="color: var(--primary)">
-              {{ money(invoicePreviewOrder.total) }}
-            </p>
-          </div>
-        </div>
-
-        <!-- 隨機碼 / 訂單編號 -->
-        <div
-          class="rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-500"
-        >
-          隨機碼：{{ mockRandomCodeOf(invoicePreviewOrder) }}
-          <span class="mx-2">·</span>
-          訂單編號：{{ invoicePreviewOrder.orderNo }}
-        </div>
-      </div>
-      <template #footer>
-        <Button
-          label="關閉"
-          severity="secondary"
-          outlined
-          @click="invoicePreviewOrder = null"
-        />
-        <Button label="列印" icon="pi pi-print" @click="handlePrintInvoice" />
-      </template>
     </Dialog>
 
     <!-- 訂單提問 drawer 已依規劃移除（智能客服尚未開發） -->
