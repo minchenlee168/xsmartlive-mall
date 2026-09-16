@@ -1569,7 +1569,7 @@ const handlePlaceOrder = () => {
 
           <!-- 運費折抵：有運費時達 / 未達門檻都顯示；達標折抵全額運費、未達顯示 $0 -->
           <div v-if="groupHasShippingFee(group)" :class="RECEIPT_ROW_CLASS">
-            <span class="text-sm text-slate-700">運費折抵</span>
+            <span class="text-sm text-slate-700">免運折抵</span>
             <Tag
               v-if="isGroupFreeShipping(group)"
               value="達免運門檻"
@@ -1855,7 +1855,7 @@ const handlePlaceOrder = () => {
             >
               <span class="flex items-center gap-1 text-slate-500">
                 <i class="pi pi-truck text-xs" />
-                運費折抵（滿千免運）
+                免運折抵（滿千免運）
               </span>
               <span class="font-medium text-red-500"
                 >- {{ money(shippingDiscountTotal) }}</span

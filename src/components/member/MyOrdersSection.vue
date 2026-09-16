@@ -575,18 +575,18 @@ const amountRows = computed(() => {
       value: -a.couponDiscount,
       isDiscount: true,
     });
-  if (a.rewardPointsUsed)
-    rows.push({
-      label: `紅利折抵（${a.rewardPointsUsed} 點）`,
-      value: -a.rewardPointsUsed,
-      isDiscount: true,
-    });
   if (a.shippingFee)
     rows.push({ label: '運費', value: a.shippingFee, isDiscount: false });
   if (a.shippingDiscount)
     rows.push({
-      label: '運費折抵',
+      label: '免運折抵',
       value: -a.shippingDiscount,
+      isDiscount: true,
+    });
+  if (a.rewardPointsUsed)
+    rows.push({
+      label: `紅利折抵（${a.rewardPointsUsed} 點）`,
+      value: -a.rewardPointsUsed,
       isDiscount: true,
     });
   return rows;
