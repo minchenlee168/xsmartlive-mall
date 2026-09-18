@@ -60,6 +60,16 @@ const OVERRIDE_TABS: Array<{ key: StatusTab; label: string }> = [
   { key: 'exchanged', label: '已換貨' },
   { key: 'cancelled', label: '已取消' },
 ];
+/**
+ * 暫時隱藏退換貨：把退貨中 / 已退貨 / 已換貨 的訂單整批濾掉（尾巴分頁因 count 歸零自動消失），
+ * 並鎖住自助退換貨申請入口。要恢復時清空這個 set、把 IS_RETURN_FLOW_HIDDEN 設為 false 即可。
+ */
+const HIDDEN_OVERRIDE_STATUSES: OverrideStatus[] = [
+  'returning',
+  'returned',
+  'exchanged',
+];
+const IS_RETURN_FLOW_HIDDEN = true;
 // 狀態篩選：只保留配送狀態下拉（付款狀態改為僅欄位顯示，不作篩選）
 const shipFilter = ref<StatusTab>('all');
 /**
@@ -127,7 +137,11 @@ const invoiceTypeDisplay = (order: OrderRecord): string =>
 
 /** 套用日期區間 + 關鍵字後的訂單（不含 status tab 過濾）— 給 tab 數字 + filteredOrders 共用 */
 const dateKeywordFilteredOrders = computed(() => {
-  let list = orders.value;
+  // 暫時隱藏退換貨：退貨中 / 已退貨 / 已換貨 的訂單一律不進清單（尾巴分頁與狀態標籤隨之消失）
+  let list = orders.value.filter(
+    (o) =>
+      !o.overrideStatus || !HIDDEN_OVERRIDE_STATUSES.includes(o.overrideStatus),
+  );
   const [from, to] = appliedDateRange.value;
   if (from || to) {
     const fromTs = from
@@ -301,17 +315,15 @@ const payStatusOf = (order: OrderRecord): PayStatus =>
   order.payStatus ?? (order.status === 'unpaid' ? 'unpaid' : 'paid');
 
 // ── 權益膠囊：展開後顯示「狀態 · 可退/可取消/可換」對照文案 ──
+// 退換貨暫時隱藏：權益文案只保留「可否取消」語意，移除退／換貨相關敘述
 const RIGHTS_BANNER: Record<string, string> = {
-  待付款: '可取消，不可退換貨',
-  待出貨: '可取消，不可退換貨',
-  備貨中: '不可取消、不可退換貨',
-  已出貨: '可退貨，不可取消、不可換貨',
-  已送達: '可退貨、可換貨，不可取消',
-  已完成: '不可取消，如需退換貨請洽賣家',
+  待付款: '可取消',
+  待出貨: '可取消',
+  備貨中: '不可取消',
+  已出貨: '不可取消',
+  已送達: '不可取消',
+  已完成: '不可取消',
   處理中: '各包裹階段不同，權益依各包裹狀態判斷',
-  退貨中: '退貨處理中，請洽賣家',
-  已退貨: '這筆訂單已退貨結案',
-  已換貨: '換貨已完成',
   已取消: '訂單已由賣家取消',
 };
 const rightsBannerOf = (order: OrderRecord): string =>
@@ -1076,6 +1088,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <!-- 駁回可再點按查看原因；申請中 / 通過為 disabled 唯讀 -->
                 <Button
                   v-if="
+                    !IS_RETURN_FLOW_HIDDEN &&
                     order.detailTab === 'return' &&
                     itemCanReturnOrExchange(item) &&
                     !returnReasonText(order)
@@ -1152,7 +1165,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                     <span v-else class="text-slate-500">尚未配箱</span>
                     <!-- 換貨後的第二次出貨標籤 -->
                     <Tag
-                      v-if="pkg.exchangeTag"
+                      v-if="!IS_RETURN_FLOW_HIDDEN && pkg.exchangeTag"
                       :value="pkg.exchangeTag"
                       class="!border !border-emerald-300 !bg-emerald-50 !py-[1px] !text-xs !font-normal !text-emerald-700"
                     />
@@ -1310,8 +1323,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       :mode="changeAddressMode"
     />
 
-    <!-- 退換貨申請 dialog -->
+    <!-- 退換貨申請 dialog（退換貨暫時隱藏：整組不掛載） -->
     <Dialog
+      v-if="!IS_RETURN_FLOW_HIDDEN"
       v-model:visible="isReturnDialogVisible"
       modal
       :draggable="false"
@@ -1398,8 +1412,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </template>
     </Dialog>
 
-    <!-- 退換貨申請駁回原因 dialog -->
+    <!-- 退換貨申請駁回原因 dialog（退換貨暫時隱藏：整組不掛載） -->
     <Dialog
+      v-if="!IS_RETURN_FLOW_HIDDEN"
       v-model:visible="isRejectReasonDialogVisible"
       modal
       :draggable="false"
@@ -1431,8 +1446,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </template>
     </Dialog>
 
-    <!-- 退換貨申請通過：聯絡賣家 dialog -->
+    <!-- 退換貨申請通過：聯絡賣家 dialog（退換貨暫時隱藏：整組不掛載） -->
     <Dialog
+      v-if="!IS_RETURN_FLOW_HIDDEN"
       v-model:visible="isApprovedContactDialogVisible"
       modal
       :draggable="false"

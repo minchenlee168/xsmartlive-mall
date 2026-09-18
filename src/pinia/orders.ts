@@ -66,7 +66,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_HAT,
           name: '兒童防風連帽外套',
-          spec: '綠/120cm（原 110cm 尺寸不合換貨）',
+          spec: '綠/120cm',
           price: 690,
           qty: 1,
           returnStatus: 'approved',
@@ -665,7 +665,7 @@ export const useOrdersStore = defineStore('orders', () => {
         {
           image: IMG_HAT,
           name: '兒童保暖羽絨背心',
-          spec: '藍/110cm（原 120cm 尺寸不合換貨）',
+          spec: '藍/110cm',
           price: 890,
           qty: 1,
           packages: [
