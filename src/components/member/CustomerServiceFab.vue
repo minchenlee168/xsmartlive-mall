@@ -193,7 +193,7 @@ const MENU_TREE: MenuButton[] = [
   {
     key: 'human',
     label: '找真人客服',
-    icon: 'pi pi-headphone',
+    icon: 'pi pi-headphones',
     isPrimary: true,
     reply:
       '已為您登記轉接真人客服 🙋 服務時間為週一至週五 09:00–18:00（例假日除外）。請留下訂單編號與聯絡方式，專人將盡快與您聯繫；非服務時間的訊息我們會於上班後優先處理。',
