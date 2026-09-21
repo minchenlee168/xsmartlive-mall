@@ -406,7 +406,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown));
             class="text-xs font-medium"
             style="color: var(--primary)"
           >
-            [AI客服]
+            AI 客服
           </span>
 
           <div
