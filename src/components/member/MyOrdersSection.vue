@@ -89,10 +89,8 @@ const TIMELINE_TABS: Record<string, TimelineStepKey> = {
 
 // 日期 / 搜尋（appliedXxx 為「按下查詢」後才更新的快照，
 // 篩選邏輯只看 applied 值，輸入過程不會即時 refresh） */
-const dateRange = ref<Array<Date | null>>([
-  new Date('2026-01-06'),
-  new Date('2026-02-04'),
-]);
+// 結束日預設為今天，讓剛結帳建立的訂單（今日）也落在預設範圍內
+const dateRange = ref<Array<Date | null>>([new Date('2026-01-06'), new Date()]);
 const keyword = ref('');
 const appliedDateRange = ref<Array<Date | null>>([
   dateRange.value[0],
@@ -714,9 +712,9 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
         class="overflow-hidden rounded-lg border border-slate-200 bg-white"
       >
         <!-- Header table：手機卡片堆疊；其他用 table 兩列（header + data） -->
+        <!-- 窄～中寬度：卡片堆疊（@5xl 起改 4 欄用滿橫向空間）；@7xl 起改用表格 -->
         <div
-          v-if="isMobile"
-          class="grid grid-cols-2 gap-y-2 p-3 text-sm"
+          class="grid grid-cols-2 gap-y-2 p-3 text-sm @5xl:grid-cols-4 @7xl:hidden"
           style="background: color-mix(in srgb, var(--primary) 8%, transparent)"
         >
           <div>
@@ -781,100 +779,109 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
         </div>
 
-        <table v-else class="w-full table-fixed text-sm">
-          <thead>
-            <tr
-              style="
-                background: color-mix(in srgb, var(--primary) 8%, transparent);
-              "
-            >
-              <th class="py-2.5 pr-3 pl-4 text-left font-medium text-slate-700">
-                訂單日期
-              </th>
-              <th class="px-3 py-2.5 text-left font-medium text-slate-700">
-                訂單編號
-              </th>
-              <th
-                class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 70px"
-              >
-                數量
-              </th>
-              <th
-                class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 150px"
-              >
-                訂單總額
-              </th>
-              <th
-                class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 110px"
-              >
-                付款方式
-              </th>
-              <th
-                class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 90px"
-              >
-                付款狀態
-              </th>
-              <th
-                class="px-3 py-2.5 text-left font-medium text-slate-700"
-                style="width: 95px"
-              >
-                配送方式
-              </th>
-              <th
-                class="py-2.5 pr-4 pl-3 text-left font-medium text-slate-700"
-                style="width: 95px"
-              >
-                配送狀態
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="py-3 pr-3 pl-4 text-slate-700">{{ order.date }}</td>
-              <td class="px-3 py-3 text-slate-700">{{ order.orderNo }}</td>
-              <td class="px-3 py-3 text-slate-700">{{ order.qty }}</td>
-              <td class="px-3 py-3">
-                <div class="flex items-center gap-1">
-                  <span class="font-bold" style="color: var(--danger)">
-                    {{ money(order.total) }}
-                  </span>
-                  <!-- 金額明細：眼睛圖示（與金額同列，灰色）-->
-                  <Button
-                    v-if="order.amounts"
-                    icon="pi pi-eye"
-                    text
-                    rounded
-                    size="small"
-                    severity="secondary"
-                    aria-label="金額明細"
-                    @click="handleOpenAmountDialog(order)"
-                  />
-                </div>
-              </td>
-              <td class="px-3 py-3 text-slate-700">{{ order.payment }}</td>
-              <td
-                class="px-3 py-3 font-medium"
-                :class="PAY_STATUS_CLASS[payStatusOf(order)]"
-              >
-                {{ PAY_STATUS_LABEL[payStatusOf(order)] }}
-              </td>
-              <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
-              <td
-                class="py-3 pr-4 pl-3 font-medium"
-                :class="orderStatusToneClass(order)"
-                :style="
-                  order.overrideStatus ? undefined : 'color: var(--primary)'
+        <!-- 大桌機（@7xl 1280↑）：8 欄表格；min-w + 橫向捲動避免窄欄擠壓破版 -->
+        <div class="hidden overflow-x-auto @7xl:block">
+          <table class="w-full min-w-[960px] table-fixed text-sm">
+            <thead>
+              <tr
+                style="
+                  background: color-mix(
+                    in srgb,
+                    var(--primary) 8%,
+                    transparent
+                  );
                 "
               >
-                {{ orderDisplayStatus(order) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <th
+                  class="py-2.5 pr-3 pl-4 text-left font-medium text-slate-700"
+                >
+                  訂單日期
+                </th>
+                <th class="px-3 py-2.5 text-left font-medium text-slate-700">
+                  訂單編號
+                </th>
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 70px"
+                >
+                  數量
+                </th>
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 150px"
+                >
+                  訂單總額
+                </th>
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 110px"
+                >
+                  付款方式
+                </th>
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 90px"
+                >
+                  付款狀態
+                </th>
+                <th
+                  class="px-3 py-2.5 text-left font-medium text-slate-700"
+                  style="width: 95px"
+                >
+                  配送方式
+                </th>
+                <th
+                  class="py-2.5 pr-4 pl-3 text-left font-medium text-slate-700"
+                  style="width: 95px"
+                >
+                  配送狀態
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="py-3 pr-3 pl-4 text-slate-700">{{ order.date }}</td>
+                <td class="px-3 py-3 text-slate-700">{{ order.orderNo }}</td>
+                <td class="px-3 py-3 text-slate-700">{{ order.qty }}</td>
+                <td class="px-3 py-3">
+                  <div class="flex items-center gap-1">
+                    <span class="font-bold" style="color: var(--danger)">
+                      {{ money(order.total) }}
+                    </span>
+                    <!-- 金額明細：眼睛圖示（與金額同列，灰色）-->
+                    <Button
+                      v-if="order.amounts"
+                      icon="pi pi-eye"
+                      text
+                      rounded
+                      size="small"
+                      severity="secondary"
+                      aria-label="金額明細"
+                      @click="handleOpenAmountDialog(order)"
+                    />
+                  </div>
+                </td>
+                <td class="px-3 py-3 text-slate-700">{{ order.payment }}</td>
+                <td
+                  class="px-3 py-3 font-medium"
+                  :class="PAY_STATUS_CLASS[payStatusOf(order)]"
+                >
+                  {{ PAY_STATUS_LABEL[payStatusOf(order)] }}
+                </td>
+                <td class="px-3 py-3 text-slate-700">{{ order.delivery }}</td>
+                <td
+                  class="py-3 pr-4 pl-3 font-medium"
+                  :class="orderStatusToneClass(order)"
+                  :style="
+                    order.overrideStatus ? undefined : 'color: var(--primary)'
+                  "
+                >
+                  {{ orderDisplayStatus(order) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <!-- 已送達 → 買家可「確認完成」，訂單轉為已完成 -->
         <div
