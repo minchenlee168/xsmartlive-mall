@@ -844,7 +844,6 @@ export const useOrdersStore = defineStore('orders', () => {
     const orderId = `SO${ymd}${pad2(seq)}`;
     const time = `${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
     const date = `${now.getFullYear()}/${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
-    const dateShort = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
 
     const items: OrderItem[] = input.items.map((it, idx) => ({
       image: it.image,
@@ -886,18 +885,71 @@ export const useOrdersStore = defineStore('orders', () => {
       buyerNote: input.buyerNote,
       amounts: input.amounts,
     });
-    transactions.value.unshift({
-      date: dateShort,
-      method: input.payment,
-      orderId,
-      amount: input.total,
-    });
+    // 交易記錄改綁「付款成功」才寫（見 markBatchPaid）——建單時金流尚未發生。
     return orderNo;
   }
 
   const lastPaymentSummary = ref<LastPaymentSummary | null>(null);
   const setLastPaymentSummary = (s: LastPaymentSummary | null) => {
     lastPaymentSummary.value = s;
+  };
+
+  // ── 線上付款（模擬藍新金流，pay-then-clear）──────────────────────────────
+  // 規則：付款成功才轉待出貨並清購物車；失敗 / 取消 / 離開一律把訂單標為「已取消」，
+  //      購物車不動（本次結帳商品自然留在購物車，可重新結帳）。
+  /** 目前開啟中的付款批次（付款層顯示中）；null = 未在付款。 */
+  const activePayment = ref<{ orderNos: string[]; amount: number } | null>(null);
+
+  /** 開啟付款層：結帳建單後呼叫。 */
+  const startPayment = (orderNos: string[], amount: number): void => {
+    activePayment.value = { orderNos, amount };
+  };
+  /** 關閉付款層（不改訂單狀態）。 */
+  const closePayment = (): void => {
+    activePayment.value = null;
+  };
+
+  /** 付款成功：整批待付款訂單 unpaid→to_ship、payStatus=paid，並補寫交易記錄。 */
+  const markBatchPaid = (orderNos: string[]): void => {
+    const now = new Date();
+    const time = `${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+    const dateShort = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+    orderNos.forEach((no) => {
+      const order = orders.value.find((o) => o.orderNo === no);
+      if (!order || order.status !== 'unpaid') return;
+      order.status = 'to_ship';
+      order.payStatus = 'paid';
+      order.items.forEach((it) => {
+        it.packages.forEach((p) => {
+          if (p.currentStep === 'unpaid') {
+            p.currentStep = 'to_ship';
+            p.stepTimes = { ...p.stepTimes, to_ship: time };
+          }
+        });
+      });
+      transactions.value.unshift({
+        date: dateShort,
+        method: order.payment,
+        orderId: order.id,
+        amount: order.total,
+      });
+    });
+    activePayment.value = null;
+  };
+
+  /** 付款未成功（失敗 / 取消 / 離開）：整批待付款訂單標為「已取消」。 */
+  const cancelOrders = (orderNos: string[], reason: string): void => {
+    const now = new Date();
+    const t = `${now.getFullYear()}/${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+    orderNos.forEach((no) => {
+      const order = orders.value.find((o) => o.orderNo === no);
+      if (!order || order.status !== 'unpaid') return;
+      order.overrideStatus = 'cancelled';
+      order.payStatus = 'failed';
+      order.cancelTime = t;
+      order.cancelReason = reason;
+    });
+    activePayment.value = null;
   };
 
   /** 買家確認「已完成」：已送達的包裹推進到 completed，訂單狀態轉為 completed。 */
@@ -926,5 +978,10 @@ export const useOrdersStore = defineStore('orders', () => {
     completeOrder,
     lastPaymentSummary,
     setLastPaymentSummary,
+    activePayment,
+    startPayment,
+    closePayment,
+    markBatchPaid,
+    cancelOrders,
   };
 });

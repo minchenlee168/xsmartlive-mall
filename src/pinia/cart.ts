@@ -603,6 +603,14 @@ export const useCartStore = defineStore('cart', () => {
     if (g) g.items = g.items.filter((i) => i.id !== itemId);
   }
 
+  /** 結帳付款成功後：移除已勾選（本次結帳）商品，空的購物車一併移除。 */
+  function removeCheckedItems() {
+    groups.value.forEach((g) => {
+      g.items = g.items.filter((i) => !i.checked);
+    });
+    groups.value = groups.value.filter((g) => g.items.length > 0);
+  }
+
   // ---- 購物車設定：新增 / 修改 / 刪除 ---------------------------------------
   function addCart(patch?: Partial<Omit<CartGroup, 'id' | 'items'>>) {
     const g: CartGroup = {
@@ -697,6 +705,7 @@ export const useCartStore = defineStore('cart', () => {
     bulkDiscountForItems,
     addItem,
     removeItem,
+    removeCheckedItems,
     addCart,
     updateCart,
     removeCart,

@@ -1272,12 +1272,23 @@ const handlePlaceOrder = () => {
     deliveryAddress,
   });
 
-  cartStore.groups.forEach((g) => {
-    g.items = g.items.filter((i) => !i.checked);
-  });
-  cartStore.groups = cartStore.groups.filter((g) => g.items.length > 0);
-  ui.toast('付款成功');
-  router.push('/payment-success');
+  const paidAmount = checkoutGroups.value.reduce(
+    (sum, g) => sum + groupDisplayTotal(g),
+    0,
+  );
+
+  if (paymentMethod.value === 'credit') {
+    // 線上信用卡：建單（待付款）+ 開模擬藍新付款層；購物車先不清。
+    // 付款成功才清購物車、轉待出貨；失敗 / 取消 / 離開則訂單取消、商品留在購物車。
+    ordersStore.startPayment(orderNos, paidAmount);
+    ui.toast('訂單已建立，請完成付款');
+  } else {
+    // 其他付款方式（貨到付款 / ATM / 超商代碼等）維持即時完成。
+    ordersStore.markBatchPaid(orderNos);
+    cartStore.removeCheckedItems();
+    ui.toast('付款成功');
+    router.push('/payment-success');
+  }
 };
 </script>
 

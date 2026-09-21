@@ -13,6 +13,7 @@ import AppFooter from './components/AppFooter.vue';
 import PageLoading from './components/PageLoading.vue';
 import AuroraShell from './components/AuroraShell.vue';
 import AppToast from './components/AppToast.vue';
+import PaymentGateway from './components/checkout/PaymentGateway.vue';
 import { useViewportStore } from './pinia/viewport';
 import { useUiStore } from './pinia/ui';
 import { useThemeStore } from './pinia/theme';
@@ -178,6 +179,9 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
       </template>
     </div>
   </div>
+
+  <!-- 模擬藍新付款層 + 待付款 banner：整頁接管性質，掛 frame 外以「視窗」為定位基準 -->
+  <PaymentGateway />
 
   <FloatingControls v-if="showControls" />
 
