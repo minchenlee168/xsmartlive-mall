@@ -1266,6 +1266,7 @@ const handleGoProduct = (productId?: number) => {
             v-if="isGroupCheckable(group)"
             :model-value="isGroupAllChecked(group)"
             binary
+            :disabled="!group.items.some(isSelectableItem)"
             :input-id="'grp-' + group.id"
             aria-label="全選此店家所有商品"
             @update:model-value="toggleGroupAll(group)"
@@ -1324,12 +1325,14 @@ const handleGoProduct = (productId?: number) => {
             <span class="h-px flex-1 bg-slate-200"></span>
           </div>
         <div
-          :class="
+          :class="[
             ii !== orderedGroupItems[group.id].length - 1 &&
             !(!item.isAddOn && orderedGroupItems[group.id][ii + 1]?.isAddOn)
               ? 'cart-divider'
-              : ''
-          "
+              : '',
+            'transition-opacity',
+            item.isPreorder && isGroupAllChecked(group) ? 'opacity-50' : '',
+          ]"
         >
           <!-- Item row（有備註時收窄底內距，讓備註貼齊所屬商品；下方間距改由備註 mb 提供，統一節奏） -->
           <div
@@ -1464,7 +1467,7 @@ const handleGoProduct = (productId?: number) => {
                     :max="itemStockMax(item)"
                     :max-fraction-digits="0"
                     :allow-empty="false"
-                    :disabled="isQtyLocked(group) && !item.isAddOn"
+                    :disabled="(isQtyLocked(group) && !item.isAddOn) || item.isPreorder"
                     show-buttons
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"
@@ -1568,8 +1571,8 @@ const handleGoProduct = (productId?: number) => {
                 class="flex w-fit items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500"
               >
                 <i class="pi pi-clock" style="font-size: 11px" />
-                預購商品，到貨後才可勾選結帳
-              </p>
+                預購商品，到貨後才可結帳
+</p>
 
               <!-- 第 2 排：數量（左）… 刪除（右，右緣對齊上方金額） -->
               <div
@@ -1583,7 +1586,7 @@ const handleGoProduct = (productId?: number) => {
                     :max="itemStockMax(item)"
                     :max-fraction-digits="0"
                     :allow-empty="false"
-                    :disabled="isQtyLocked(group) && !item.isAddOn"
+                    :disabled="(isQtyLocked(group) && !item.isAddOn) || item.isPreorder"
                     show-buttons
                     button-layout="horizontal"
                     increment-button-icon="pi pi-plus"

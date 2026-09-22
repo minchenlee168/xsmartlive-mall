@@ -286,7 +286,20 @@ export const useCartStore = defineStore('cart', () => {
           qty: 1,
           price: 300,
           checked: false,
+          isPreorder: true,
           note: '此款為直播限定色，不參與退換貨。',
+        },
+        {
+          // 同台車的一般（非預購）商品：與預購品混放，示範一般品可正常結帳
+          id: 'i5b',
+          productId: 11,
+          name: '女童碎花連衣裙 春款長袖娃娃領公主裙',
+          image: products.find((p) => p.id === 11)?.image,
+          spec: '110cm',
+          qty: 1,
+          price: 320,
+          original: 480,
+          checked: false,
         },
       ],
     },
@@ -311,7 +324,6 @@ export const useCartStore = defineStore('cart', () => {
           price: 450,
           original: 680,
           checked: false,
-          isPreorder: true,
         },
         {
           // 同商品多規格：與 i6 同一件公主裙、不同尺寸/顏色，購物車拆成獨立一列
