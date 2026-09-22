@@ -337,12 +337,18 @@ const bulkHintForItem = (
   };
 };
 
-const isGroupAllChecked = (group: CartGroup) =>
-  group.items.length > 0 && group.items.every((i) => i.checked);
+/** 預購品到貨前不可結帳，全選 / 群組全選一律略過，且不計入「是否全選」判斷。 */
+const isSelectableItem = (item: CartItem): boolean => !item.isPreorder;
+
+const isGroupAllChecked = (group: CartGroup) => {
+  const selectable = group.items.filter(isSelectableItem);
+  return selectable.length > 0 && selectable.every((i) => i.checked);
+};
 
 const toggleGroupAll = (group: CartGroup) => {
   const all = isGroupAllChecked(group);
   group.items.forEach((i) => {
+    if (!isSelectableItem(i)) return;
     i.checked = !all;
   });
 };
@@ -350,11 +356,13 @@ const toggleGroupAll = (group: CartGroup) => {
 /** 全域全選：paused 的購物車不參與（無法結帳）。 */
 const globalAllChecked = computed(() => {
   const candidates = groups.value.filter(
-    (g) => isGroupCheckable(g) && g.items.length > 0,
+    (g) => isGroupCheckable(g) && g.items.some(isSelectableItem),
   );
   return (
     candidates.length > 0 &&
-    candidates.every((g) => g.items.every((i) => i.checked))
+    candidates.every((g) =>
+      g.items.filter(isSelectableItem).every((i) => i.checked),
+    )
   );
 });
 
@@ -363,6 +371,7 @@ const toggleGlobalAll = () => {
   groups.value.forEach((g) => {
     if (!isGroupCheckable(g)) return;
     g.items.forEach((i) => {
+      if (!isSelectableItem(i)) return;
       i.checked = !all;
     });
   });
@@ -1327,12 +1336,14 @@ const handleGoProduct = (productId?: number) => {
             class="flex flex-wrap items-start gap-3 px-[var(--card-pad)] pt-[var(--card-pad)] @3xl:flex-nowrap @7xl:gap-4"
             :class="item.note ? 'pb-2' : 'pb-[var(--card-pad)]'"
           >
-            <!-- Checkbox + 圖片：default 是整台一起、paused 不能結帳，都不顯示 item 勾選 -->
+            <!-- Checkbox + 圖片：default 是整台一起、paused 不能結帳，都不顯示 item 勾選；預購品停用勾選（到貨後才可結帳） -->
             <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
               <Checkbox
                 v-if="isItemCheckable(group)"
                 v-model="item.checked"
                 binary
+                :disabled="item.isPreorder"
+                :aria-label="item.isPreorder ? '預購商品，到貨後才可結帳' : undefined"
               />
               <button
                 type="button"
@@ -1362,17 +1373,28 @@ const handleGoProduct = (productId?: number) => {
               </p>
               <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
               <div class="flex items-start justify-between gap-3">
-                <p
-                  class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
-                  :class="
-                    item.productId != null
-                      ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
-                      : ''
-                  "
-                  @click="handleGoProduct(item.productId)"
-                >
-                  {{ item.name }}
-                </p>
+                <div class="flex min-w-0 flex-1 items-start gap-1.5">
+                  <span
+                    v-if="item.isPreorder"
+                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-xs text-white"
+                    style="background: var(--primary)"
+                    aria-label="預購商品"
+                    title="預購商品，到貨後才可結帳"
+                  >
+                    預
+                  </span>
+                  <p
+                    class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
+                    :class="
+                      item.productId != null
+                        ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
+                        : ''
+                    "
+                    @click="handleGoProduct(item.productId)"
+                  >
+                    {{ item.name }}
+                  </p>
+                </div>
                 <div class="flex shrink-0 items-center gap-1.5">
                   <Tag
                     v-if="bulkHintForItem(group, item)"
@@ -1487,17 +1509,28 @@ const handleGoProduct = (productId?: number) => {
               </p>
               <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
               <div class="flex items-start justify-between gap-3">
-                <p
-                  class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
-                  :class="
-                    item.productId != null
-                      ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
-                      : ''
-                  "
-                  @click="handleGoProduct(item.productId)"
-                >
-                  {{ item.name }}
-                </p>
+                <div class="flex min-w-0 flex-1 items-start gap-1.5">
+                  <span
+                    v-if="item.isPreorder"
+                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-xs text-white"
+                    style="background: var(--primary)"
+                    aria-label="預購商品"
+                    title="預購商品，到貨後才可結帳"
+                  >
+                    預
+                  </span>
+                  <p
+                    class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
+                    :class="
+                      item.productId != null
+                        ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
+                        : ''
+                    "
+                    @click="handleGoProduct(item.productId)"
+                  >
+                    {{ item.name }}
+                  </p>
+                </div>
                 <div class="flex shrink-0 items-center gap-1.5">
                   <Tag
                     v-if="bulkHintForItem(group, item)"
@@ -1528,6 +1561,15 @@ const handleGoProduct = (productId?: number) => {
               >
                 {{ item.spec }}
               </div>
+
+              <!-- 預購提示：到貨前不可勾選結帳，到貨轉一般商品後才開放 -->
+              <p
+                v-if="item.isPreorder"
+                class="flex w-fit items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500"
+              >
+                <i class="pi pi-clock" style="font-size: 11px" />
+                預購商品，到貨後才可勾選結帳
+              </p>
 
               <!-- 第 2 排：數量（左）… 刪除（右，右緣對齊上方金額） -->
               <div

@@ -37,6 +37,8 @@ export interface CartItem {
   bundleItems?: CartBundleItem[];
   /** 商品備註（顯示於商品列下方，例如冷藏須知、賣家提醒） */
   note?: string;
+  /** 預購商品：商品名稱前顯示方形「預購」標記（此商品採預購 / 分批出貨）。 */
+  isPreorder?: boolean;
   /** 由加購區加入：購物車列顯示「加購」標記。 */
   isAddOn?: boolean;
   /** 加購商品來源場次名稱；同一台車的加購商品可能來自不同場次（顯示於商品列）。 */

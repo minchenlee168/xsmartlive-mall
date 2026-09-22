@@ -311,6 +311,7 @@ export const useCartStore = defineStore('cart', () => {
           price: 450,
           original: 680,
           checked: false,
+          isPreorder: true,
         },
         {
           // 同商品多規格：與 i6 同一件公主裙、不同尺寸/顏色，購物車拆成獨立一列
