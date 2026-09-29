@@ -9,8 +9,19 @@ export interface Address {
   id: string;
   name: string;
   phone: string;
+  /** 顯示用完整地址字串（各處列表 / 摘要沿用）。 */
   address: string;
   isDefault: boolean;
   chain?: CvsChain;
   storeName?: string;
+  /**
+   * 結構化欄位：宅配地址填寫時保留原始輸入，方便日後對接 API。
+   * 台灣：country / city / district；海外：country / city / state / postalCode。
+   * 台灣地址若只用 address 單一字串亦可，這些欄位皆為選填。
+   */
+  country?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  postalCode?: string;
 }

@@ -54,12 +54,8 @@ interface Coupon {
   // 由輸入優惠碼 / QR 掃描兌換而來 → 列表置頂，方便使用者辨識
   redeemed?: boolean;
 }
-interface HomeAddress {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  isDefault: boolean;
+interface HomeAddress extends Address {
+  /** 目前不提供配送至此地區（灰底 + 不可選）。 */
   unavailable?: boolean;
 }
 
@@ -101,7 +97,35 @@ const PAYMENT_METHODS: { label: string; value: PaymentMethodId }[] = [
 ];
 const BANK_TRANSFER_INFO = ['銀行：台新008', '分行：13456-111333'];
 const DRAWER_COUNTRY_CODES = ['+886', '+852'];
-const DRAWER_COUNTRIES = ['台灣', '香港'];
+/** 國別 → 電話國碼對照（新增宅配地址：選國別自動帶入國碼）。 */
+const COUNTRY_DIAL_CODES: Record<string, string> = {
+  台灣: '+886',
+  香港: '+852',
+  中國大陸: '+86',
+  日本: '+81',
+  韓國: '+82',
+  新加坡: '+65',
+  馬來西亞: '+60',
+  美國: '+1',
+  加拿大: '+1',
+  澳洲: '+61',
+  英國: '+44',
+};
+const DRAWER_COUNTRIES = Object.keys(COUNTRY_DIAL_CODES);
+/**
+ * 新增宅配地址的國碼下拉選項：數字在前、國名注記在後（如「+82 韓國」）。
+ * 同一國碼對應多國時合併注記（如「+1 美國/加拿大」）；value 只存純國碼。
+ */
+const DRAWER_HOME_COUNTRY_CODES = (() => {
+  const countriesByCode = new Map<string, string[]>();
+  for (const [country, code] of Object.entries(COUNTRY_DIAL_CODES)) {
+    countriesByCode.set(code, [...(countriesByCode.get(code) ?? []), country]);
+  }
+  return [...countriesByCode].map(([code, countries]) => ({
+    label: `${code} ${countries.join('/')}`,
+    value: code,
+  }));
+})();
 const DRAWER_CITIES = ['高雄市', '台北市', '桃園市'];
 const DRAWER_DISTRICTS = ['前鎮區', '三民區', '信義區'];
 
@@ -659,26 +683,54 @@ const newHomeName = ref('');
 const newHomeCountryCode = ref('+886');
 const newHomePhone = ref('');
 const newHomeCountry = ref('台灣');
+// 選國別自動帶入對應電話國碼（仍保留下拉可手動微調）。
+watch(newHomeCountry, (c) => {
+  const code = COUNTRY_DIAL_CODES[c];
+  if (code) newHomeCountryCode.value = code;
+});
 const newHomeCity = ref('高雄市');
 const newHomeDistrict = ref('前鎮區');
 const newHomeAddress = ref('');
+// 海外地址額外欄位（國別非台灣時填寫）
+const newHomeOverseasCity = ref('');
+const newHomeState = ref('');
+const newHomePostal = ref('');
 const resetAddHomeForm = () => {
   newHomeName.value = '';
   newHomePhone.value = '';
   newHomeAddress.value = '';
+  newHomeOverseasCity.value = '';
+  newHomeState.value = '';
+  newHomePostal.value = '';
 };
 const handleSubmitAddHome = () => {
   if (!newHomeName.value.trim()) return;
   const isTW = newHomeCountry.value === '台灣';
+  const overseasParts = [
+    newHomePostal.value,
+    newHomeState.value,
+    newHomeOverseasCity.value,
+    newHomeAddress.value,
+  ].filter((part) => part.trim());
   const address = isTW
     ? `${newHomeCity.value}${newHomeDistrict.value} ${newHomeAddress.value}`
-    : `${newHomeCountry.value} ${newHomeAddress.value}`;
+    : `${newHomeCountry.value} ${overseasParts.join(' ')}`;
+  // 台灣：city / district；海外：city / state / postalCode。詳細地址一律存 address。
+  const structured = isTW
+    ? { city: newHomeCity.value, district: newHomeDistrict.value }
+    : {
+        city: newHomeOverseasCity.value,
+        state: newHomeState.value,
+        postalCode: newHomePostal.value,
+      };
   homeAddresses.value.push({
     id: 'h' + (homeAddresses.value.length + 1),
     name: newHomeName.value,
     phone: `${newHomeCountryCode.value} ${newHomePhone.value || '000****00'}`,
     address,
     isDefault: false,
+    country: newHomeCountry.value,
+    ...structured,
   });
   resetAddHomeForm();
   shipDrawerView.value = 'list';
@@ -2659,13 +2711,15 @@ const handlePlaceOrder = () => {
                   <div class="flex gap-2">
                     <Select
                       v-model="newHomeCountryCode"
-                      :options="DRAWER_COUNTRY_CODES"
-                      class="w-[120px]"
+                      :options="DRAWER_HOME_COUNTRY_CODES"
+                      option-label="label"
+                      option-value="value"
+                      class="w-44 shrink-0"
                     />
                     <InputText
                       v-model="newHomePhone"
                       type="tel"
-                      class="flex-1"
+                      class="min-w-0 flex-1"
                     />
                   </div>
                 </div>
@@ -2695,6 +2749,22 @@ const handlePlaceOrder = () => {
                     />
                   </div>
                 </div>
+                <!-- 海外地址額外欄位：國別非台灣時顯示（郵遞區號 → 城市 → 州/省/地區） -->
+                <template v-if="newHomeCountry !== '台灣'">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-sm text-slate-700">郵遞區號</label>
+                    <InputText v-model="newHomePostal" class="w-full" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-sm text-slate-700">城市</label>
+                    <InputText v-model="newHomeOverseasCity" class="w-full" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-sm text-slate-700">州/省/地區</label>
+                    <InputText v-model="newHomeState" class="w-full" />
+                  </div>
+                </template>
+                <!-- 詳細收件地址：兩種國別都放最下方 -->
                 <div class="flex flex-col gap-1">
                   <label class="text-sm text-slate-700">詳細收件地址</label>
                   <InputText v-model="newHomeAddress" class="w-full" />
