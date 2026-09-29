@@ -330,24 +330,28 @@ const paymentMethod = ref<PaymentMethodId>('credit');
 const supportedShippingMethods = computed<ShippingMethodId[]>(() => {
   const groups = checkoutGroups.value;
   if (groups.length === 0) return [];
-  const base = SHIPPING_METHOD_ORDER.filter((m) =>
+  return SHIPPING_METHOD_ORDER.filter((m) =>
     groups.every((g) => g.shippingMethods.includes(m)),
   );
-  return paymentMethod.value === 'self-pickup'
-    ? base.filter((m) => m === 'pickup')
-    : base;
 });
-/** 各購物車支援的付款方式取交集。現金付款（限自取）僅在所有車皆支援自取物流時可選。 */
+/**
+ * 各購物車支援的付款方式取交集（能力面）。
+ * 現金付款（限自取）另需「所有訂單都已選運送且全部為自取」才可用（單一方向：運送 → 付款）。
+ */
 const supportedPaymentMethods = computed<PaymentMethodId[]>(() => {
   const groups = checkoutGroups.value;
-  if (groups.length === 0) return [];
-  const allSupportPickup = groups.every((g) =>
-    g.shippingMethods.includes('pickup'),
-  );
+  if (groups.length === 0 || !allShipMethodsChosen.value) return [];
+  // 混合(自取 + 非自取)→ 全域單一付款無法並存,無可用付款(UI 另外擋下結帳)
+  if (isMixedShipping.value) return [];
+  // 全部自取 → 只支援現金付款(限自取)；需所有自取訂單的賣家都收現金,否則視為無共用付款
+  if (isAllPickupShipping.value)
+    return groups.every((g) => g.paymentMethods.includes('self-pickup'))
+      ? ['self-pickup']
+      : [];
+  // 全部非自取 → 線上 / 貨到付款交集(排除現金付款限自取)
   return groups[0].paymentMethods.filter(
     (m) =>
-      groups.every((g) => g.paymentMethods.includes(m)) &&
-      (m !== 'self-pickup' || allSupportPickup),
+      m !== 'self-pickup' && groups.every((g) => g.paymentMethods.includes(m)),
   );
 });
 
@@ -407,15 +411,9 @@ const shipMethodByGroup = ref<Record<number, ShippingMethodId | null>>({});
 /** 讀某訂單目前選的運送方式。 */
 const groupShipMethod = (g: CheckoutGroup): ShippingMethodId | null =>
   shipMethodByGroup.value[g.id] ?? null;
-/** 單一訂單支援的運送方式（固定順序）。現金付款（限自取）→ 只留自取。 */
-const groupSupportedMethods = (g: CheckoutGroup): ShippingMethodId[] => {
-  const base = SHIPPING_METHOD_ORDER.filter((m) =>
-    g.shippingMethods.includes(m),
-  );
-  return paymentMethod.value === 'self-pickup'
-    ? base.filter((m) => m === 'pickup')
-    : base;
-};
+/** 單一訂單支援的運送方式（固定順序）。 */
+const groupSupportedMethods = (g: CheckoutGroup): ShippingMethodId[] =>
+  SHIPPING_METHOD_ORDER.filter((m) => g.shippingMethods.includes(m));
 /** 所有訂單是否都選同一種方式；是 → 該方式，否（含未全選）→ null。 */
 const sharedShipMethod = computed<ShippingMethodId | null>(() => {
   const groups = checkoutGroups.value;
@@ -428,6 +426,31 @@ const sharedShipMethod = computed<ShippingMethodId | null>(() => {
 /** 是否至少有一筆訂單已選運送方式（底部運費列顯示與否）。 */
 const hasAnyShipMethod = computed(() =>
   checkoutGroups.value.some((g) => groupShipMethod(g) !== null),
+);
+/** 所有結帳訂單是否都已選運送方式（付款方式 gating 用；範圍限已勾選的 checkoutGroups）。 */
+const allShipMethodsChosen = computed(
+  () =>
+    checkoutGroups.value.length > 0 &&
+    checkoutGroups.value.every((g) => groupShipMethod(g) !== null),
+);
+// 運送 → 付款：自取只支援現金、非自取只支援線上/貨到，全域單一付款下三態互斥。
+const anyPickupOrder = computed(
+  () =>
+    allShipMethodsChosen.value &&
+    checkoutGroups.value.some((g) => groupShipMethod(g) === 'pickup'),
+);
+const anyNonPickupOrder = computed(
+  () =>
+    allShipMethodsChosen.value &&
+    checkoutGroups.value.some((g) => groupShipMethod(g) !== 'pickup'),
+);
+/** 混合:同時含自取與非自取 → 無法一起結帳（擋下）。 */
+const isMixedShipping = computed(
+  () => anyPickupOrder.value && anyNonPickupOrder.value,
+);
+/** 全部自取 → 付款僅現金付款(限自取)。 */
+const isAllPickupShipping = computed(
+  () => anyPickupOrder.value && !anyNonPickupOrder.value,
 );
 const selectedPickupId = ref(PICKUP_LOCATIONS[0].id);
 
@@ -1127,6 +1150,21 @@ const availablePaymentMethods = computed(() =>
     supportedPaymentMethods.value.includes(m.value),
   ),
 );
+/** 全部非自取時：是否有線上/貨到付款因各車不共同支援而隱藏（能力面提示用）。 */
+const hasHiddenOnlinePayment = computed(() => {
+  const groups = checkoutGroups.value;
+  if (
+    !allShipMethodsChosen.value ||
+    isMixedShipping.value ||
+    isAllPickupShipping.value
+  )
+    return false;
+  const nonCash = PAYMENT_METHODS.filter((m) => m.value !== 'self-pickup');
+  const supported = nonCash.filter((m) =>
+    groups.every((g) => g.paymentMethods.includes(m.value)),
+  );
+  return supported.length < nonCash.length;
+});
 const isBankInfoVisible = computed(() => paymentMethod.value === 'transfer');
 /** 付款方式包含 LINE Pay 時，於標題列顯示「歡迎使用 LINE Pay」。 */
 const LINE_PAY_LOGO = `${import.meta.env.BASE_URL}partners/linepay.png`;
@@ -1140,17 +1178,6 @@ watch(
     if (!methods.includes(paymentMethod.value)) {
       paymentMethod.value = methods[0];
     }
-  },
-  { immediate: true },
-);
-// 現金付款（限自取）：選了現金付款 → 各訂單運送方式一律鎖定為自取
-watch(
-  paymentMethod,
-  (m) => {
-    if (m !== 'self-pickup') return;
-    const next = { ...shipMethodByGroup.value };
-    for (const g of checkoutGroups.value) next[g.id] = 'pickup';
-    shipMethodByGroup.value = next;
   },
   { immediate: true },
 );
@@ -1207,6 +1234,16 @@ const handlePlaceOrder = () => {
   if (checkoutGroups.value.some((g) => !groupShipMethod(g))) {
     ui.toast('請先為各訂單選擇配送方式');
     handleOpenShipDrawer();
+    return;
+  }
+  // 混合(自取需現場付現 + 非自取需線上/貨到)無法一起結帳 → 擋下,請分開結帳
+  if (isMixedShipping.value) {
+    ui.toast('自取與非自取訂單無法一起結帳，請分開結帳');
+    return;
+  }
+  // 所選訂單沒有可共用的付款方式（例:自取賣家不收現金、非自取無共同金流）→ 擋下
+  if (!supportedPaymentMethods.value.includes(paymentMethod.value)) {
+    ui.toast('所選訂單沒有可共用的付款方式，請分開結帳');
     return;
   }
   if (
@@ -1334,6 +1371,12 @@ const handlePlaceOrder = () => {
     // 付款成功才清購物車、轉待出貨；失敗 / 取消 / 離開則訂單取消、商品留在購物車。
     ordersStore.startPayment(orderNos, paidAmount);
     ui.toast('訂單已建立，請完成付款');
+  } else if (paymentMethod.value === 'self-pickup') {
+    // 現金付款（限自取）：到取貨門市現場付現，結帳當下金流尚未發生。
+    // 訂單維持「待付款」（placeOrder 建單即 unpaid），不標已付款、不寫交易記錄、不進 payment-success。
+    cartStore.removeCheckedItems();
+    ui.toast('訂單已成立，請至取貨門市現場付現');
+    router.push('/member');
   } else {
     // 其他付款方式（貨到付款 / ATM / 超商代碼等）維持即時完成。
     ordersStore.markBatchPaid(orderNos);
@@ -1843,35 +1886,67 @@ const handlePlaceOrder = () => {
           </span>
         </div>
         <div class="card-pad max-w-[440px]">
-          <label class="mb-1 block text-sm text-slate-700">選擇付款方式</label>
-          <Select
-            v-model="paymentMethod"
-            :options="availablePaymentMethods"
-            option-label="label"
-            option-value="value"
-            class="w-full"
-          />
-          <!-- 轉帳匯款 → 帶出銀行戶頭資料 -->
+          <!-- 尚未為每筆訂單選運送方式 → 先擋住付款並引導（運送 → 付款） -->
           <div
-            v-if="isBankInfoVisible"
-            class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
+            v-if="!allShipMethodsChosen"
+            class="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500"
           >
-            <p class="mb-1 text-sm font-bold text-slate-700">銀行戶頭資料</p>
-            <p
-              v-for="line in BANK_TRANSFER_INFO"
-              :key="line"
-              class="py-0.5 text-sm text-slate-500"
-            >
-              {{ line }}
-            </p>
+            <i class="pi pi-info-circle mt-0.5" />
+            <span>請先為每筆訂單選擇運送方式，再選擇付款方式。</span>
           </div>
-          <p
-            v-if="availablePaymentMethods.length < PAYMENT_METHODS.length"
-            class="mt-2 text-xs text-slate-500"
+          <!-- 混合（自取 + 非自取）→ 全域單一付款無法並存，擋下結帳 -->
+          <div
+            v-else-if="isMixedShipping"
+            class="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
           >
-            <i class="pi pi-info-circle mr-1" />
-            部分付款方式因您勾選的購物車不共同支援，已自動隱藏。
-          </p>
+            <i class="pi pi-exclamation-triangle mt-0.5" />
+            <span
+              >含自取（需現場付現）與非自取（需線上 / 貨到付款）訂單，無法一起結帳，請分開結帳。</span
+            >
+          </div>
+          <!-- 所選訂單沒有可共用的付款方式（自取賣家不收現金 / 非自取無共同金流）→ 擋下 -->
+          <div
+            v-else-if="availablePaymentMethods.length === 0"
+            class="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+          >
+            <i class="pi pi-exclamation-triangle mt-0.5" />
+            <span>所選訂單沒有可共用的付款方式，請分開結帳。</span>
+          </div>
+          <!-- 可選付款 -->
+          <template v-else>
+            <label class="mb-1 block text-sm text-slate-700">選擇付款方式</label>
+            <Select
+              v-model="paymentMethod"
+              :options="availablePaymentMethods"
+              option-label="label"
+              option-value="value"
+              class="w-full"
+            />
+            <!-- 全部自取：說明現場付現 -->
+            <p v-if="isAllPickupShipping" class="mt-2 text-xs text-slate-500">
+              <i class="pi pi-info-circle mr-1" />
+              自取訂單需於取貨門市現場以現金付款。
+            </p>
+            <!-- 轉帳匯款 → 帶出銀行戶頭資料 -->
+            <div
+              v-if="isBankInfoVisible"
+              class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
+            >
+              <p class="mb-1 text-sm font-bold text-slate-700">銀行戶頭資料</p>
+              <p
+                v-for="line in BANK_TRANSFER_INFO"
+                :key="line"
+                class="py-0.5 text-sm text-slate-500"
+              >
+                {{ line }}
+              </p>
+            </div>
+            <!-- 能力面：某些線上/貨到付款各車不共同支援 -->
+            <p v-if="hasHiddenOnlinePayment" class="mt-2 text-xs text-slate-500">
+              <i class="pi pi-info-circle mr-1" />
+              部分付款方式因您勾選的購物車不共同支援，已自動隱藏。
+            </p>
+          </template>
         </div>
       </section>
     </main>
@@ -1986,6 +2061,10 @@ const handlePlaceOrder = () => {
         <Button
           label="去付款"
           class="!min-h-12 shrink-0 !px-6 @3xl:!px-16"
+          :disabled="
+            isMixedShipping ||
+            (allShipMethodsChosen && availablePaymentMethods.length === 0)
+          "
           @click="handlePlaceOrder"
         />
       </div>
