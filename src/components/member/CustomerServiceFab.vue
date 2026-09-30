@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { useRoute } from 'vue-router';
+import { storeToRefs } from 'pinia';
+import { useCustomerServiceStore } from '../../pinia/customerService';
 
 /**
  * 客服浮動鈕 + 客服對話 bottom sheet（原型假 UI，後端未開發）。
- * - 只掛在「我的訂單」頁；選單式互動：AI 訊息下方可掛一組按鈕（分類 / 子項）。
+ * - 全站掛一次（App.vue）；開關狀態抽到 customerService store，彈窗全站可開。
+ * - 浮動鈕只在購物車與會員中心（含我的訂單／紅利點數／優惠券／個人帳號）顯示；
+ *   其他頁面靠 Footer 的「線上客服」連結叫出同一個彈窗。選單式互動：AI 訊息下方可掛一組按鈕（分類 / 子項）。
  * - 分類與子項點擊都復用 sendUserMessage，讓「上屏 → 輸入中 → 回覆」節奏跟打字一致。
  * - 對話 session 僅存在元件內 ref，重整自然清空，不做持久化。
  * - z-index：遮罩 / 面板需壓過設定 FAB（z-[9999]），故用 10000 / 10001。
@@ -200,7 +205,15 @@ const MENU_TREE: MenuButton[] = [
   },
 ];
 
-const isOpen = ref(false);
+// 彈窗開關狀態由 store 統一持有（浮動鈕與 Footer 連結共用）
+const customerService = useCustomerServiceStore();
+const { isOpen } = storeToRefs(customerService);
+
+// 浮動鈕只在購物車與會員中心（含各分頁）顯示；其他頁面走 Footer 連結
+const FAB_VISIBLE_PATHS = ['/cart', '/member'];
+const route = useRoute();
+const isFabVisible = computed(() => FAB_VISIBLE_PATHS.includes(route.path));
+
 const isAgentTyping = ref(false);
 const inputText = ref('');
 const messagesRef = ref<HTMLElement | null>(null);
@@ -300,12 +313,12 @@ const handleShowMenu = (): void => {
 };
 
 const handleOpen = (): void => {
-  isOpen.value = true;
+  customerService.open();
   scrollToBottom();
 };
 
 const handleClose = (): void => {
-  isOpen.value = false;
+  customerService.close();
 };
 
 const handleKeydown = (e: KeyboardEvent): void => {
@@ -317,8 +330,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown));
 </script>
 
 <template>
-  <!-- 客服 FAB：位於設定 FAB（bottom-24）正上方；面板開啟時隱藏避免重疊 -->
-  <div v-if="!isOpen" class="fixed right-6 bottom-40 z-[9999]">
+  <!-- 客服 FAB：只在購物車／會員中心顯示；位於設定 FAB（bottom-24）正上方；面板開啟時隱藏避免重疊 -->
+  <div v-if="isFabVisible && !isOpen" class="fixed right-6 bottom-40 z-[9999]">
     <button
       class="flex h-12 w-12 min-h-11 min-w-11 items-center justify-center rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-all duration-200 hover:scale-110 active:scale-95"
       style="

@@ -15,7 +15,6 @@ import type {
 } from '../../types/order';
 import { parseSlashDate, formatDateRange } from '../../utils/date';
 import ChangeAddressDialog from './ChangeAddressDialog.vue';
-import CustomerServiceFab from './CustomerServiceFab.vue';
 import { useMoney } from '../../composables/useMoney';
 
 const { money } = useMoney();
@@ -1674,8 +1673,6 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
     </Dialog>
 
     <!-- 訂單提問 drawer 已依規劃移除（智能客服尚未開發） -->
-
-    <!-- 客服浮動鈕 + 客服對話 bottom sheet（原型假 UI，僅此頁顯示） -->
-    <CustomerServiceFab />
+    <!-- 客服浮動鈕已上移至會員中心頁層級（MemberCenterPage），全分頁共用 -->
   </div>
 </template>

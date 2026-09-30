@@ -14,6 +14,7 @@ import PageLoading from './components/PageLoading.vue';
 import AuroraShell from './components/AuroraShell.vue';
 import AppToast from './components/AppToast.vue';
 import PaymentGateway from './components/checkout/PaymentGateway.vue';
+import CustomerServiceFab from './components/member/CustomerServiceFab.vue';
 import { useViewportStore } from './pinia/viewport';
 import { useUiStore } from './pinia/ui';
 import { useThemeStore } from './pinia/theme';
@@ -177,6 +178,10 @@ watch([() => viewportStore.current.id, isFullscreen], () => {
         <RouterView />
         <AppFooter v-if="showFooter" />
       </template>
+
+      <!-- 客服浮動鈕 + 彈窗：全站掛一次，置於 @container frame 內以維持裝置模擬；
+           浮動鈕僅購物車／會員中心顯示，Footer 連結全站可叫出同一彈窗 -->
+      <CustomerServiceFab />
     </div>
   </div>
 

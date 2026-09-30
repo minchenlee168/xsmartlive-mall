@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import { useCustomerServiceStore } from '../pinia/customerService';
+
+const customerService = useCustomerServiceStore();
+
+const handleOpenCustomerService = () => {
+  customerService.open();
+};
+
 const SITE_URL = 'https://www.168money.com.tw';
 const PLATFORM_URL = 'https://www.168money.com.tw/';
 
@@ -57,8 +65,17 @@ const LOGISTICS_LAST_INDEX = 4;
       <div
         class="flex flex-col items-center gap-2 text-center text-sm text-slate-500"
       >
-        <!-- Copyright -->
+        <!-- Copyright + 客服入口：行內連結樣式，與版權同一列不另佔高度 -->
         <p class="text-xs leading-relaxed text-slate-400">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 align-baseline font-medium text-[color:var(--primary)] underline underline-offset-2 transition-opacity hover:opacity-70"
+            @click="handleOpenCustomerService"
+          >
+            <i class="pi pi-comments text-[10px]" />
+            線上客服
+          </button>
+          <span class="mx-1">|</span>
           Copyright ©
           <a
             :href="SITE_URL"
