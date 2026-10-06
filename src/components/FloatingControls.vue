@@ -44,18 +44,23 @@ const SHIPPING_OPTS: { label: string; value: ShippingMethodId }[] = [
   { label: '自取（不計運費）', value: 'pickup' },
   { label: '商家自建（如郵局）', value: 'post' },
 ];
-// 支付方式：對齊後台「支付方式設定」複選項（9 種）與結帳頁 PAYMENT_METHODS label 一致。
+// 支付方式：對齊後台「支付方式設定」複選項（10 種）與結帳頁 PAYMENT_METHODS label 一致。
 const PAYMENT_OPTS: { label: string; value: PaymentMethodId }[] = [
-  { label: '線上信用卡', value: 'credit' },
-  { label: 'Apple Pay', value: 'apple-pay' },
-  { label: 'ATM 繳費帳號', value: 'atm' },
-  { label: '超商代碼繳費', value: 'cvs-code' },
+  { label: '信用卡一次付清', value: 'credit' },
+  { label: 'ATM 轉帳', value: 'atm' },
   { label: '轉帳匯款', value: 'transfer' },
-  { label: 'LINE Pay', value: 'line-pay' },
-  { label: 'iPASS MONEY', value: 'ipass' },
   { label: '貨到付款', value: 'cod' },
-  { label: '現金付款（限自取）', value: 'self-pickup' },
+  { label: 'LINE Pay', value: 'line-pay' },
+  { label: 'Apple Pay', value: 'apple-pay' },
+  { label: 'iPASS MONEY', value: 'ipass' },
+  { label: '超商代碼', value: 'cvs-code' },
+  { label: '數位簽', value: 'credit-digital' },
+  { label: '取貨現場付款', value: 'self-pickup' },
 ];
+/** 自取運送 → 取貨現場付款：勾自取時自動補上限自取的現場付款。 */
+const PICKUP_SHIPPING: ShippingMethodId = 'pickup';
+const PICKUP_PAYMENT: PaymentMethodId = 'self-pickup';
+
 /** 結帳模式：對應 CheckoutMode，顯示用 label（對齊後台）+ 一句話說明。 */
 const CHECKOUT_MODES: {
   label: string;
@@ -85,6 +90,27 @@ const setTempOf = (g: CartGroup, temp: TempLabel | null) => {
   cartStore.updateCart(g.id, {
     tags: [...others, { label: temp, type: opt?.tagType ?? 'secondary' }],
   });
+};
+
+/** 切換運送方式；勾選自取時自動補上「取貨現場付款」。 */
+const handleShippingToggle = (
+  g: CartGroup,
+  value: ShippingMethodId,
+  isChecked: boolean,
+) => {
+  const patch: Partial<Omit<CartGroup, 'id'>> = {
+    shippingMethods: isChecked
+      ? [...g.shippingMethods, value]
+      : g.shippingMethods.filter((m) => m !== value),
+  };
+  if (
+    value === PICKUP_SHIPPING &&
+    isChecked &&
+    !g.paymentMethods.includes(PICKUP_PAYMENT)
+  ) {
+    patch.paymentMethods = [...g.paymentMethods, PICKUP_PAYMENT];
+  }
+  cartStore.updateCart(g.id, patch);
 };
 
 /** 分類清單：從商品目錄抽出唯一值，給規則 Select 用。 */
@@ -606,13 +632,7 @@ const buildTimeDisplay = (() => {
                         :model-value="g.shippingMethods.includes(opt.value)"
                         :binary="true"
                         @update:model-value="
-                          cartStore.updateCart(g.id, {
-                            shippingMethods: $event
-                              ? [...g.shippingMethods, opt.value]
-                              : g.shippingMethods.filter(
-                                  (m) => m !== opt.value,
-                                ),
-                          })
+                          handleShippingToggle(g, opt.value, $event)
                         "
                       />
                       {{ opt.label }}

@@ -153,7 +153,7 @@ export const useOrdersStore = defineStore('orders', () => {
       qty: 1,
       total: 290,
       amounts: { goodsTotal: 290 },
-      payment: '現金付款（限自取）',
+      payment: '取貨現場付款',
       delivery: '自取',
       invoice: '會員載具',
       invoiceStatus: 'pending',

@@ -85,15 +85,16 @@ const DONATE_ORGS = [
   '財團法人愛盲基金會',
 ];
 const PAYMENT_METHODS: { label: string; value: PaymentMethodId }[] = [
-  { label: '線上信用卡', value: 'credit' },
-  { label: 'Apple Pay', value: 'apple-pay' },
-  { label: 'ATM 繳費帳號', value: 'atm' },
-  { label: '超商代碼繳費', value: 'cvs-code' },
+  { label: '信用卡一次付清', value: 'credit' },
+  { label: 'ATM 轉帳', value: 'atm' },
   { label: '轉帳匯款', value: 'transfer' },
-  { label: 'LINE Pay', value: 'line-pay' },
-  { label: 'iPASS MONEY', value: 'ipass' },
   { label: '貨到付款', value: 'cod' },
-  { label: '現金付款（限自取）', value: 'self-pickup' },
+  { label: 'LINE Pay', value: 'line-pay' },
+  { label: 'Apple Pay', value: 'apple-pay' },
+  { label: 'iPASS MONEY', value: 'ipass' },
+  { label: '超商代碼', value: 'cvs-code' },
+  { label: '數位簽', value: 'credit-digital' },
+  { label: '取貨現場付款', value: 'self-pickup' },
 ];
 const BANK_TRANSFER_INFO = ['銀行：台新008', '分行：13456-111333'];
 const DRAWER_COUNTRY_CODES = ['+886', '+852'];
