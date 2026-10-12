@@ -169,21 +169,16 @@ const handlePickKeyword = (kw: string) => {
       class="mx-auto max-w-7xl px-4 py-3 @4xl:flex @4xl:h-full @4xl:flex-col @4xl:justify-center @4xl:py-[4px]"
     >
       <div class="flex items-center justify-between gap-3">
-        <!-- Logo：手機顯示 X 圖示、桌機顯示完整 logo -->
+        <!-- Logo：手機與桌機皆顯示含商家名稱的完整 logo -->
         <button
           class="flex shrink-0 items-center"
           aria-label="xSmartLive"
           @click="router.push(homePath)"
         >
           <img
-            src="/logo.png"
-            alt="xSmartLive"
-            class="block h-9 w-auto @4xl:hidden"
-          />
-          <img
             src="/logo-xl.png"
             alt="xSmartLive"
-            class="hidden h-8 w-auto @4xl:block"
+            class="block h-7 w-auto @4xl:h-8"
           />
         </button>
 
