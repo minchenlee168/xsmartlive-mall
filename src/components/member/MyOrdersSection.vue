@@ -196,6 +196,18 @@ const BOXED_STEPS: TimelineStepKey[] = [
 const isBoxed = (pkg: PackageInfo): boolean =>
   !!pkg.exchangeTag || BOXED_STEPS.includes(pkg.currentStep);
 
+/**
+ * 「部分…」文字：各包裹階段不一致時，以「進度最快」的包裹階段改標成這組。
+ * 不含 completed——「已完成」須全部包裹皆已送達、使用者按確認完成才成立，
+ * 不會與其他階段並存，故無「部分完成」。
+ */
+const PARTIAL_LABEL: Partial<Record<TimelineStepKey, string>> = {
+  to_ship: '部分待出貨',
+  to_receive: '部分備貨中',
+  shipped: '部分出貨',
+  delivered: '部分送達',
+};
+
 /** 單筆訂單是否符合某配送狀態 key（沿用原進度 / 終點貨態判定）。 */
 const matchesStatusKey = (o: OrderRecord, key: StatusTab): boolean => {
   if (key === 'all') return true;
@@ -277,15 +289,28 @@ const OVERRIDE_TONE_CLASS: Record<OverrideStatus, string> = {
   cancelled: 'text-red-500',
 };
 
-/** 訂單狀態：終點貨態優先；否則看包裹 currentStep（不同階段 → 處理中）。 */
+/**
+ * 從一組包裹階段推算顯示狀態（終點貨態請在呼叫端先處理）：
+ * 一律取「進度最快」的包裹階段；只要各包裹階段不一致（不分是否已出貨），
+ * 就改顯示對應的「部分…」。全部同階段才顯示純階段。不產生「處理中」。
+ */
+const deriveShipLabel = (steps: TimelineStepKey[]): string => {
+  if (steps.length === 0) return '—';
+  const fastest = steps.reduce((a, b) =>
+    TIMELINE_STEPS.findIndex((s) => s.key === a) >=
+    TIMELINE_STEPS.findIndex((s) => s.key === b)
+      ? a
+      : b,
+  );
+  const isMixed = new Set(steps).size > 1;
+  if (isMixed && PARTIAL_LABEL[fastest]) return PARTIAL_LABEL[fastest]!;
+  return TIMELINE_STEPS.find((s) => s.key === fastest)?.label ?? '—';
+};
+
+/** 訂單狀態：終點貨態優先；否則由包裹 currentStep 推算（待付款在配送語意視為待出貨）。 */
 const orderDisplayStatus = (order: OrderRecord): string => {
   if (order.overrideStatus) return OVERRIDE_LABEL[order.overrideStatus];
-  // 待付款在配送語意上視為待出貨
-  const steps = allPackageSteps(order).map(deliveryStepOf);
-  const uniq = new Set(steps);
-  if (uniq.size === 0) return '—';
-  if (uniq.size > 1) return '處理中';
-  return TIMELINE_STEPS.find((s) => s.key === steps[0])?.label ?? '—';
+  return deriveShipLabel(allPackageSteps(order).map(deliveryStepOf));
 };
 /** 配送狀態欄的語意色 class；一般進度狀態回傳空字串（沿用主色樣式）。 */
 const orderStatusToneClass = (order: OrderRecord): string =>
@@ -315,28 +340,24 @@ const payStatusOf = (order: OrderRecord): PayStatus =>
 // ── 權益膠囊：展開後顯示「狀態 · 可退/可取消/可換」對照文案 ──
 // 退換貨暫時隱藏：權益文案只保留「可否取消」語意，移除退／換貨相關敘述
 const RIGHTS_BANNER: Record<string, string> = {
-  待付款: '可取消',
-  待出貨: '可取消',
+  待付款: '後台可取消',
+  待出貨: '後台可取消',
   備貨中: '不可取消',
   已出貨: '不可取消',
   已送達: '不可取消',
   已完成: '不可取消',
-  處理中: '各包裹階段不同，權益依各包裹狀態判斷',
   已取消: '訂單已由賣家取消',
 };
-const rightsBannerOf = (order: OrderRecord): string =>
-  RIGHTS_BANNER[orderDisplayStatus(order)] ?? '';
-
-/** 商品狀態：同 item 所有包裹同階段 → 顯示該階段；不同 → 「處理中」。 */
-const itemDisplayStatus = (item: OrderItem): string => {
-  if (item.packages.length === 0) return '—';
-  const uniq = new Set(item.packages.map((p) => p.currentStep));
-  if (uniq.size > 1) return '處理中';
-  return (
-    TIMELINE_STEPS.find((s) => s.key === item.packages[0].currentStep)?.label ??
-    '—'
-  );
+const rightsBannerOf = (order: OrderRecord): string => {
+  const status = orderDisplayStatus(order);
+  // 「部分…」：各包裹進度不同，權益依各包裹狀態判斷
+  if (status.startsWith('部分')) return '各包裹進度不同，權益依各包裹狀態判斷';
+  return RIGHTS_BANNER[status] ?? '';
 };
+
+/** 商品狀態：由該 item 各包裹階段推算（最快階段為主，混合出貨改用「部分…」），同樣不產生「處理中」。 */
+const itemDisplayStatus = (item: OrderItem): string =>
+  deriveShipLabel(item.packages.map((p) => p.currentStep));
 
 /**
  * 動作可否：依包裹階段判斷
