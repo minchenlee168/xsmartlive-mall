@@ -1286,7 +1286,7 @@ const shippingDiscountSummaryLabel = computed(() => {
     case 'first-purchase':
       return '免運折抵（期間首購免運）';
     case 'cart-level':
-      return '免運折抵（首購後免運）';
+      return '免運折抵（期間首購後免運）';
     default:
       return '免運折抵（滿千免運）';
   }
