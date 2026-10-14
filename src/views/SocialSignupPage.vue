@@ -193,19 +193,16 @@ const handlePickOtherSocial = () => {
       <div
         class="mx-auto flex h-14 max-w-7xl items-center justify-between px-8 py-2"
       >
+        <!-- Logo：手機與桌機皆顯示含商家名稱的完整 logo（與 NavBar 一致） -->
         <button
-          class="flex shrink-0 items-center gap-2"
+          class="flex shrink-0 items-center"
+          aria-label="xSmartLive"
           @click="router.push('/shop')"
         >
           <img
-            src="/logo.png"
-            alt="xSmartLive"
-            class="block h-10 w-auto @4xl:hidden"
-          />
-          <img
             src="/logo-xl.png"
             alt="xSmartLive"
-            class="hidden h-8 w-auto @4xl:block"
+            class="block h-7 w-auto @4xl:h-8"
           />
         </button>
 
