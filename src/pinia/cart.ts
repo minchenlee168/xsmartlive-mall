@@ -511,22 +511,65 @@ export const useCartStore = defineStore('cart', () => {
     groups.value.reduce((sum, g) => sum + g.items.length, 0),
   );
 
-  /** 依規則挑目標購物車：先跑 routingRules（上→下），沒命中回傳 undefined。 */
-  const findRoutedCart = (productId: number): CartGroup | undefined => {
+  /**
+   * 商城車（商城嚴選）重建範本：該台被移除後（結帳清空 / 手動刪除），
+   * 再加入商城商品時用此重建，避免 fallback 到別台。設定需與上方 seed 的 id:7 一致。
+   */
+  const makeMallCart = (): CartGroup => ({
+    id: 7,
+    sellerName: 'xsmartlive 商城嚴選',
+    sellerId: 's_mall',
+    freeShippingReturn: true,
+    tags: [{ label: '常溫', type: 'secondary' }],
+    shippingMethods: ['home', 'store', 'pickup', 'post'],
+    paymentMethods: [
+      'credit',
+      'apple-pay',
+      'atm',
+      'cvs-code',
+      'transfer',
+      'line-pay',
+      'ipass',
+    ],
+    checkoutMode: 'pickable',
+    items: [],
+  });
+  /** 有重建範本的 targetCartId → 範本工廠（其餘 targetCartId 無範本、不重建）。 */
+  const ROUTED_CART_TEMPLATES: Record<number, () => CartGroup> = {
+    7: makeMallCart,
+  };
+
+  /** 依規則找商品該進的 targetCartId（上→下，命中回傳 id，未命中 undefined）。 */
+  const routedCartId = (productId: number): number | undefined => {
     const product = products.find((pr) => pr.id === productId);
     for (const rule of routingRules.value) {
-      const target = groups.value.find((g) => g.id === rule.targetCartId);
-      if (!target) continue;
       const cond = rule.condition;
-      if (cond.type === 'productId' && cond.value === productId) return target;
+      if (cond.type === 'productId' && cond.value === productId)
+        return rule.targetCartId;
       if (
         cond.type === 'category' &&
         product?.category &&
         cond.value === product.category
       )
-        return target;
+        return rule.targetCartId;
     }
     return undefined;
+  };
+
+  /**
+   * 依規則挑目標購物車；命中但該台已被移除時，若有重建範本則自動重建並回傳。
+   * 沒命中或命中但無範本可重建 → 回 undefined（由呼叫端 fallback）。
+   */
+  const findRoutedCart = (productId: number): CartGroup | undefined => {
+    const cid = routedCartId(productId);
+    if (cid == null) return undefined;
+    const existing = groups.value.find((g) => g.id === cid);
+    if (existing) return existing;
+    const template = ROUTED_CART_TEMPLATES[cid];
+    if (!template) return undefined;
+    const recreated = template();
+    groups.value.push(recreated);
+    return recreated;
   };
 
   function addItem(
@@ -598,7 +641,7 @@ export const useCartStore = defineStore('cart', () => {
       qty,
       price: p.price,
       original: p.original,
-      checked: false,
+      checked: true,
       isBundle: cat?.isBundle,
       bundleExpanded: cat?.isBundle ? true : undefined,
       bundleItems: resolvedBundleItems,
