@@ -1713,7 +1713,7 @@ const handlePlaceOrder = () => {
           <!-- 運送方式/運費：先方式名稱（如冷凍宅配），再貼合字寬的變更鈕；最右為運費 -->
           <div :class="RECEIPT_ROW_CLASS">
             <span
-              class="col-start-1 row-start-1 text-sm whitespace-nowrap text-slate-700"
+              class="col-start-1 row-start-1 text-sm break-words text-slate-700"
               >運送方式/運費</span
             >
             <div
@@ -1732,6 +1732,18 @@ const handlePlaceOrder = () => {
                 :class="[RECEIPT_BUTTON_CLASS, 'shrink-0']"
                 @click="handleOpenShipDrawer(group.id)"
               />
+              <!-- 首購後免運未解鎖預告：併入運送方式/運費列，整行換到方式下方；字多可換行 -->
+              <span
+                v-if="showGroupCartLevelTeaser(group)"
+                class="flex w-full items-start gap-1.5 text-xs text-slate-500"
+              >
+                <i class="pi pi-truck mt-0.5 shrink-0 text-slate-400" />
+                <span class="min-w-0"
+                  >活動期間買幾次都行，<span class="font-medium text-slate-600"
+                    >運費只付第一筆</span
+                  ></span
+                >
+              </span>
             </div>
             <span
               v-if="groupShippingFee(group) === null"
@@ -1751,7 +1763,7 @@ const handlePlaceOrder = () => {
           <!-- 收件人資訊：選完運送方式後顯示姓名 + 手機號碼 -->
           <div v-if="groupRecipient(group)" :class="RECEIPT_ROW_CLASS">
             <span
-              class="col-start-1 row-start-1 text-sm whitespace-nowrap text-slate-700"
+              class="col-start-1 row-start-1 text-sm break-words text-slate-700"
               >收件人</span
             >
             <div
@@ -1792,19 +1804,6 @@ const handlePlaceOrder = () => {
             <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'">{{
               money(0)
             }}</span>
-          </div>
-
-          <!-- 首購後免運：未解鎖預告（本台首筆需付運費、下一筆起免運）誠實告知 -->
-          <div
-            v-if="showGroupCartLevelTeaser(group)"
-            class="col-span-full flex items-center gap-1.5 text-xs text-slate-500"
-          >
-            <i class="pi pi-truck text-slate-400" />
-            <span
-              >活動期間買幾次都行，<span class="font-medium text-slate-600"
-                >運費只付第一筆</span
-              ></span
-            >
           </div>
 
           <!-- 優惠券：操作欄放按鈕，說明欄放券名 -->

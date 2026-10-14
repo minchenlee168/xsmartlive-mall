@@ -7,16 +7,16 @@ import { parseDashDate, parseSlashDate, formatSlashDate } from '../utils/date';
  * - 觸發條件：檔期內只要下過一筆訂單（首購）就解鎖——不要求首筆實付運費。
  * - 免運範圍：解鎖後，檔期內後續每一筆訂單皆免運；檔期結束即失效。
  *
- * 原型把「帳號級」檔期設成已結束（9 月、休眠），讓「購物車級」（每台開關控制、10 月）
- * 的獨立畫面能展示、不被帳號級擇優壓過。要展示帳號級時把此檔期改回涵蓋今天即可。
+ * 檔期涵蓋今天（10 月）→ 檔期內下過一筆（首購）即解鎖「全站下一筆起免運」。
+ * 與購物車級並存時擇優：帳號級解鎖後會壓過購物車級（見 CheckoutPage groupFreeShippingReason）。
  */
 export const FREE_SHIPPING_CAMPAIGN = {
   id: 'first-purchase-free-shipping-2026q4',
   name: '期間首購後免運',
   /** 檔期起日（含當日）。 */
-  startDate: '2026-09-01',
+  startDate: '2026-10-01',
   /** 檔期訖日（含當日，到 23:59:59 仍有效）。 */
-  endDate: '2026-09-30',
+  endDate: '2026-10-31',
 } as const;
 
 const DAY_IN_MS = 86_400_000;
