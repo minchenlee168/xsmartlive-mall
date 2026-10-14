@@ -559,16 +559,16 @@ const isGroupFreeShipping = (g: CheckoutGroup): boolean =>
 const isFirstPurchaseFreeShipping = computed(
   () => ordersStore.isFirstPurchaseFreeShippingActive,
 );
-/** 該組是否符合購物車級「賣場回購免運」（該台檔期內已下過首筆）。 */
+/** 該組是否符合購物車級「首購後免運」（該台檔期內已下過首筆）。 */
 const isGroupCartLevelFreeShipping = (g: CheckoutGroup): boolean =>
   ordersStore.isCartLevelFreeShippingActive(g.sellerId);
-/** 該組是否掛了「賣場回購免運」活動（該台開關開啟且檔期窗進行中；用於未解鎖的預告）。 */
+/** 該組是否掛了「首購後免運」活動（該台開關開啟且檔期窗進行中；用於未解鎖的預告）。 */
 const groupHasCartCampaign = (g: CheckoutGroup): boolean =>
   !!g.freeShippingReturn && isReturnWindowActive(new Date());
 /**
  * 該組運費折抵（折抵全額運費）：
- * - 帳號級首購 或 已解鎖的賣場回購 → 免運。
- * - 掛了賣場回購、尚未解鎖的台（首筆）→ 一律不免運（連滿千門檻也不吃），
+ * - 帳號級首購 或 已解鎖的首購後免運 → 免運。
+ * - 掛了首購後免運、尚未解鎖的台（首筆）→ 一律不免運（連滿千門檻也不吃），
  *   讓首筆必付運費以觸發回購免運。
  * - 一般台 → 走滿千免運門檻。
  */
@@ -593,7 +593,7 @@ const groupFreeShippingReason = (
   return 'threshold';
 };
 /**
- * 是否顯示「賣場回購免運」的未解鎖預告：該台掛活動、尚未解鎖、且無帳號級涵蓋、本筆需付運費。
+ * 是否顯示「首購後免運」的未解鎖預告：該台掛活動、尚未解鎖、且無帳號級涵蓋、本筆需付運費。
  * 誠實告知使用者「本筆為首筆要付、下一筆起免運」，避免下單後落差。
  */
 const showGroupCartLevelTeaser = (g: CheckoutGroup): boolean =>
@@ -608,7 +608,7 @@ const groupFreeShippingLabel = (g: CheckoutGroup): string => {
     case 'first-purchase':
       return '期間首購免運';
     case 'cart-level':
-      return '賣場回購免運';
+      return '期間首購後免運';
     default:
       return '達免運門檻';
   }
@@ -1286,7 +1286,7 @@ const shippingDiscountSummaryLabel = computed(() => {
     case 'first-purchase':
       return '免運折抵（期間首購免運）';
     case 'cart-level':
-      return '免運折抵（賣場回購免運）';
+      return '免運折抵（首購後免運）';
     default:
       return '免運折抵（滿千免運）';
   }
@@ -1794,16 +1794,15 @@ const handlePlaceOrder = () => {
             }}</span>
           </div>
 
-          <!-- 賣場回購免運：未解鎖預告（本台首筆需付運費、下一筆起免運）誠實告知 -->
+          <!-- 首購後免運：未解鎖預告（本台首筆需付運費、下一筆起免運）誠實告知 -->
           <div
             v-if="showGroupCartLevelTeaser(group)"
             class="col-span-full flex items-center gap-1.5 text-xs text-slate-500"
           >
             <i class="pi pi-truck text-slate-400" />
             <span
-              >本賣場回購免運：本筆為首筆需付運費，<span
-                class="font-medium text-slate-600"
-                >下一筆訂單起免運</span
+              >活動期間買幾次都行，<span class="font-medium text-slate-600"
+                >運費只付第一筆</span
               ></span
             >
           </div>

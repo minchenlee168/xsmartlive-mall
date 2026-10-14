@@ -40,7 +40,7 @@ const freeShippingDaysLeft = computed(
 );
 const freeShippingEndLabel = ordersStore.freeShippingCampaignEndLabel;
 
-// 賣場回購免運：逐台列出已解鎖的賣場（>3 摺疊）
+// 首購後免運：逐台列出已解鎖的賣場（>3 摺疊）
 const cartLevelSellers = computed(() => ordersStore.cartLevelUnlockedSellers);
 const CART_SELLERS_COLLAPSED = 3;
 const isCartLevelExpanded = ref(false);
@@ -719,10 +719,10 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
       </div>
     </div>
 
-    <!-- 賣場回購免運：逐台列出已解鎖的賣場（accent 色，與帳號級區隔） -->
+    <!-- 首購後免運：逐台列出已解鎖的賣場（accent 色，與帳號級區隔） -->
     <div v-if="cartLevelSellers.length" class="flex flex-col gap-2">
       <p v-if="showFreeShippingBanner" class="px-1 text-xs text-slate-500">
-        帳號已享全站免運，以下賣場回購免運為額外保障（檔期結束後仍可能適用）
+        帳號已享全站免運，以下首購後免運為額外保障（檔期結束後仍可能適用）
       </p>
       <div
         v-for="s in visibleCartLevelSellers"

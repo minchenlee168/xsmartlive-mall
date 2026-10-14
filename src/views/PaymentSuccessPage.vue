@@ -31,7 +31,7 @@ const freeShippingDaysLeft = computed(
 );
 const freeShippingEndLabel = ordersStore.freeShippingCampaignEndLabel;
 
-/** 本次結帳中、剛解鎖「賣場回購免運」的賣場（僅限本次下單涉及的台）。 */
+/** 本次結帳中、剛解鎖「首購後免運」的賣場（僅限本次下單涉及的台）。 */
 const unlockedCartSellers = computed(() => {
   const ids = new Set(summary.value?.sellerIds ?? []);
   return ordersStore.cartLevelUnlockedSellers.filter((s) => ids.has(s.sellerId));
@@ -41,8 +41,8 @@ const cartSellersNote = computed(() => {
   const list = unlockedCartSellers.value;
   if (list.length === 0) return '';
   return list.length === 1
-    ? `本次「${list[0].sellerName}」亦符合賣場回購免運`
-    : `本次「${list[0].sellerName}」等 ${list.length} 個賣場亦符合賣場回購免運`;
+    ? `本次「${list[0].sellerName}」亦符合首購後免運`
+    : `本次「${list[0].sellerName}」等 ${list.length} 個賣場亦符合首購後免運`;
 });
 /** 整個解鎖區是否要顯示（帳號級 或 有購物車級剛解鎖）。 */
 const showUnlockSection = computed(
@@ -144,7 +144,7 @@ const handleGoOrders = () => {
               <i class="pi pi-truck text-lg text-white" />
             </div>
             <p class="text-base font-bold" style="color: var(--primary)">
-              已解鎖「賣場回購免運」
+              已解鎖「首購後免運」
             </p>
           </div>
           <ul class="flex flex-col gap-2 pl-1">
