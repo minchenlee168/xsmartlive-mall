@@ -104,6 +104,8 @@ export interface OrderRecord {
   detailTab: DetailTab;
   expanded: boolean;
   items: OrderItem[];
+  /** 來源賣家 / 場次識別碼；用於「賣場回購免運」逐台判定（該台是否已下過首筆）。 */
+  sellerId?: string;
   /** 買家對這筆訂單的備註（留言給賣家）；下單時從結帳頁帶入。 */
   buyerNote?: string;
   /** 金額明細（優惠券 / 紅利 / 運費折抵等）；下單時從結帳頁帶入，顯示於訂購/付款資訊。 */

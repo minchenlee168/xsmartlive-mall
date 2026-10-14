@@ -619,6 +619,27 @@ const buildTimeDisplay = (() => {
                 </p>
               </div>
 
+              <!-- 期間首購後免運（這台）：開啟後該台第 2 筆訂單起免運 -->
+              <div
+                class="mt-3 flex items-start justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-slate-700">
+                    期間首購後免運
+                  </p>
+                  <p class="mt-0.5 text-xs leading-snug text-slate-400">
+                    開啟後，這台檔期內第一筆付運費、之後每筆免運
+                  </p>
+                </div>
+                <ToggleSwitch
+                  :model-value="!!g.freeShippingReturn"
+                  class="mt-0.5 shrink-0"
+                  @update:model-value="
+                    cartStore.updateCart(g.id, { freeShippingReturn: !!$event })
+                  "
+                />
+              </div>
+
               <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
                   <p class="mb-1 text-xs text-slate-500">支援運送方式</p>

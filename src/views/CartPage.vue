@@ -12,6 +12,12 @@ import {
 } from '../pinia/cart';
 import { useUiStore } from '../pinia/ui';
 import { useViewportStore } from '../pinia/viewport';
+import { useOrdersStore } from '../pinia/orders';
+import {
+  isReturnWindowActive,
+  returnWindowEndLabel,
+  returnWindowDaysLeft,
+} from '../data/freeShippingCampaign';
 import { products, type PickOption } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
 import { useMoney } from '../composables/useMoney';
@@ -238,6 +244,41 @@ const LIVE_REPLAYS: LiveReplay[] = [
 const router = useRouter();
 const ui = useUiStore();
 const cart = useCartStore();
+const ordersStore = useOrdersStore();
+
+/**
+ * 購物車頁的免運提示（逐台）：這裡是「資格預告」不是價格列（還沒選運送、算不出運費）。
+ * 擇優：帳號級（全站）＞ 購物車級已解鎖 ＞ 購物車級未解鎖（誠實預告本台首筆仍付運費）。
+ */
+type FreeShippingHint = {
+  type: 'account' | 'cart-unlocked' | 'cart-teaser';
+  endLabel: string;
+  daysLeft: number;
+};
+const freeShippingHintByGroup = computed(() => {
+  const now = new Date();
+  const map: Record<number, FreeShippingHint | null> = {};
+  for (const g of cart.groups) {
+    if (ordersStore.isFirstPurchaseFreeShippingActive) {
+      map[g.id] = {
+        type: 'account',
+        endLabel: ordersStore.freeShippingCampaignEndLabel,
+        daysLeft: ordersStore.freeShippingCampaignDaysLeft,
+      };
+    } else if (g.freeShippingReturn && isReturnWindowActive(now)) {
+      map[g.id] = {
+        type: ordersStore.isCartLevelFreeShippingActive(g.sellerId)
+          ? 'cart-unlocked'
+          : 'cart-teaser',
+        endLabel: returnWindowEndLabel(),
+        daysLeft: returnWindowDaysLeft(now),
+      };
+    } else {
+      map[g.id] = null;
+    }
+  }
+  return map;
+});
 
 const groups = computed(() => cart.groups);
 /** 購物車頁只顯示「有商品」的購物車；加購區 picker 另有 allCarts 涵蓋全 mall */
@@ -1308,6 +1349,40 @@ const handleGoProduct = (productId?: number) => {
         >
           <i class="pi pi-flag" />
           <span>直播 / 團購棄標流程：可放棄先前喊下的品項以釋出庫存。</span>
+        </div>
+
+        <!-- 免運提示（逐台）：已啟用用主色系；未解鎖預告用中性灰（尚未免運、本筆仍付） -->
+        <div
+          v-if="freeShippingHintByGroup[group.id]"
+          class="flex items-center gap-2 border-b px-[var(--card-pad)] py-2 text-sm"
+          :class="
+            freeShippingHintByGroup[group.id]!.type === 'cart-teaser'
+              ? 'border-slate-200 bg-slate-50 text-slate-500'
+              : ''
+          "
+          :style="
+            freeShippingHintByGroup[group.id]!.type === 'cart-teaser'
+              ? ''
+              : 'background: var(--primary-surface); border-color: var(--primary); color: var(--primary)'
+          "
+        >
+          <i class="pi pi-truck" />
+          <span v-if="freeShippingHintByGroup[group.id]!.type === 'account'">
+            全站首購免運已啟用，本台結帳即享免運．檔期至
+            {{ freeShippingHintByGroup[group.id]!.endLabel }}（剩
+            {{ freeShippingHintByGroup[group.id]!.daysLeft }} 天）
+          </span>
+          <span
+            v-else-if="freeShippingHintByGroup[group.id]!.type === 'cart-unlocked'"
+          >
+            本賣場回購免運已啟用，本台結帳即享免運．檔期至
+            {{ freeShippingHintByGroup[group.id]!.endLabel }}（剩
+            {{ freeShippingHintByGroup[group.id]!.daysLeft }} 天）
+          </span>
+          <span v-else>
+            本賣場回購免運：本台第 2 筆訂單起免運（本筆為首筆，結帳仍需運費）．檔期至
+            {{ freeShippingHintByGroup[group.id]!.endLabel }}
+          </span>
         </div>
 
         <!-- Items：一般商品在前、加購商品集中排最後，加購前插入「-加購區-」分隔 -->

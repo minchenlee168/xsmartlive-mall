@@ -31,6 +31,28 @@ const isMobile = computed(() => vp.value === 'mobile');
 const ordersStore = useOrdersStore();
 const ui = useUiStore();
 
+// 期間首購後免運：解鎖後於訂單列表頂部提醒「下一筆免運」
+const showFreeShippingBanner = computed(
+  () => ordersStore.isFirstPurchaseFreeShippingActive,
+);
+const freeShippingDaysLeft = computed(
+  () => ordersStore.freeShippingCampaignDaysLeft,
+);
+const freeShippingEndLabel = ordersStore.freeShippingCampaignEndLabel;
+
+// 賣場回購免運：逐台列出已解鎖的賣場（>3 摺疊）
+const cartLevelSellers = computed(() => ordersStore.cartLevelUnlockedSellers);
+const CART_SELLERS_COLLAPSED = 3;
+const isCartLevelExpanded = ref(false);
+const visibleCartLevelSellers = computed(() =>
+  isCartLevelExpanded.value
+    ? cartLevelSellers.value
+    : cartLevelSellers.value.slice(0, CART_SELLERS_COLLAPSED),
+);
+const handleToggleCartLevel = () => {
+  isCartLevelExpanded.value = !isCartLevelExpanded.value;
+};
+
 // 主 tab（退貨 / 退款相關 tab 已移除）
 /**
  * 頁籤狀態：除了 OrderStatus 之外，再加 timeline 階段 key（shipped / to_receive / delivered）。
@@ -671,6 +693,80 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
 
 <template>
   <div class="flex flex-col gap-4">
+    <!-- 期間首購後免運：已解鎖提醒（檔期內下一筆起皆免運） -->
+    <div
+      v-if="showFreeShippingBanner"
+      class="shadow-card flex items-center gap-3 rounded-xl p-3 @3xl:p-4"
+      style="
+        background: var(--primary-surface);
+        border: 1px solid var(--primary);
+      "
+    >
+      <div
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+        style="background: var(--primary)"
+      >
+        <i class="pi pi-truck text-white" />
+      </div>
+      <div class="flex min-w-0 flex-col">
+        <span class="text-sm font-semibold" style="color: var(--primary)">
+          期間首購後免運已啟用
+        </span>
+        <span class="text-xs text-slate-600">
+          檔期內下一筆訂單起全站皆享免運，不限金額．檔期至
+          {{ freeShippingEndLabel }}（剩 {{ freeShippingDaysLeft }} 天）
+        </span>
+      </div>
+    </div>
+
+    <!-- 賣場回購免運：逐台列出已解鎖的賣場（accent 色，與帳號級區隔） -->
+    <div v-if="cartLevelSellers.length" class="flex flex-col gap-2">
+      <p v-if="showFreeShippingBanner" class="px-1 text-xs text-slate-500">
+        帳號已享全站免運，以下賣場回購免運為額外保障（檔期結束後仍可能適用）
+      </p>
+      <div
+        v-for="s in visibleCartLevelSellers"
+        :key="s.sellerId"
+        class="shadow-card flex items-center gap-3 rounded-xl p-3 @3xl:p-4"
+        style="
+          background: var(--primary-surface);
+          border: 1px solid var(--primary);
+        "
+      >
+        <div
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+          style="background: var(--primary)"
+        >
+          <i class="pi pi-truck text-white" />
+        </div>
+        <div class="flex min-w-0 flex-col">
+          <span
+            class="text-sm font-semibold"
+            style="color: var(--primary)"
+          >
+            {{ s.sellerName }}
+          </span>
+          <span class="text-xs text-slate-600">
+            本賣場下一筆訂單起免運．檔期至 {{ s.endLabel }}（剩
+            {{ s.daysLeft }} 天）
+          </span>
+        </div>
+      </div>
+      <button
+        v-if="cartLevelSellers.length > CART_SELLERS_COLLAPSED"
+        type="button"
+        class="min-h-11 self-start text-sm font-medium"
+        style="color: var(--primary)"
+        @click="handleToggleCartLevel"
+      >
+        {{
+          isCartLevelExpanded
+            ? '收合'
+            : `查看全部 ${cartLevelSellers.length} 個賣場`
+        }}
+      </button>
+    </div>
+
     <!-- 篩選卡：頁籤 + 日期/搜尋 + 結果摘要（購物權益與售後說明區塊已依規劃移除） -->
     <div class="shadow-card flex flex-col gap-4 rounded-xl bg-white p-4">
       <!-- 查詢條件：PC 版一排（配送 / 日期 / 搜尋 / 查詢）；手機堆疊。

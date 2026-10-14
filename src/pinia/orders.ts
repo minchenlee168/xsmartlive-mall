@@ -1,5 +1,17 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import {
+  FREE_SHIPPING_CAMPAIGN,
+  isWithinCampaign,
+  isOrderDateInCampaign,
+  campaignDaysLeft,
+  campaignEndLabel,
+  isReturnWindowActive,
+  isOrderDateInReturnWindow,
+  returnWindowEndLabel,
+  returnWindowDaysLeft,
+} from '../data/freeShippingCampaign';
+import { useCartStore } from './cart';
 import type {
   OrderRecord,
   OrderItem,
@@ -43,6 +55,8 @@ export interface LastPaymentSummary {
   buyerPhone: string;
   paymentMethod: string;
   deliveryAddress: string;
+  /** 本次結帳各組來源賣場 id（判定哪些台的「賣場回購免運」剛觸發）。 */
+  sellerIds?: string[];
 }
 
 export const useOrdersStore = defineStore('orders', () => {
@@ -834,6 +848,8 @@ export const useOrdersStore = defineStore('orders', () => {
     /** 發票類型（結帳頁 INVOICE_TYPES 的 label）；未提供時用個人發票（紙本）。 */
     invoice?: string;
     buyerNote?: string;
+    /** 來源賣場 id（「賣場回購免運」逐台判定用）。 */
+    sellerId?: string;
     /** 金額明細（優惠券 / 紅利 / 運費折抵等）。 */
     amounts?: OrderAmountBreakdown;
   }): string {
@@ -882,6 +898,7 @@ export const useOrdersStore = defineStore('orders', () => {
       detailTab: 'progress',
       expanded: true,
       items,
+      sellerId: input.sellerId,
       buyerNote: input.buyerNote,
       amounts: input.amounts,
     });
@@ -971,11 +988,88 @@ export const useOrdersStore = defineStore('orders', () => {
     order.status = 'completed';
   }
 
+  // ── 期間首購後免運（帳號級）────────────────────────────────────────────────
+  /**
+   * 檔期內使用者是否已有過訂單（首購，下單就算、不要求實付運費）。
+   * 排除已取消的訂單——下單秒取消 / 付款失敗（cancelOrders 會標 overrideStatus:'cancelled'）
+   * 不算真正首購，否則「從未成立的購買」也能解鎖免運，有被鑽空間。
+   */
+  const hasCampaignOrder = computed(() =>
+    orders.value.some(
+      (o) =>
+        isOrderDateInCampaign(o.date) && o.overrideStatus !== 'cancelled',
+    ),
+  );
+  /**
+   * 「下一筆免運」資格是否成立：檔期進行中、且已完成首購。
+   * 注意：結帳當下本次訂單尚未寫入 orders，故首筆結帳時仍為 false（正是首購那筆要付運費）。
+   */
+  const isFirstPurchaseFreeShippingActive = computed(
+    () => isWithinCampaign(new Date()) && hasCampaignOrder.value,
+  );
+  /** 檔期是否進行中（無論是否已首購）。 */
+  const isFreeShippingCampaignOngoing = computed(() =>
+    isWithinCampaign(new Date()),
+  );
+  /** 距檔期結束剩餘天數。 */
+  const freeShippingCampaignDaysLeft = computed(() =>
+    campaignDaysLeft(new Date()),
+  );
+  /** 檔期名稱與訖日（提醒文案用）。 */
+  const freeShippingCampaignName = FREE_SHIPPING_CAMPAIGN.name;
+  const freeShippingCampaignEndLabel = campaignEndLabel();
+
+  // ── 購物車級「賣場回購免運」（參與與否由各購物車開關控制）────────────────────
+  /** 該台是否開啟回購免運活動（讀購物車設定的每台開關）。 */
+  const isSellerReturnEnabled = (sellerId: string | undefined): boolean => {
+    if (!sellerId) return false;
+    const g = useCartStore().groups.find((x) => x.sellerId === sellerId);
+    return !!g?.freeShippingReturn;
+  };
+  /**
+   * 某賣場的回購免運是否成立：該台已開啟活動、檔期窗進行中、且檔期內已有過該台訂單（首筆）。
+   * 同帳號級推理：結帳當下本次訂單尚未寫入，故該台首筆結帳仍需付運費。
+   * 已取消訂單不算首購（同帳號級防鑽規則）。
+   */
+  const isCartLevelFreeShippingActive = (sellerId: string | undefined): boolean =>
+    isSellerReturnEnabled(sellerId) &&
+    isReturnWindowActive(new Date()) &&
+    orders.value.some(
+      (o) =>
+        o.sellerId === sellerId &&
+        isOrderDateInReturnWindow(o.date) &&
+        o.overrideStatus !== 'cancelled',
+    );
+  /** 目前已解鎖「賣場回購免運」的賣場清單（會員中心 / 付款成功頁逐台列用）。 */
+  const cartLevelUnlockedSellers = computed(() => {
+    const now = new Date();
+    if (!isReturnWindowActive(now)) return [];
+    const endLabel = returnWindowEndLabel();
+    const daysLeft = returnWindowDaysLeft(now);
+    return useCartStore()
+      .groups.filter(
+        (g) => g.sellerId && g.freeShippingReturn && isCartLevelFreeShippingActive(g.sellerId),
+      )
+      .map((g) => ({
+        sellerId: g.sellerId as string,
+        sellerName: g.sellerName,
+        endLabel,
+        daysLeft,
+      }));
+  });
+
   return {
     orders,
     transactions,
     placeOrder,
     completeOrder,
+    isFirstPurchaseFreeShippingActive,
+    isFreeShippingCampaignOngoing,
+    freeShippingCampaignDaysLeft,
+    freeShippingCampaignName,
+    freeShippingCampaignEndLabel,
+    isCartLevelFreeShippingActive,
+    cartLevelUnlockedSellers,
     lastPaymentSummary,
     setLastPaymentSummary,
     activePayment,

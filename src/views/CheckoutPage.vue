@@ -21,6 +21,7 @@ import {
   type CheckoutMode,
 } from '../pinia/cart';
 import { useOrdersStore } from '../pinia/orders';
+import { isReturnWindowActive } from '../data/freeShippingCampaign';
 import { products } from '../data/products';
 import { useAuthStore } from '../pinia/auth';
 import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
@@ -34,6 +35,8 @@ type TempLayer = '常溫' | '冷藏' | '冷凍';
 interface CheckoutGroup {
   id: number;
   sellerName: string;
+  sellerId?: string;
+  freeShippingReturn?: boolean;
   tempLayer: TempLayer;
   items: CartItem[];
   shippingMethods: ShippingMethodId[];
@@ -311,6 +314,8 @@ const checkoutGroups = computed<CheckoutGroup[]>(() =>
     .map((g) => ({
       id: g.id,
       sellerName: g.sellerName,
+      sellerId: g.sellerId,
+      freeShippingReturn: g.freeShippingReturn,
       tempLayer: tempOfTags(g.tags),
       items: g.items
         .filter((i) => i.checked)
@@ -547,11 +552,70 @@ const groupShippingFee = (g: CheckoutGroup): number | null => {
 /** 該組是否達免運門檻（逐筆訂單判定）。 */
 const isGroupFreeShipping = (g: CheckoutGroup): boolean =>
   groupAfterBulk(g) >= FREE_SHIPPING_MIN;
-/** 該組運費折抵（達免運門檻 → 折抵全額運費）。 */
+/**
+ * 帳號級「期間首購後免運」資格：檔期內已有過訂單 → 本次所有訂單皆免運（不看門檻）。
+ * 檔期回饋為頭條，優先於滿千免運。
+ */
+const isFirstPurchaseFreeShipping = computed(
+  () => ordersStore.isFirstPurchaseFreeShippingActive,
+);
+/** 該組是否符合購物車級「賣場回購免運」（該台檔期內已下過首筆）。 */
+const isGroupCartLevelFreeShipping = (g: CheckoutGroup): boolean =>
+  ordersStore.isCartLevelFreeShippingActive(g.sellerId);
+/** 該組是否掛了「賣場回購免運」活動（該台開關開啟且檔期窗進行中；用於未解鎖的預告）。 */
+const groupHasCartCampaign = (g: CheckoutGroup): boolean =>
+  !!g.freeShippingReturn && isReturnWindowActive(new Date());
+/**
+ * 該組運費折抵（折抵全額運費）：
+ * - 帳號級首購 或 已解鎖的賣場回購 → 免運。
+ * - 掛了賣場回購、尚未解鎖的台（首筆）→ 一律不免運（連滿千門檻也不吃），
+ *   讓首筆必付運費以觸發回購免運。
+ * - 一般台 → 走滿千免運門檻。
+ */
 const groupShippingDiscount = (g: CheckoutGroup): number => {
   const fee = groupShippingFee(g);
-  return fee !== null && fee > 0 && isGroupFreeShipping(g) ? fee : 0;
+  if (fee === null || fee <= 0) return 0;
+  if (isFirstPurchaseFreeShipping.value || isGroupCartLevelFreeShipping(g)) {
+    return fee;
+  }
+  if (groupHasCartCampaign(g)) return 0;
+  return isGroupFreeShipping(g) ? fee : 0;
 };
+/**
+ * 該組免運的原因（驅動折抵列標籤）；擇優：帳號級 ＞ 購物車級 ＞ 滿千。無折抵回 null。
+ */
+const groupFreeShippingReason = (
+  g: CheckoutGroup,
+): 'first-purchase' | 'cart-level' | 'threshold' | null => {
+  if (groupShippingDiscount(g) <= 0) return null;
+  if (isFirstPurchaseFreeShipping.value) return 'first-purchase';
+  if (isGroupCartLevelFreeShipping(g)) return 'cart-level';
+  return 'threshold';
+};
+/**
+ * 是否顯示「賣場回購免運」的未解鎖預告：該台掛活動、尚未解鎖、且無帳號級涵蓋、本筆需付運費。
+ * 誠實告知使用者「本筆為首筆要付、下一筆起免運」，避免下單後落差。
+ */
+const showGroupCartLevelTeaser = (g: CheckoutGroup): boolean =>
+  groupHasShippingFee(g) &&
+  groupHasCartCampaign(g) &&
+  !isGroupCartLevelFreeShipping(g) &&
+  !isFirstPurchaseFreeShipping.value &&
+  groupShippingDiscount(g) <= 0;
+/** 折抵列 Tag 文案（依來源）。 */
+const groupFreeShippingLabel = (g: CheckoutGroup): string => {
+  switch (groupFreeShippingReason(g)) {
+    case 'first-purchase':
+      return '期間首購免運';
+    case 'cart-level':
+      return '賣場回購免運';
+    default:
+      return '達免運門檻';
+  }
+};
+/** 折抵列 Tag 配色（統一主色系；來源差異靠文案與 icon 區分）。 */
+const groupFreeShippingTagStyle = (): string =>
+  'background: var(--primary-surface); color: var(--primary)';
 /** 該組是否有實際運費（有運費才顯示運費折抵列，達/未達門檻都顯示）。 */
 const groupHasShippingFee = (g: CheckoutGroup): boolean => {
   const fee = groupShippingFee(g);
@@ -1210,6 +1274,23 @@ const shippingTotal = computed(() =>
 const shippingDiscountTotal = computed(() =>
   checkoutGroups.value.reduce((s, g) => s + groupShippingDiscount(g), 0),
 );
+/** 底部總折抵的來源文案：單一來源 → 具名；混多來源 → 中性「免運折抵」避免誤導。 */
+const shippingDiscountSummaryLabel = computed(() => {
+  const reasons = new Set(
+    checkoutGroups.value
+      .map((g) => groupFreeShippingReason(g))
+      .filter((r): r is NonNullable<typeof r> => r !== null),
+  );
+  if (reasons.size !== 1) return '免運折抵';
+  switch ([...reasons][0]) {
+    case 'first-purchase':
+      return '免運折抵（期間首購免運）';
+    case 'cart-level':
+      return '免運折抵（賣場回購免運）';
+    default:
+      return '免運折抵（滿千免運）';
+  }
+});
 const couponDiscountTotal = computed(() =>
   checkoutGroups.value.reduce((s, g) => s + groupCouponDiscount(g), 0),
 );
@@ -1294,10 +1375,13 @@ const handlePlaceOrder = () => {
     INVOICE_TYPES.find((t) => t.value === invoiceType.value)?.label ??
     '個人發票（紙本）';
 
-  // 每個群組（賣家 / 場次）拆成獨立一筆訂單，收集訂單編號
-  const orderNos: string[] = checkoutGroups.value.map((g) => {
+  // 每個群組（賣家 / 場次）拆成獨立一筆訂單。
+  // 先「一次算完」各組金額再建單：首購免運資格依賴 orders，若邊 placeOrder 寫入邊算，
+  // 第一次結帳會被自己剛建的單翻轉資格（各組不一致、收款與紀錄對不上、打破「首筆仍付運費」）。
+  // 故所有金額在任何訂單寫入前先快照成陣列，之後才逐筆 placeOrder。
+  const orderInputs = checkoutGroups.value.map((g) => {
     const appliedCoupon = appliedCouponOf(g);
-    return ordersStore.placeOrder({
+    return {
       items: g.items.map((i) => ({
         name: i.name,
         image: i.image,
@@ -1318,6 +1402,7 @@ const handlePlaceOrder = () => {
       payment: method,
       delivery: SHIPPING_METHOD_LABELS[groupShipMethod(g)!],
       invoice: invoiceLabel,
+      sellerId: g.sellerId,
       amounts: {
         goodsTotal: groupGoodsTotal(g),
         bulkDiscount: groupBulkDiscount(g),
@@ -1332,8 +1417,13 @@ const handlePlaceOrder = () => {
         shippingFee: groupShippingFee(g) ?? 0,
         shippingDiscount: groupShippingDiscount(g),
       },
-    });
+    };
   });
+
+  // 金額皆已快照完成 → 此時才逐筆寫入 orders，收集訂單編號
+  const orderNos: string[] = orderInputs.map((input) =>
+    ordersStore.placeOrder(input),
+  );
 
   // 收件聯絡人 / 電話：整筆自取 → 用自取聯絡人；否則沿用共用宅配地址簿
   const isAllPickup = sharedShipMethod.value === 'pickup';
@@ -1360,12 +1450,14 @@ const handlePlaceOrder = () => {
     buyerPhone,
     paymentMethod: method,
     deliveryAddress,
+    sellerIds: checkoutGroups.value
+      .map((g) => g.sellerId)
+      .filter((id): id is string => !!id),
   });
 
-  const paidAmount = checkoutGroups.value.reduce(
-    (sum, g) => sum + groupDisplayTotal(g),
-    0,
-  );
+  // 用快照後的 total 加總，確保收款金額與寫入的訂單紀錄一致
+  // （不可事後再呼叫 groupDisplayTotal——那會讀到已含本次新單的 orders 而翻轉資格）
+  const paidAmount = orderInputs.reduce((sum, input) => sum + input.total, 0);
 
   if (paymentMethod.value === 'credit') {
     // 線上信用卡：建單（待付款）+ 開模擬藍新付款層；購物車先不清。
@@ -1675,18 +1767,16 @@ const handlePlaceOrder = () => {
           </div>
 
           <!-- 運費折抵：有運費時達 / 未達門檻都顯示；達標折抵全額運費、未達顯示 $0 -->
-          <div v-if="groupHasShippingFee(group)" :class="RECEIPT_ROW_CLASS">
+          <div
+            v-if="groupHasShippingFee(group) && !showGroupCartLevelTeaser(group)"
+            :class="RECEIPT_ROW_CLASS"
+          >
             <span class="text-sm text-slate-700">免運折抵</span>
             <Tag
-              v-if="isGroupFreeShipping(group)"
-              value="達免運門檻"
+              v-if="groupFreeShippingReason(group)"
+              :value="groupFreeShippingLabel(group)"
               class="col-start-2 row-start-1 !w-[132px] !justify-center !py-0.5 !text-xs"
-              :pt="{
-                root: {
-                  style:
-                    'background: var(--primary-surface); color: var(--primary)',
-                },
-              }"
+              :pt="{ root: { style: groupFreeShippingTagStyle() } }"
             />
             <Tag
               v-else
@@ -1695,13 +1785,27 @@ const handlePlaceOrder = () => {
               class="col-start-2 row-start-1 !w-[132px] !justify-center !bg-slate-100 !py-0.5 !text-xs !text-slate-400"
             />
             <span
-              v-if="isGroupFreeShipping(group)"
+              v-if="groupShippingDiscount(group) > 0"
               :class="RECEIPT_AMOUNT_CLASS + ' font-medium text-red-500'"
               >- {{ money(groupShippingDiscount(group)) }}</span
             >
             <span v-else :class="RECEIPT_AMOUNT_CLASS + ' text-slate-400'">{{
               money(0)
             }}</span>
+          </div>
+
+          <!-- 賣場回購免運：未解鎖預告（本台首筆需付運費、下一筆起免運）誠實告知 -->
+          <div
+            v-if="showGroupCartLevelTeaser(group)"
+            class="col-span-full flex items-center gap-1.5 text-xs text-slate-500"
+          >
+            <i class="pi pi-truck text-slate-400" />
+            <span
+              >本賣場回購免運：本筆為首筆需付運費，<span
+                class="font-medium text-slate-600"
+                >下一筆訂單起免運</span
+              ></span
+            >
           </div>
 
           <!-- 優惠券：操作欄放按鈕，說明欄放券名 -->
@@ -1994,7 +2098,7 @@ const handlePlaceOrder = () => {
             >
               <span class="flex items-center gap-1 text-slate-500">
                 <i class="pi pi-truck text-xs" />
-                免運折抵（滿千免運）
+                {{ shippingDiscountSummaryLabel }}
               </span>
               <span class="font-medium text-red-500"
                 >- {{ money(shippingDiscountTotal) }}</span

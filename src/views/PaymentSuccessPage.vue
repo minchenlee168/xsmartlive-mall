@@ -18,6 +18,36 @@ const ordersStore = useOrdersStore();
 const appMode = useAppModeStore();
 
 const summary = computed(() => ordersStore.lastPaymentSummary);
+
+/**
+ * 期間首購後免運提醒：剛完成的這筆訂單已讓使用者在檔期內有過訂單，
+ * 檔期內下一筆即享免運 → 在此落地頁種下回購期待。
+ */
+const showFreeShippingUnlock = computed(
+  () => ordersStore.isFirstPurchaseFreeShippingActive,
+);
+const freeShippingDaysLeft = computed(
+  () => ordersStore.freeShippingCampaignDaysLeft,
+);
+const freeShippingEndLabel = ordersStore.freeShippingCampaignEndLabel;
+
+/** 本次結帳中、剛解鎖「賣場回購免運」的賣場（僅限本次下單涉及的台）。 */
+const unlockedCartSellers = computed(() => {
+  const ids = new Set(summary.value?.sellerIds ?? []);
+  return ordersStore.cartLevelUnlockedSellers.filter((s) => ids.has(s.sellerId));
+});
+/** 購物車級附註文案（帳號級已啟用時，購物車級降為一行）。 */
+const cartSellersNote = computed(() => {
+  const list = unlockedCartSellers.value;
+  if (list.length === 0) return '';
+  return list.length === 1
+    ? `本次「${list[0].sellerName}」亦符合賣場回購免運`
+    : `本次「${list[0].sellerName}」等 ${list.length} 個賣場亦符合賣場回購免運`;
+});
+/** 整個解鎖區是否要顯示（帳號級 或 有購物車級剛解鎖）。 */
+const showUnlockSection = computed(
+  () => showFreeShippingUnlock.value || unlockedCartSellers.value.length > 0,
+);
 /** 付款方式為 LINE Pay 時，以 logo 圖取代文字顯示。 */
 const LINE_PAY_LOGO = `${import.meta.env.BASE_URL}partners/linepay.png`;
 const isLinePay = computed(() => summary.value?.paymentMethod === 'LINE Pay');
@@ -64,6 +94,74 @@ const handleGoOrders = () => {
           @click="handleGoOrders"
         />
       </div>
+
+      <!-- 期間首購後免運：解鎖提醒（帳號級為主，購物車級降為附註） -->
+      <section
+        v-if="showUnlockSection"
+        class="shadow-card flex flex-col gap-3 rounded-xl p-4 @3xl:p-5"
+        style="
+          background: var(--primary-surface);
+          border: 1px solid var(--primary);
+        "
+      >
+        <!-- 帳號級（全站）大標 -->
+        <div v-if="showFreeShippingUnlock" class="flex items-start gap-3">
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            style="background: var(--primary)"
+          >
+            <i class="pi pi-truck text-lg text-white" />
+          </div>
+          <div class="flex min-w-0 flex-col gap-1">
+            <p class="text-base font-bold" style="color: var(--primary)">
+              已解鎖「期間首購後免運」
+            </p>
+            <p class="text-sm text-slate-700">
+              檔期內你的下一筆訂單起，<span class="font-semibold"
+                >全站所有賣場</span
+              >皆享 <span class="font-semibold">免運費</span>，不限金額。檔期至
+              {{ freeShippingEndLabel }}，把握機會回來逛逛！
+            </p>
+            <p class="text-xs text-slate-500">
+              <i class="pi pi-clock mr-1" />剩 {{ freeShippingDaysLeft }} 天
+            </p>
+            <!-- 購物車級降為一行附註（帳號級已涵蓋全站） -->
+            <p v-if="cartSellersNote" class="text-xs text-slate-500">
+              <i class="pi pi-truck mr-1" style="color: var(--primary)" />{{
+                cartSellersNote
+              }}
+            </p>
+          </div>
+        </div>
+
+        <!-- 僅購物車級（無帳號級）：逐台列出賣場 + 各自到期日 -->
+        <template v-else>
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              style="background: var(--primary)"
+            >
+              <i class="pi pi-truck text-lg text-white" />
+            </div>
+            <p class="text-base font-bold" style="color: var(--primary)">
+              已解鎖「賣場回購免運」
+            </p>
+          </div>
+          <ul class="flex flex-col gap-2 pl-1">
+            <li
+              v-for="s in unlockedCartSellers"
+              :key="s.sellerId"
+              class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-700"
+            >
+              <span class="font-semibold">{{ s.sellerName }}</span>
+              <span>下一筆訂單起免運</span>
+              <span class="text-xs text-slate-500"
+                >檔期至 {{ s.endLabel }}（剩 {{ s.daysLeft }} 天）</span
+              >
+            </li>
+          </ul>
+        </template>
+      </section>
 
       <!-- Order info -->
       <section class="shadow-card rounded-xl bg-white">

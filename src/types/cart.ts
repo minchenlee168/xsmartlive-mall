@@ -92,6 +92,10 @@ export type CheckoutMode = 'default' | 'pickable' | 'abandon' | 'paused';
 export interface CartGroup {
   id: number;
   sellerName: string;
+  /** 賣家 / 場次穩定識別碼；用於「賣場回購免運」逐台判定（跨訂單綁同一台）。 */
+  sellerId?: string;
+  /** 這台是否開啟「賣場回購免運」活動（由購物車設定每台開關控制）。 */
+  freeShippingReturn?: boolean;
   tags: CartTag[];
   items: CartItem[];
   /** 該賣家 / 場次支援的運送方式；合併結帳時取所有 group 的交集 */
