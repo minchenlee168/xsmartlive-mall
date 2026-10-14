@@ -1375,7 +1375,7 @@ const handleGoProduct = (productId?: number) => {
           <span
             v-else-if="freeShippingHintByGroup[group.id]!.type === 'cart-unlocked'"
           >
-            本賣場回購免運已啟用，本台結帳即享免運．檔期至
+            首購後免運已啟用，本台結帳即享免運．檔期至
             {{ freeShippingHintByGroup[group.id]!.endLabel }}（剩
             {{ freeShippingHintByGroup[group.id]!.daysLeft }} 天）
           </span>
