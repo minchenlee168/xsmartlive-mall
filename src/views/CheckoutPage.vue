@@ -1081,6 +1081,72 @@ const drawerGroups = computed(() =>
     ? checkoutGroups.value.filter((g) => g.id === shipDrawerGroupId.value)
     : checkoutGroups.value,
 );
+/**
+ * 抽屜內：給定「方式＋目的地」的 shipKey，該組是否可享免運（純預覽，不改狀態）。
+ * 期間首購後免運看方式＋地址；門檻型（滿額/滿件/單品/滿千）與方式/地址無關；偏遠一律不免。
+ */
+const shipKeyFreeForGroup = (
+  g: CheckoutGroup,
+  method: ShippingMethodId,
+  destId: string,
+  destAddress: string,
+): boolean => {
+  if (destAddress && isRemoteArea(destAddress)) return false;
+  const shipKey = `${method}|${destId}`;
+  if (isSiteWideFreeShippingOn.value) {
+    switch (ordersStore.siteWideFreeShipping.type) {
+      case 'period':
+        return true;
+      case 'first-purchase':
+        return !ordersStore.hasAnyReturnWindowOrder;
+      case 'first-purchase-then-free':
+        return (
+          ordersStore.hasAnyReturnWindowOrder &&
+          ordersStore.siteWideBaselineKeys.includes(shipKey)
+        );
+      case 'min-amount':
+        return groupAfterBulk(g) >= SITE_WIDE_MIN_AMOUNT;
+      case 'min-qty':
+        return g.items.reduce((s, i) => s + i.qty, 0) >= SITE_WIDE_MIN_QTY;
+      case 'single-item':
+        return g.items.some(
+          (i) =>
+            i.productId != null &&
+            SITE_WIDE_FREE_SHIPPING_PRODUCT_IDS.includes(i.productId),
+        );
+      default:
+        return false;
+    }
+  }
+  if (isFirstPurchaseFreeShipping.value) return true;
+  if (groupCartLevelUnlocked(g)) {
+    return ordersStore.cartLevelBaselineKey(g.sellerId) === shipKey;
+  }
+  if (groupHasCartCampaign(g)) return false;
+  return isGroupFreeShipping(g);
+};
+/** 宅配類某地址對抽屜範圍所有訂單是否皆免運（符合才標「免運」）。 */
+const drawerHomeAddrFree = (m: ShippingMethodId, addr: HomeAddress): boolean =>
+  drawerGroups.value.length > 0 &&
+  drawerGroups.value.every((g) =>
+    shipKeyFreeForGroup(g, m, addr.id, addr.address),
+  );
+/** 超商某門市對該組是否免運（店址缺省不做偏遠判定）。 */
+const drawerStoreFree = (g: CheckoutGroup, storeId: string): boolean =>
+  shipKeyFreeForGroup(g, 'store', storeId, '');
+/** 方式層級：該方式底下存在可享免運的目的地（標在方式名稱旁）。 */
+const drawerMethodFree = (m: ShippingMethodId): boolean => {
+  if (drawerGroups.value.length === 0) return false;
+  if (m === 'home' || m === 'post' || m === 'cross-border') {
+    return homeAddresses.value.some((addr) => drawerHomeAddrFree(m, addr));
+  }
+  if (m === 'store') {
+    return cvsStoreList.value.some((s) =>
+      drawerGroups.value.every((g) => drawerStoreFree(g, s.id)),
+    );
+  }
+  return false;
+};
 /** 抽屜可選的運送方式：個別訂單 → 該訂單支援的；套用全部 → 各車交集。 */
 const drawerMethods = computed<ShippingMethodId[]>(() => {
   if (shipDrawerGroupId.value == null) return supportedShippingMethods.value;
@@ -2848,9 +2914,20 @@ const handlePlaceOrder = () => {
                     }"
                     @click="handleSelectShipMethod(m)"
                   >
-                    <span class="font-medium">{{
-                      SHIPPING_METHOD_LABELS[m]
-                    }}</span>
+                    <span class="flex items-center gap-2">
+                      <span class="font-medium">{{
+                        SHIPPING_METHOD_LABELS[m]
+                      }}</span>
+                      <span
+                        v-if="drawerMethodFree(m)"
+                        class="rounded px-1.5 py-0.5 text-xs font-medium"
+                        style="
+                          background: var(--primary-surface);
+                          color: var(--primary);
+                        "
+                        >免運</span
+                      >
+                    </span>
                     <i
                       v-if="drawerSelectedMethod === m"
                       class="pi pi-check text-green-600"
@@ -2895,6 +2972,15 @@ const handlePlaceOrder = () => {
                               class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
                               style="background: var(--primary)"
                               >預設</span
+                            >
+                            <span
+                              v-if="drawerHomeAddrFree(m, addr)"
+                              class="rounded px-1.5 py-0.5 text-xs font-medium"
+                              style="
+                                background: var(--primary-surface);
+                                color: var(--primary);
+                              "
+                              >免運</span
                             >
                           </div>
                           <div
@@ -3089,9 +3175,15 @@ const handlePlaceOrder = () => {
                               class="h-5 w-5 shrink-0 object-contain"
                             />
                             <span>{{ s.storeName }}</span>
-                            <span v-if="s.chain">{{
-                              money(CVS_FEES[s.chain][g.tempLayer])
-                            }}</span>
+                            <span
+                              v-if="drawerStoreFree(g, s.id)"
+                              class="rounded px-1.5 py-0.5 text-xs font-medium"
+                              style="
+                                background: var(--primary-surface);
+                                color: var(--primary);
+                              "
+                              >免運</span
+                            >
                           </span>
                         </button>
                       </div>
