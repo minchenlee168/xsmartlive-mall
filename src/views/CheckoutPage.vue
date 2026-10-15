@@ -889,11 +889,25 @@ const applySiteWideBaselineShipping = () => {
     }
   }
 };
-/** 配送資訊那一排是否顯示「期間首購後免運」提示（全站或購物車級已解鎖）。 */
+/** 全站「期間首購後免運」已啟用但本帳號尚未首購（本筆為第一筆、需付運費）。 */
+const isSiteWideReturnTeaser = computed(
+  () =>
+    isSiteWideFreeShippingOn.value &&
+    ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
+    !isSiteWideFPThenFreeUnlocked.value,
+);
+/** 配送資訊那一排是否顯示「期間首購後免運」提示（全站已解鎖 / 未首購預告 / 購物車級已解鎖）。 */
 const showReturnFreeShippingNote = computed(
   () =>
     isSiteWideFPThenFreeUnlocked.value ||
+    isSiteWideReturnTeaser.value ||
     checkoutGroups.value.some((g) => groupCartLevelUnlocked(g)),
+);
+/** 配送資訊那一排的提示文案：未首購預告 vs 已選好免運配送。 */
+const returnFreeShippingNoteText = computed(() =>
+  isSiteWideReturnTeaser.value
+    ? '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運'
+    : '已選可享「期間首購後免運」的配送，改寄其他地址或改用其他方式需另外付運費',
 );
 /**
  * 進結帳頁時，自動把各組配送選到可享「期間首購後免運」的預設配送，
@@ -1818,9 +1832,12 @@ const handlePlaceOrder = () => {
       style="gap: var(--stack-gap)"
     >
       <!-- 全站免運活動提示（非「期間首購後免運」類型）：單行活動說明。
-           「期間首購後免運」的提示改放在下方配送資訊那一排，並自動套好免運配送。 -->
+           「期間首購後免運」的提示（含未首購預告）改放在下方配送資訊那一排。 -->
       <section
-        v-if="isSiteWideFreeShippingOn && !isSiteWideFPThenFreeUnlocked"
+        v-if="
+          isSiteWideFreeShippingOn &&
+          ordersStore.siteWideFreeShipping.type !== 'first-purchase-then-free'
+        "
         class="shadow-card flex flex-wrap items-center gap-3 rounded-xl p-4"
         style="
           background: var(--primary-surface);
@@ -1852,16 +1869,14 @@ const handlePlaceOrder = () => {
             role="button"
             aria-label="配送方式說明"
           />
-          <!-- 期間首購後免運：已自動選好可免運的配送，提示改寄其他地址/方式需付運費 -->
+          <!-- 期間首購後免運：未首購預告 / 已自動選好免運配送 -->
           <span
             v-if="showReturnFreeShippingNote"
             class="flex min-w-0 items-center gap-1 text-xs"
             style="color: var(--primary)"
           >
             <i class="pi pi-truck shrink-0" />
-            <span class="min-w-0"
-              >已選可享「期間首購後免運」的配送，改寄其他地址或改用其他方式需另外付運費</span
-            >
+            <span class="min-w-0">{{ returnFreeShippingNoteText }}</span>
           </span>
         </div>
         <div class="card-pad flex flex-col gap-2">

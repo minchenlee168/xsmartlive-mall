@@ -13,11 +13,6 @@ import {
 import { useUiStore } from '../pinia/ui';
 import { useViewportStore } from '../pinia/viewport';
 import { useOrdersStore } from '../pinia/orders';
-import {
-  isReturnWindowActive,
-  returnWindowEndLabel,
-  returnWindowDaysLeft,
-} from '../data/freeShippingCampaign';
 import { products, type PickOption } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
 import { useMoney } from '../composables/useMoney';
@@ -247,40 +242,25 @@ const cart = useCartStore();
 const ordersStore = useOrdersStore();
 
 /**
- * 購物車頁的免運提示（逐台）：這裡是「資格預告」不是價格列（還沒選運送、算不出運費）。
- * 擇優：帳號級（全站）＞ 購物車級已解鎖 ＞ 購物車級未解鎖（誠實預告本台首筆仍付運費）。
+ * 購物車頁的免運提示（逐台）：僅保留帳號級（全站首購免運）資格預告。
+ * 「期間首購後免運」（全站與指定購物車）的提示改由結帳頁配送資訊列統一呈現，
+ * 購物車頁不再預告。
  */
 type FreeShippingHint = {
-  type: 'account' | 'cart-unlocked' | 'cart-teaser';
+  type: 'account';
   endLabel: string;
   daysLeft: number;
 };
 const freeShippingHintByGroup = computed(() => {
-  const now = new Date();
   const map: Record<number, FreeShippingHint | null> = {};
   for (const g of cart.groups) {
-    if (ordersStore.isFirstPurchaseFreeShippingActive) {
-      map[g.id] = {
-        type: 'account',
-        endLabel: ordersStore.freeShippingCampaignEndLabel,
-        daysLeft: ordersStore.freeShippingCampaignDaysLeft,
-      };
-    } else if (
-      !ordersStore.siteWideFreeShipping.enabled &&
-      g.freeShippingReturn &&
-      isReturnWindowActive(now)
-    ) {
-      // 全站免運啟用時，指定購物車的「期間首購後免運」休眠 → 不顯示本提示
-      map[g.id] = {
-        type: ordersStore.isCartLevelFreeShippingActive(g.sellerId)
-          ? 'cart-unlocked'
-          : 'cart-teaser',
-        endLabel: returnWindowEndLabel(),
-        daysLeft: returnWindowDaysLeft(now),
-      };
-    } else {
-      map[g.id] = null;
-    }
+    map[g.id] = ordersStore.isFirstPurchaseFreeShippingActive
+      ? {
+          type: 'account',
+          endLabel: ordersStore.freeShippingCampaignEndLabel,
+          daysLeft: ordersStore.freeShippingCampaignDaysLeft,
+        }
+      : null;
   }
   return map;
 });
@@ -1358,7 +1338,7 @@ const handleGoProduct = (productId?: number) => {
           <span>直播 / 團購棄標流程：可放棄先前喊下的品項以釋出庫存。</span>
         </div>
 
-        <!-- 免運提示（逐台）：已啟用與未解鎖預告皆用主色系 -->
+        <!-- 免運提示（逐台）：僅帳號級全站首購免運；用主色系 -->
         <div
           v-if="freeShippingHintByGroup[group.id]"
           class="flex items-center gap-2 border-b px-[var(--card-pad)] py-2 text-sm"
@@ -1369,23 +1349,10 @@ const handleGoProduct = (productId?: number) => {
           "
         >
           <i class="pi pi-truck" />
-          <span v-if="freeShippingHintByGroup[group.id]!.type === 'account'">
+          <span>
             全站首購免運已啟用，本台結帳即享免運．檔期至
             {{ freeShippingHintByGroup[group.id]!.endLabel }}（剩
             {{ freeShippingHintByGroup[group.id]!.daysLeft }} 天）
-          </span>
-          <span
-            v-else-if="
-              freeShippingHintByGroup[group.id]!.type === 'cart-unlocked'
-            "
-          >
-            期間首購後免運已啟用，本台結帳即享免運．檔期至
-            {{ freeShippingHintByGroup[group.id]!.endLabel }}（剩
-            {{ freeShippingHintByGroup[group.id]!.daysLeft }} 天）
-          </span>
-          <span v-else>
-            活動期間買幾次都行，運費只付第一筆，檔期至
-            {{ freeShippingHintByGroup[group.id]!.endLabel }}
           </span>
         </div>
 
