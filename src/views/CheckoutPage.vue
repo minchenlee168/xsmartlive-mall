@@ -692,14 +692,6 @@ const groupFreeShippingReason = (
   return 'threshold';
 };
 /**
- * 該台掛「期間首購後免運」活動、尚未首購、且無帳號級涵蓋 → 本次為第一筆、需付運費的預告。
- * 以「資格」判定（不綁已選配送），讓一進結帳頁、尚未選配送方式時就能在配送資訊列提示。
- */
-const isGroupCartReturnTeaser = (g: CheckoutGroup): boolean =>
-  groupHasCartCampaign(g) &&
-  !groupCartLevelUnlocked(g) &&
-  !isFirstPurchaseFreeShipping.value;
-/**
  * 是否顯示「配送方式／地址與首筆不同」提示：該台已首購、但本筆配送/地址與首筆不符
  * → 不享免運、照付運費，誠實說明原因。
  */
@@ -755,28 +747,23 @@ const isSiteWideReturnTeaser = computed(
     ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
     !isSiteWideFPThenFreeUnlocked.value,
 );
-/** 配送資訊那一排是否顯示「期間首購後免運」提示（全站未首購/已首購、購物車級各狀態）。 */
+/**
+ * 配送資訊那一排是否顯示「期間首購後免運」提示：僅全站（未首購/已首購）。
+ * 指定購物車（購物車級）不在此列提示。
+ */
 const showReturnFreeShippingNote = computed(
-  () =>
-    isSiteWideFPThenFreeUnlocked.value ||
-    isSiteWideReturnTeaser.value ||
-    checkoutGroups.value.some(
-      (g) => groupCartLevelUnlocked(g) || isGroupCartReturnTeaser(g),
-    ),
+  () => isSiteWideFPThenFreeUnlocked.value || isSiteWideReturnTeaser.value,
 );
 /**
- * 配送資訊那一排的提示文案：
- * - 期間首購後免運．未首購（第一筆）→ 預告第一筆付運費、之後免運。
- * - 期間首購後免運．已首購（第二筆起）→ 不代選，提示「選與首購相同的配送即免運」。
+ * 配送資訊那一排的提示文案（全站期間首購後免運）：
+ * - 未首購（第一筆）→ 預告第一筆付運費、之後免運。
+ * - 已首購（第二筆起）→ 不代選，提示「選與首購相同的配送即免運」。
  */
-const returnFreeShippingNoteText = computed(() => {
-  const isTeaser =
-    isSiteWideReturnTeaser.value ||
-    checkoutGroups.value.some((g) => isGroupCartReturnTeaser(g));
-  return isTeaser
+const returnFreeShippingNoteText = computed(() =>
+  isSiteWideReturnTeaser.value
     ? '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運'
-    : '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費';
-});
+    : '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費',
+);
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
   switch (groupFreeShippingReason(g)) {
@@ -1087,9 +1074,8 @@ const shipKeyFreeForGroup = (
     }
   }
   if (isFirstPurchaseFreeShipping.value) return true;
-  if (groupCartLevelUnlocked(g)) {
-    return ordersStore.cartLevelBaselineKey(g.sellerId) === shipKey;
-  }
+  // 指定購物車（購物車級）期間首購後免運：抽屜不提示免運（依使用者需求）；
+  // 其掛活動的台一律不在抽屜標免運，實際免運仍由費用列呈現。
   if (groupHasCartCampaign(g)) return false;
   return isGroupFreeShipping(g);
 };
