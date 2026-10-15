@@ -1766,22 +1766,14 @@ const handleConfirmPayWithoutFreeShip = () => {
           <!-- 期間首購後免運：整條淺主色提示（全站每台、指定購物車僅該台） -->
           <div
             v-if="isSiteWideFPThenFree || groupHasCartCampaign(group)"
-            class="flex items-center gap-1.5 px-4 py-2 text-xs font-medium"
+            class="flex items-start gap-1.5 px-4 py-2 text-xs"
             style="background: var(--primary-surface); color: var(--primary)"
           >
-            <i class="pi pi-truck" />
-            期間首購後免運
-            <i
-              v-tooltip.top="{
-                value:
-                  '活動期間，寄送到與首購相同的配送方式與地址即免運；改用其他配送方式或地址則照收運費。',
-                event: 'focus',
-              }"
-              class="pi pi-info-circle cursor-pointer"
-              tabindex="0"
-              role="button"
-              aria-label="期間首購後免運說明"
-            />
+            <i class="pi pi-truck mt-0.5 shrink-0" />
+            <span class="min-w-0"
+              ><span class="font-semibold">期間首購後免運</span
+              >：配送選擇與首購相同地點享免運</span
+            >
           </div>
         </div>
         <div
