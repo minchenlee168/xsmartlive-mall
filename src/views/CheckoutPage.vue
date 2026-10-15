@@ -590,29 +590,6 @@ const groupShipKey = (g: CheckoutGroup): string => {
 const isSiteWideFreeShippingOn = computed(
   () => ordersStore.siteWideFreeShipping.enabled,
 );
-/** 全站免運活動名稱（依類型）。 */
-const siteWideHintLabel = computed(() =>
-  siteWideFreeShippingLabel(ordersStore.siteWideFreeShipping.type),
-);
-/** 全站免運活動說明（結帳頁頂部提示用）。 */
-const siteWideHintDesc = computed(() => {
-  switch (ordersStore.siteWideFreeShipping.type) {
-    case 'first-purchase-then-free':
-      return '第一筆付運費，之後每筆免運';
-    case 'first-purchase':
-      return '新客第一筆即享免運';
-    case 'min-amount':
-      return `單筆滿 ${SITE_WIDE_MIN_AMOUNT} 元免運`;
-    case 'min-qty':
-      return `單筆滿 ${SITE_WIDE_MIN_QTY} 件免運`;
-    case 'single-item':
-      return '購買指定商品即享免運';
-    case 'period':
-      return '活動期間全站免運';
-    default:
-      return '';
-  }
-});
 /** 該組是否符合全站免運（依選定類型；未啟用回 false）。 */
 const groupSiteWideFreeShipping = (g: CheckoutGroup): boolean => {
   if (!isSiteWideFreeShippingOn.value) return false;
@@ -1125,8 +1102,9 @@ const shipKeyFreeForGroup = (
   if (groupHasCartCampaign(g)) return false;
   return isGroupFreeShipping(g);
 };
-/** 宅配類某地址對抽屜範圍所有訂單是否皆免運（符合才標「免運」）。 */
+/** 宅配類某地址對抽屜範圍所有訂單是否皆免運（不可配送地址不算、符合才標「免運」）。 */
 const drawerHomeAddrFree = (m: ShippingMethodId, addr: HomeAddress): boolean =>
+  !addr.unavailable &&
   drawerGroups.value.length > 0 &&
   drawerGroups.value.every((g) =>
     shipKeyFreeForGroup(g, m, addr.id, addr.address),
@@ -1134,18 +1112,32 @@ const drawerHomeAddrFree = (m: ShippingMethodId, addr: HomeAddress): boolean =>
 /** 超商某門市對該組是否免運（店址缺省不做偏遠判定）。 */
 const drawerStoreFree = (g: CheckoutGroup, storeId: string): boolean =>
   shipKeyFreeForGroup(g, 'store', storeId, '');
-/** 方式層級：該方式底下存在可享免運的目的地（標在方式名稱旁）。 */
-const drawerMethodFree = (m: ShippingMethodId): boolean => {
-  if (drawerGroups.value.length === 0) return false;
+/**
+ * 方式層級免運程度：
+ * - 'all'：該方式底下所有可選地址/門市都免運 → 標「免運」。
+ * - 'some'：只有部分地址/門市免運（如期間首購後免運只符合首購那一個地址）→ 標「部分免運」。
+ * - 'none'：都不免運 → 不標。
+ */
+const drawerMethodFreeLevel = (
+  m: ShippingMethodId,
+): 'all' | 'some' | 'none' => {
+  if (drawerGroups.value.length === 0) return 'none';
+  let options: boolean[];
   if (m === 'home' || m === 'post' || m === 'cross-border') {
-    return homeAddresses.value.some((addr) => drawerHomeAddrFree(m, addr));
-  }
-  if (m === 'store') {
-    return cvsStoreList.value.some((s) =>
+    // 只看可配送的地址：不可配送地址無法選、不計入全部/部分判定
+    options = homeAddresses.value
+      .filter((addr) => !addr.unavailable)
+      .map((addr) => drawerHomeAddrFree(m, addr));
+  } else if (m === 'store') {
+    options = cvsStoreList.value.map((s) =>
       drawerGroups.value.every((g) => drawerStoreFree(g, s.id)),
     );
+  } else {
+    return 'none';
   }
-  return false;
+  const freeCount = options.filter(Boolean).length;
+  if (options.length === 0 || freeCount === 0) return 'none';
+  return freeCount === options.length ? 'all' : 'some';
 };
 /** 抽屜可選的運送方式：個別訂單 → 該訂單支援的；套用全部 → 各車交集。 */
 const drawerMethods = computed<ShippingMethodId[]>(() => {
@@ -1767,28 +1759,6 @@ const handlePlaceOrder = () => {
       class="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--page-pad-x)] pb-[120px] @7xl:px-0"
       style="gap: var(--stack-gap)"
     >
-      <!-- 全站免運活動提示（非「期間首購後免運」類型）：單行活動說明。
-           「期間首購後免運」的提示（含未首購預告）改放在下方配送資訊那一排。 -->
-      <section
-        v-if="
-          isSiteWideFreeShippingOn &&
-          ordersStore.siteWideFreeShipping.type !== 'first-purchase-then-free'
-        "
-        class="shadow-card flex flex-wrap items-center gap-3 rounded-xl p-4"
-        style="
-          background: var(--primary-surface);
-          border: 1px solid var(--primary);
-        "
-      >
-        <i class="pi pi-truck text-lg" style="color: var(--primary)" />
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-semibold" style="color: var(--primary)">
-            全站免運活動：{{ siteWideHintLabel }}
-          </p>
-          <p class="mt-0.5 text-xs text-slate-600">{{ siteWideHintDesc }}</p>
-        </div>
-      </section>
-
       <!-- 配送資訊（套用全部入口；各訂單仍可於下方明細個別調整） -->
       <section class="shadow-card overflow-hidden rounded-xl bg-white">
         <div
@@ -2914,24 +2884,26 @@ const handlePlaceOrder = () => {
                     }"
                     @click="handleSelectShipMethod(m)"
                   >
+                    <span class="font-medium">{{
+                      SHIPPING_METHOD_LABELS[m]
+                    }}</span>
                     <span class="flex items-center gap-2">
-                      <span class="font-medium">{{
-                        SHIPPING_METHOD_LABELS[m]
-                      }}</span>
                       <span
-                        v-if="drawerMethodFree(m)"
-                        class="rounded px-1.5 py-0.5 text-xs font-medium"
-                        style="
-                          background: var(--primary-surface);
-                          color: var(--primary);
-                        "
+                        v-if="drawerMethodFreeLevel(m) === 'all'"
+                        class="text-xs font-medium"
+                        style="color: var(--primary)"
                         >免運</span
                       >
+                      <span
+                        v-else-if="drawerMethodFreeLevel(m) === 'some'"
+                        class="text-xs font-medium text-red-500"
+                        >部分免運</span
+                      >
+                      <i
+                        v-if="drawerSelectedMethod === m"
+                        class="pi pi-check text-green-600"
+                      />
                     </span>
-                    <i
-                      v-if="drawerSelectedMethod === m"
-                      class="pi pi-check text-green-600"
-                    />
                   </Button>
 
                   <!-- 宅配 / 郵局宅配 / 跨境：共用收件地址清單 -->
