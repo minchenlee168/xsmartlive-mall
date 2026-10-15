@@ -1414,19 +1414,14 @@ const handleGoProduct = (productId?: number) => {
           <span>直播 / 團購棄標流程：可放棄先前喊下的品項以釋出庫存。</span>
         </div>
 
-        <!-- 免運提示（逐台）：已啟用用主色系；未解鎖預告用中性灰（尚未免運、本筆仍付） -->
+        <!-- 免運提示（逐台）：已啟用與未解鎖預告皆用主色系 -->
         <div
           v-if="freeShippingHintByGroup[group.id]"
           class="flex items-center gap-2 border-b px-[var(--card-pad)] py-2 text-sm"
-          :class="
-            freeShippingHintByGroup[group.id]!.type === 'cart-teaser'
-              ? 'border-slate-200 bg-slate-50 text-slate-500'
-              : ''
-          "
-          :style="
-            freeShippingHintByGroup[group.id]!.type === 'cart-teaser'
-              ? ''
-              : 'background: var(--primary-surface); border-color: var(--primary); color: var(--primary)'
+          style="
+            background: var(--primary-surface);
+            border-color: var(--primary);
+            color: var(--primary);
           "
         >
           <i class="pi pi-truck" />

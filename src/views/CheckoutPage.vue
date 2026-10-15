@@ -2117,11 +2117,12 @@ const handlePlaceOrder = () => {
               <!-- 期間首購後免運未解鎖預告：併入運送方式/運費列，整行換到方式下方；字多可換行 -->
               <span
                 v-else-if="showGroupCartLevelTeaser(group)"
-                class="flex w-full items-start gap-1.5 text-xs text-slate-500"
+                class="flex w-full items-start gap-1.5 text-xs"
+                style="color: var(--primary)"
               >
-                <i class="pi pi-truck mt-0.5 shrink-0 text-slate-400" />
+                <i class="pi pi-truck mt-0.5 shrink-0" />
                 <span class="min-w-0"
-                  >活動期間買幾次都行，<span class="font-medium text-slate-600"
+                  >活動期間買幾次都行，<span class="font-medium"
                     >運費只付第一筆</span
                   ></span
                 >
