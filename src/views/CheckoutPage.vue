@@ -226,6 +226,10 @@ const cartStore = useCartStore();
 const ordersStore = useOrdersStore();
 const authStore = useAuthStore();
 
+// 去付款時：若有訂單可改配送享免運卻尚未調整 → 先跳提示確認（去調整 / 仍要付款）
+const isFreeShipConfirmVisible = ref(false);
+const hasConfirmedPayWithoutFreeShip = ref(false);
+
 // 手機未綁定 → 按「去付款」時擋下，跳綁定 Dialog 走 inline 綁定流程（不離開結帳頁）
 const BIND_CODE_LENGTH = 6;
 const BIND_RESEND_COOLDOWN_SEC = 60;
@@ -720,6 +724,16 @@ const showGroupSiteWideMismatchHint = (g: CheckoutGroup): boolean =>
   isSiteWideFPThenFreeUnlocked.value &&
   !ordersStore.siteWideBaselineKeys.includes(groupShipKey(g)) &&
   groupShippingDiscount(g) <= 0;
+/**
+ * 是否有「改配送即可免運卻尚未調整」的訂單（已首購、配送與首購不同故照收運費）。
+ * 去付款時據此先跳確認，避免使用者白付可省的運費。
+ */
+const hasMissedFreeShipping = computed(() =>
+  checkoutGroups.value.some(
+    (g) =>
+      showGroupSiteWideMismatchHint(g) || showGroupCartLevelMismatchHint(g),
+  ),
+);
 
 // ── 期間首購後免運：一鍵套用首購配送 ───────────────────────────────────────
 /** shipKey → 可讀說明（配送方式 · 地址/門市/取貨點）。 */
@@ -1594,6 +1608,11 @@ const handlePlaceOrder = () => {
       return;
     }
   }
+  // 有可改配送享免運卻未調整 → 先跳確認（去調整 / 仍要付款）；確認後再跑一次本函式
+  if (hasMissedFreeShipping.value && !hasConfirmedPayWithoutFreeShip.value) {
+    isFreeShipConfirmVisible.value = true;
+    return;
+  }
   // 未完成手機驗證 → 攔下、開 inline 驗證 Dialog；驗證完會自動再跑一次這個函式
   if (!authStore.hasPhoneBound) {
     openBindPhoneDialog();
@@ -1709,6 +1728,17 @@ const handlePlaceOrder = () => {
     ui.toast('付款成功');
     router.push('/payment-success');
   }
+};
+
+/** 免運確認：關閉提示，讓使用者自行調整配送（amber 提示已標出哪些訂單）。 */
+const handleGoAdjustShipping = () => {
+  isFreeShipConfirmVisible.value = false;
+};
+/** 免運確認：仍要付款 → 記旗標、關閉提示，再跑一次結帳流程（略過本提示）。 */
+const handleConfirmPayWithoutFreeShip = () => {
+  hasConfirmedPayWithoutFreeShip.value = true;
+  isFreeShipConfirmVisible.value = false;
+  handlePlaceOrder();
 };
 </script>
 
@@ -2439,6 +2469,38 @@ const handlePlaceOrder = () => {
         />
       </div>
     </div>
+
+    <!-- ============== 去付款前：有可享免運卻未調整配送 → 提示確認 ============== -->
+    <Dialog
+      v-model:visible="isFreeShipConfirmVisible"
+      modal
+      :draggable="false"
+      :style="{ width: '420px' }"
+      :breakpoints="{ '768px': '92vw' }"
+    >
+      <template #header>
+        <span class="text-base font-bold text-slate-950"
+          >有可享免運的配送選擇</span
+        >
+      </template>
+      <div class="flex items-start gap-3 py-1">
+        <i class="pi pi-truck mt-0.5 text-lg" style="color: var(--primary)" />
+        <p class="text-sm text-slate-600">
+          部分訂單改用與首購相同的配送方式與地址即可免運，確定不調整直接付款嗎？
+        </p>
+      </div>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <Button
+            label="仍要付款"
+            severity="secondary"
+            text
+            @click="handleConfirmPayWithoutFreeShip"
+          />
+          <Button label="去調整" @click="handleGoAdjustShipping" />
+        </div>
+      </template>
+    </Dialog>
 
     <!-- ============== 綁定手機 Dialog（inline 流程，綁完直接回到結帳） ============== -->
     <Dialog
