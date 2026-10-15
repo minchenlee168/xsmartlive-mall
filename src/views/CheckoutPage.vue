@@ -769,23 +769,34 @@ const isSiteWideReturnTeaser = computed(
     ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
     !isSiteWideFPThenFreeUnlocked.value,
 );
-/** 配送資訊那一排是否顯示「期間首購後免運」提示（全站已解鎖 / 未首購預告 / 購物車級已解鎖）。 */
+/** 全站「首購免運」啟用、且本帳號還沒買第一筆（新客）→ 本次全部配送免運。 */
+const isSiteWideFirstPurchaseActive = computed(
+  () =>
+    isSiteWideFreeShippingOn.value &&
+    ordersStore.siteWideFreeShipping.type === 'first-purchase' &&
+    !ordersStore.hasAnyReturnWindowOrder,
+);
+/** 配送資訊那一排是否顯示免運提示（首購免運 / 期間首購後免運各狀態）。 */
 const showReturnFreeShippingNote = computed(
   () =>
+    isSiteWideFirstPurchaseActive.value ||
     isSiteWideFPThenFreeUnlocked.value ||
     isSiteWideReturnTeaser.value ||
     checkoutGroups.value.some((g) => groupCartLevelUnlocked(g)),
 );
 /**
  * 配送資訊那一排的提示文案：
- * - 未首購（第一筆）→ 預告第一筆付運費、之後免運。
- * - 已首購（第二筆起）→ 不代選，只提示「選與首購相同的配送即免運」，由使用者自行選。
+ * - 首購免運（還沒買第一筆）→ 本次全部配送免運。
+ * - 期間首購後免運．未首購（第一筆）→ 預告第一筆付運費、之後免運。
+ * - 期間首購後免運．已首購（第二筆起）→ 不代選，提示「選與首購相同的配送即免運」。
  */
-const returnFreeShippingNoteText = computed(() =>
-  isSiteWideReturnTeaser.value
-    ? '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運'
-    : '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費',
-);
+const returnFreeShippingNoteText = computed(() => {
+  if (isSiteWideFirstPurchaseActive.value)
+    return '新客首購免運，本次結帳所有配送方式皆免運';
+  if (isSiteWideReturnTeaser.value)
+    return '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運';
+  return '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費';
+});
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
   switch (groupFreeShippingReason(g)) {
