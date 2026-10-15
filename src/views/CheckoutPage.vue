@@ -643,6 +643,16 @@ const groupHasCartCampaign = (g: CheckoutGroup): boolean =>
   !isSiteWideFreeShippingOn.value &&
   !!g.freeShippingReturn &&
   isReturnWindowActive(new Date());
+/**
+ * 是否有任一購物車掛「期間首購後免運」活動且檔期窗進行中（全站免運啟用時不算）。
+ * 不會同時有兩個檔期的免運活動 → 此活動進行中時，滿千免運門檻休眠（其他台也不吃滿千）。
+ */
+const isCartLevelCampaignRunning = computed(
+  () =>
+    !isSiteWideFreeShippingOn.value &&
+    isReturnWindowActive(new Date()) &&
+    cartStore.groups.some((g) => g.freeShippingReturn),
+);
 /** 該組目前配送目的地的地址字串（宅配/郵局/跨境用宅配地址、超商用門市地址；自取不計）。 */
 const groupDeliveryAddress = (g: CheckoutGroup): string => {
   switch (groupShipMethod(g)) {
@@ -664,7 +674,8 @@ const groupIsRemoteArea = (g: CheckoutGroup): boolean =>
  * - 帳號級首購 或 已解鎖的首購後免運 → 免運。
  * - 掛了首購後免運、尚未解鎖的台（首筆）→ 一律不免運（連滿千門檻也不吃），
  *   讓首筆必付運費以觸發回購免運。
- * - 一般台 → 走滿千免運門檻。
+ * - 有購物車級首購後免運活動進行中 → 不同時有兩檔期，其他台也不吃滿千。
+ * - 無上述活動的一般台 → 走滿千免運門檻。
  */
 const groupShippingDiscount = (g: CheckoutGroup): number => {
   const fee = groupShippingFee(g);
@@ -679,7 +690,8 @@ const groupShippingDiscount = (g: CheckoutGroup): number => {
   if (isFirstPurchaseFreeShipping.value || isGroupCartLevelFreeShipping(g)) {
     return fee;
   }
-  if (groupHasCartCampaign(g)) return 0;
+  // 購物車級首購後免運活動進行中 → 滿千門檻整個休眠（含未解鎖的活動台與其他台）
+  if (isCartLevelCampaignRunning.value) return 0;
   return isGroupFreeShipping(g) ? fee : 0;
 };
 /**
