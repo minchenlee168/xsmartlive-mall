@@ -692,16 +692,13 @@ const groupFreeShippingReason = (
   return 'threshold';
 };
 /**
- * 是否顯示「期間首購後免運」的未解鎖預告：該台掛活動、尚未首購、且無帳號級涵蓋、本筆需付運費。
- * 誠實告知「本筆為首筆要付、下一筆起免運」，避免下單後落差。
+ * 該台掛「期間首購後免運」活動、尚未首購、且無帳號級涵蓋 → 本次為第一筆、需付運費的預告。
+ * 以「資格」判定（不綁已選配送），讓一進結帳頁、尚未選配送方式時就能在配送資訊列提示。
  */
-const showGroupCartLevelTeaser = (g: CheckoutGroup): boolean =>
-  groupHasShippingFee(g) &&
-  !groupIsRemoteArea(g) &&
+const isGroupCartReturnTeaser = (g: CheckoutGroup): boolean =>
   groupHasCartCampaign(g) &&
   !groupCartLevelUnlocked(g) &&
-  !isFirstPurchaseFreeShipping.value &&
-  groupShippingDiscount(g) <= 0;
+  !isFirstPurchaseFreeShipping.value;
 /**
  * 是否顯示「配送方式／地址與首筆不同」提示：該台已首購、但本筆配送/地址與首筆不符
  * → 不享免運、照付運費，誠實說明原因。
@@ -717,17 +714,6 @@ const showGroupCartLevelMismatchHint = (g: CheckoutGroup): boolean =>
 /** 是否顯示「偏遠地區不適用免運」提示（最優先，壓過其他免運提示）。 */
 const showGroupRemoteAreaHint = (g: CheckoutGroup): boolean =>
   groupHasShippingFee(g) && groupIsRemoteArea(g);
-/**
- * 全站「期間首購後免運」的首筆預告：活動啟用、檔期內尚未下過第一筆 → 本筆付運費、之後免運。
- * 誠實說明「第一筆付運費」，避免顯示「未達免運門檻」造成誤解。
- */
-const showGroupSiteWideFirstPurchaseTeaser = (g: CheckoutGroup): boolean =>
-  groupHasShippingFee(g) &&
-  !groupIsRemoteArea(g) &&
-  isSiteWideFreeShippingOn.value &&
-  ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
-  !ordersStore.hasAnyReturnWindowOrder &&
-  groupShippingDiscount(g) <= 0;
 /** 全站「期間首購後免運」是否進行中且已首購（有基準）。 */
 const isSiteWideFPThenFreeUnlocked = computed(
   () =>
@@ -769,33 +755,27 @@ const isSiteWideReturnTeaser = computed(
     ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
     !isSiteWideFPThenFreeUnlocked.value,
 );
-/** 全站「首購免運」啟用、且本帳號還沒買第一筆（新客）→ 本次全部配送免運。 */
-const isSiteWideFirstPurchaseActive = computed(
-  () =>
-    isSiteWideFreeShippingOn.value &&
-    ordersStore.siteWideFreeShipping.type === 'first-purchase' &&
-    !ordersStore.hasAnyReturnWindowOrder,
-);
-/** 配送資訊那一排是否顯示免運提示（首購免運 / 期間首購後免運各狀態）。 */
+/** 配送資訊那一排是否顯示「期間首購後免運」提示（全站未首購/已首購、購物車級各狀態）。 */
 const showReturnFreeShippingNote = computed(
   () =>
-    isSiteWideFirstPurchaseActive.value ||
     isSiteWideFPThenFreeUnlocked.value ||
     isSiteWideReturnTeaser.value ||
-    checkoutGroups.value.some((g) => groupCartLevelUnlocked(g)),
+    checkoutGroups.value.some(
+      (g) => groupCartLevelUnlocked(g) || isGroupCartReturnTeaser(g),
+    ),
 );
 /**
  * 配送資訊那一排的提示文案：
- * - 首購免運（還沒買第一筆）→ 本次全部配送免運。
  * - 期間首購後免運．未首購（第一筆）→ 預告第一筆付運費、之後免運。
  * - 期間首購後免運．已首購（第二筆起）→ 不代選，提示「選與首購相同的配送即免運」。
  */
 const returnFreeShippingNoteText = computed(() => {
-  if (isSiteWideFirstPurchaseActive.value)
-    return '新客首購免運，本次結帳所有配送方式皆免運';
-  if (isSiteWideReturnTeaser.value)
-    return '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運';
-  return '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費';
+  const isTeaser =
+    isSiteWideReturnTeaser.value ||
+    checkoutGroups.value.some((g) => isGroupCartReturnTeaser(g));
+  return isTeaser
+    ? '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運'
+    : '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費';
 });
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
@@ -2021,19 +2001,6 @@ const handlePlaceOrder = () => {
                   >，本單照收運費</span
                 >
               </span>
-              <!-- 全站「期間首購後免運」首筆預告：第一筆付、之後免運 -->
-              <span
-                v-else-if="showGroupSiteWideFirstPurchaseTeaser(group)"
-                class="flex w-full items-start gap-1.5 text-xs text-slate-500"
-              >
-                <i class="pi pi-truck mt-0.5 shrink-0 text-slate-400" />
-                <span class="min-w-0"
-                  >全站活動：本筆為第一筆需付運費，<span
-                    class="font-medium text-slate-600"
-                    >之後每筆免運</span
-                  ></span
-                >
-              </span>
               <!-- 全站首購後免運：已首購但配送與首筆不同 → 本筆照收運費 -->
               <span
                 v-else-if="showGroupSiteWideMismatchHint(group)"
@@ -2044,19 +2011,6 @@ const handlePlaceOrder = () => {
                   >本筆免運需與<span class="font-medium text-slate-600"
                     >首購相同的配送方式與地址</span
                   >，本次不同故照收運費</span
-                >
-              </span>
-              <!-- 期間首購後免運未解鎖預告：併入運送方式/運費列，整行換到方式下方；字多可換行 -->
-              <span
-                v-else-if="showGroupCartLevelTeaser(group)"
-                class="flex w-full items-start gap-1.5 text-xs"
-                style="color: var(--primary)"
-              >
-                <i class="pi pi-truck mt-0.5 shrink-0" />
-                <span class="min-w-0"
-                  >活動期間買幾次都行，<span class="font-medium"
-                    >運費只付第一筆</span
-                  ></span
                 >
               </span>
               <!-- 已首購但配送方式／地址與首筆不同 → 本筆不免運，誠實說明 -->
