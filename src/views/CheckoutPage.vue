@@ -1768,6 +1768,17 @@ const handleConfirmPayWithoutFreeShip = () => {
           >
             <i class="pi pi-truck" />
             期間首購後免運
+            <i
+              v-tooltip.top="{
+                value:
+                  '活動期間，寄送到與首購相同的配送方式與地址即免運；改用其他配送方式或地址則照收運費。',
+                event: 'focus',
+              }"
+              class="pi pi-info-circle cursor-pointer"
+              tabindex="0"
+              role="button"
+              aria-label="期間首購後免運說明"
+            />
           </span>
         </div>
         <div
@@ -1948,30 +1959,6 @@ const handleConfirmPayWithoutFreeShip = () => {
                   >本筆為活動第一筆、需付運費，<span class="font-medium"
                     >之後寄送同一地址即免運</span
                   ></span
-                >
-              </span>
-              <!-- 全站首購後免運：已首購但配送與首筆不同 → 本筆照收運費 -->
-              <span
-                v-else-if="showGroupSiteWideMismatchHint(group)"
-                class="flex w-full items-start gap-1.5 text-xs text-amber-600"
-              >
-                <i class="pi pi-info-circle mt-0.5 shrink-0 text-amber-500" />
-                <span class="min-w-0"
-                  >本筆免運需與<span class="font-medium"
-                    >首購相同的配送方式與地址</span
-                  >，本次不同故照收運費</span
-                >
-              </span>
-              <!-- 已首購但配送方式／地址與首筆不同 → 本筆不免運，誠實說明 -->
-              <span
-                v-else-if="showGroupCartLevelMismatchHint(group)"
-                class="flex w-full items-start gap-1.5 text-xs text-amber-600"
-              >
-                <i class="pi pi-info-circle mt-0.5 shrink-0 text-amber-500" />
-                <span class="min-w-0"
-                  >本筆免運需與<span class="font-medium"
-                    >首購相同的配送方式與地址</span
-                  >，本次不同故照收運費</span
                 >
               </span>
             </div>
