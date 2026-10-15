@@ -105,10 +105,3 @@ const shortLabel = (d: Date): string => `${d.getMonth() + 1}/${d.getDate()}`;
 /** 回購免運檔期窗訖日短字串（'M/D'），活動截止日。 */
 export const returnWindowEndShortLabel = (): string =>
   shortLabel(parseDashDate(CART_RETURN_FREE_SHIPPING_WINDOW.endDate));
-
-/** 檔期結束隔日短字串（'M/D'），後續訂單「一起寄出」日。 */
-export const returnWindowShipShortLabel = (): string => {
-  const d = parseDashDate(CART_RETURN_FREE_SHIPPING_WINDOW.endDate);
-  d.setDate(d.getDate() + 1);
-  return shortLabel(d);
-};

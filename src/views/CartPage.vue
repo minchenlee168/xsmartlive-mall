@@ -18,7 +18,6 @@ import {
   returnWindowEndLabel,
   returnWindowDaysLeft,
   returnWindowEndShortLabel,
-  returnWindowShipShortLabel,
 } from '../data/freeShippingCampaign';
 import { products, type PickOption } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
@@ -305,7 +304,6 @@ const siteWideReturnHint = computed(() => {
   return {
     unlocked: ordersStore.hasAnyReturnWindowOrder,
     endShort: returnWindowEndShortLabel(),
-    shipShort: returnWindowShipShortLabel(),
   };
 });
 
@@ -1342,55 +1340,19 @@ const handleGoProduct = (productId?: number) => {
             <span
               class="rounded px-2 py-0.5 text-xs font-medium text-white"
               style="background: var(--primary)"
-              >免運進行中</span
+              >活動進行中</span
             >
           </div>
           <span class="text-xs text-slate-500"
-            >{{ siteWideReturnHint.endShort }} 截止 ·
-            {{ siteWideReturnHint.shipShort }} 一起寄出</span
+            >{{ siteWideReturnHint.endShort }} 截止</span
           >
         </div>
 
-        <!-- 兩階段進度：第一筆付運費 → 之後的訂單免運 -->
-        <div class="mt-3 flex items-center gap-2 text-sm">
-          <span class="flex shrink-0 items-center gap-1.5">
-            <span
-              class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium text-white"
-              style="background: var(--primary)"
-              >1</span
-            >
-            <span class="font-medium text-slate-700">第一筆付運費</span>
-          </span>
-          <span class="h-px w-6 shrink-0 bg-slate-300 @3xl:w-10" />
-          <span class="flex shrink-0 items-center gap-1.5">
-            <span
-              class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium"
-              :class="
-                siteWideReturnHint.unlocked
-                  ? 'text-white'
-                  : 'bg-slate-200 text-slate-400'
-              "
-              :style="
-                siteWideReturnHint.unlocked ? 'background: var(--primary)' : ''
-              "
-              >2</span
-            >
-            <span
-              :class="
-                siteWideReturnHint.unlocked
-                  ? 'font-medium text-slate-700'
-                  : 'text-slate-400'
-              "
-              >之後的訂單免運</span
-            >
-          </span>
-        </div>
-
-        <p class="mt-3 text-sm text-slate-600">
+        <p class="mt-2 text-sm text-slate-600">
           {{
             siteWideReturnHint.unlocked
-              ? '已完成第一筆訂單，活動期間之後寄送到同一地址的訂單都免運（貨到付款下單即可）。'
-              : '本次活動第一筆訂單需支付運費，完成付款後，之後寄送到同一地址的訂單都免運（貨到付款下單即可）。'
+              ? '已完成第一筆訂單，活動期間之後寄送到同一地址的訂單都免運。'
+              : '本次活動第一筆訂單需支付運費，完成付款後，之後寄送到同一地址的訂單都免運。'
           }}
         </p>
       </div>

@@ -1099,6 +1099,29 @@ export const useOrdersStore = defineStore('orders', () => {
     if (matches.length === 0) return undefined;
     return matches.reduce((a, b) => (a.date <= b.date ? a : b)).shipKey;
   });
+  /**
+   * 全站「期間首購後免運」的全部免運配送基準：檔期窗內（非取消）訂單用過的所有
+   * 不重複 shipKey。後續訂單只要配送方式＋地址與其中任一相同即享免運
+   * （使用者在檔期內寄過的每個配送目的地都解鎖免運）。依最早使用時間排序。
+   */
+  const siteWideBaselineKeys = computed<string[]>(() => {
+    const matches = orders.value
+      .filter(
+        (o) =>
+          isOrderDateInReturnWindow(o.date) && o.overrideStatus !== 'cancelled',
+      )
+      .slice()
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    const seen = new Set<string>();
+    const keys: string[] = [];
+    for (const o of matches) {
+      if (o.shipKey && !seen.has(o.shipKey)) {
+        seen.add(o.shipKey);
+        keys.push(o.shipKey);
+      }
+    }
+    return keys;
+  });
 
   // ── 購物車級「賣場回購免運」（參與與否由各購物車開關控制）────────────────────
   /** 該台是否開啟回購免運活動（讀購物車設定的每台開關）。 */
@@ -1215,6 +1238,7 @@ export const useOrdersStore = defineStore('orders', () => {
     siteWideFreeShipping,
     hasAnyReturnWindowOrder,
     siteWideBaselineKey,
+    siteWideBaselineKeys,
     lastPaymentSummary,
     setLastPaymentSummary,
     activePayment,

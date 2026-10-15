@@ -623,11 +623,10 @@ const groupSiteWideFreeShipping = (g: CheckoutGroup): boolean => {
       // 新客第一筆就免運：檔期窗內還沒下過訂單時成立（本筆即首購）
       return !ordersStore.hasAnyReturnWindowOrder;
     case 'first-purchase-then-free':
-      // 期間首購後免運：已下過第一筆 且 本筆配送方式＋地址與首筆相同 → 免運
+      // 期間首購後免運：已下過第一筆 且 本筆配送方式＋地址與檔期內用過的任一配送相同 → 免運
       return (
         ordersStore.hasAnyReturnWindowOrder &&
-        !!ordersStore.siteWideBaselineKey &&
-        groupShipKey(g) === ordersStore.siteWideBaselineKey
+        ordersStore.siteWideBaselineKeys.includes(groupShipKey(g))
       );
     case 'min-amount':
       return groupAfterBulk(g) >= SITE_WIDE_MIN_AMOUNT;
@@ -718,11 +717,12 @@ const groupMethodFreeShipping = (
         return true;
       case 'first-purchase':
         return !ordersStore.hasAnyReturnWindowOrder;
-      case 'first-purchase-then-free': {
-        // 方式＋地址都需與首筆基準相同才免運；選到不同地址 → 照收運費
-        const base = ordersStore.siteWideBaselineKey;
-        return !!base && methodShipKey(m, g) === base;
-      }
+      case 'first-purchase-then-free':
+        // 方式＋地址需與檔期內用過的任一配送相同才免運；選到不同地址 → 照收運費
+        return (
+          ordersStore.hasAnyReturnWindowOrder &&
+          ordersStore.siteWideBaselineKeys.includes(methodShipKey(m, g))
+        );
       case 'min-amount':
         return groupAfterBulk(g) >= SITE_WIDE_MIN_AMOUNT;
       case 'min-qty':
@@ -801,14 +801,14 @@ const isSiteWideFPThenFreeUnlocked = computed(
   () =>
     isSiteWideFreeShippingOn.value &&
     ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
-    !!ordersStore.siteWideBaselineKey,
+    ordersStore.siteWideBaselineKeys.length > 0,
 );
-/** 已首購但本筆配送/地址與首購不同 → 不享全站免運、照收運費的提示。 */
+/** 已首購但本筆配送/地址與免運清單都不同 → 不享全站免運、照收運費的提示。 */
 const showGroupSiteWideMismatchHint = (g: CheckoutGroup): boolean =>
   groupHasShippingFee(g) &&
   !groupIsRemoteArea(g) &&
   isSiteWideFPThenFreeUnlocked.value &&
-  groupShipKey(g) !== ordersStore.siteWideBaselineKey &&
+  !ordersStore.siteWideBaselineKeys.includes(groupShipKey(g)) &&
   groupShippingDiscount(g) <= 0;
 
 // ── 期間首購後免運：一鍵套用首購配送 ───────────────────────────────────────
@@ -871,25 +871,35 @@ const applyBaselineShipping = () => {
 };
 
 // ── 全站「期間首購後免運」：一鍵套用首購配送 ───────────────────────────────
-/** 全站首購配送基準的可讀說明。 */
-const siteWideBaselineLabel = computed(() => {
-  const key = ordersStore.siteWideBaselineKey;
-  return key ? shipKeyLabel(key) : '';
-});
-/** 是否顯示全站版「套用首購配送」：已首購、且有任一組配送與首購不同。 */
+/** 全站首購配送基準的可讀說明（取最早的一筆，供套用預設）。 */
+/** 全站所有免運配送基準的可讀清單（提示框逐列顯示用）。 */
+const siteWideBaselineLabels = computed(() =>
+  ordersStore.siteWideBaselineKeys.map((key) => shipKeyLabel(key)),
+);
+/** 是否顯示全站版「套用免運配送」：已首購、且有任一組配送不在免運清單中。 */
 const showApplySiteWidePrompt = computed(
   () =>
     isSiteWideFPThenFreeUnlocked.value &&
     checkoutGroups.value.some(
-      (g) => groupShipKey(g) !== ordersStore.siteWideBaselineKey,
+      (g) => !ordersStore.siteWideBaselineKeys.includes(groupShipKey(g)),
     ),
 );
-/** 一鍵套用：把所有訂單的配送方式＋地址設成全站首購那筆。 */
+/**
+ * 一鍵套用：逐組挑「該組支援、離目前選擇最近」的免運基準配送並套上。
+ * - 該組已符合免運清單 → 不動（保留使用者已選的有效基準）。
+ * - 該組不支援任何免運基準配送方式 → 跳過（照收運費，不硬套不支援的方式）。
+ */
 const applySiteWideBaselineShipping = () => {
-  const key = ordersStore.siteWideBaselineKey;
-  if (!key) return;
-  const [method, destId] = key.split('|');
+  const keys = ordersStore.siteWideBaselineKeys;
+  if (keys.length === 0) return;
   for (const g of checkoutGroups.value) {
+    if (keys.includes(groupShipKey(g))) continue;
+    const supported = groupSupportedMethods(g);
+    const key = keys.find((k) =>
+      supported.includes(k.split('|')[0] as ShippingMethodId),
+    );
+    if (!key) continue;
+    const [method, destId] = key.split('|');
     shipMethodByGroup.value = {
       ...shipMethodByGroup.value,
       [g.id]: method as ShippingMethodId,
@@ -902,7 +912,7 @@ const applySiteWideBaselineShipping = () => {
       selectedPickupId.value = destId;
     }
   }
-  ui.toast('已套用首購的配送方式，可享全站期間首購後免運');
+  ui.toast('已套用可享免運的配送方式');
 };
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
@@ -1846,33 +1856,57 @@ const handlePlaceOrder = () => {
       <!-- 全站免運活動提示（配送資訊上方）：顯示活動類型；首購後免運且配送不符時附「套用」 -->
       <section
         v-if="isSiteWideFreeShippingOn"
-        class="shadow-card flex flex-wrap items-center gap-3 rounded-xl p-4"
+        class="shadow-card rounded-xl p-4"
         style="
           background: var(--primary-surface);
           border: 1px solid var(--primary);
         "
       >
-        <i class="pi pi-truck text-lg" style="color: var(--primary)" />
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-semibold" style="color: var(--primary)">
-            全站免運活動：{{ siteWideHintLabel }}
-          </p>
-          <p class="mt-0.5 text-xs text-slate-600">
-            {{ siteWideHintDesc
-            }}<template v-if="showApplySiteWidePrompt"
-              >．本筆免運需與首購相同配送方式：<span class="font-medium">{{
-                siteWideBaselineLabel
-              }}</span></template
-            >
-          </p>
+        <!-- 期間首購後免運且已解鎖：直接列出所有可享免運的寄送方式 -->
+        <template v-if="isSiteWideFPThenFreeUnlocked">
+          <div class="flex items-start gap-3">
+            <i
+              class="pi pi-truck mt-0.5 text-lg"
+              style="color: var(--primary)"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold" style="color: var(--primary)">
+                結帳時選擇以下寄送方式，本次即可免運：
+              </p>
+              <ul class="mt-2 flex flex-col gap-2">
+                <li
+                  v-for="(label, i) in siteWideBaselineLabels"
+                  :key="i"
+                  class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
+                >
+                  <i class="pi pi-truck shrink-0 text-slate-400" />
+                  <span class="min-w-0 break-words">{{ label }}</span>
+                </li>
+              </ul>
+              <p class="mt-2 text-xs text-slate-500">
+                寄送到其他地址、門市或改用其他寄送方式，需另外支付運費。
+              </p>
+            </div>
+          </div>
+          <div v-if="showApplySiteWidePrompt" class="mt-3 flex justify-end">
+            <Button
+              label="套用免運配送"
+              size="small"
+              @click="applySiteWideBaselineShipping"
+            />
+          </div>
+        </template>
+
+        <!-- 其他全站免運類型（或首購後免運尚未解鎖）：單行活動說明 -->
+        <div v-else class="flex flex-wrap items-center gap-3">
+          <i class="pi pi-truck text-lg" style="color: var(--primary)" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold" style="color: var(--primary)">
+              全站免運活動：{{ siteWideHintLabel }}
+            </p>
+            <p class="mt-0.5 text-xs text-slate-600">{{ siteWideHintDesc }}</p>
+          </div>
         </div>
-        <Button
-          v-if="showApplySiteWidePrompt"
-          label="套用"
-          size="small"
-          class="shrink-0"
-          @click="applySiteWideBaselineShipping"
-        />
       </section>
 
       <!-- 配送資訊（套用全部入口；各訂單仍可於下方明細個別調整） -->
