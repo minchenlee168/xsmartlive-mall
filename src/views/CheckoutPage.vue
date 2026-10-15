@@ -729,6 +729,26 @@ const showGroupSiteWideMismatchHint = (g: CheckoutGroup): boolean =>
   !ordersStore.siteWideBaselineKeys.includes(groupShipKey(g)) &&
   groupShippingDiscount(g) <= 0;
 /**
+ * 期間首購後免運「未首購」預告：本筆為活動第一筆、需付運費，之後寄同地址免運。
+ * 全站(檔期內尚未下過第一筆) 或 指定購物車(該台尚未首購) 皆適用；本筆照收運費時才顯示。
+ */
+const showGroupReturnFirstPurchaseTeaser = (g: CheckoutGroup): boolean => {
+  if (
+    !groupHasShippingFee(g) ||
+    groupIsRemoteArea(g) ||
+    groupShippingDiscount(g) > 0
+  ) {
+    return false;
+  }
+  const siteWideTeaser =
+    isSiteWideFPThenFree.value && !ordersStore.hasAnyReturnWindowOrder;
+  const cartLevelTeaser =
+    groupHasCartCampaign(g) &&
+    !groupCartLevelUnlocked(g) &&
+    !isFirstPurchaseFreeShipping.value;
+  return siteWideTeaser || cartLevelTeaser;
+};
+/**
  * 是否有「改配送即可免運卻尚未調整」的訂單（已首購、配送與首購不同故照收運費）。
  * 去付款時據此先跳確認，避免使用者白付可省的運費。
  */
@@ -1915,6 +1935,19 @@ const handleConfirmPayWithoutFreeShip = () => {
                   >外島／離島／花東／山區部落<span class="font-medium"
                     >不適用免運</span
                   >，本單照收運費</span
+                >
+              </span>
+              <!-- 期間首購後免運「未首購」預告：本筆為第一筆、付運費，之後同地址免運 -->
+              <span
+                v-else-if="showGroupReturnFirstPurchaseTeaser(group)"
+                class="flex w-full items-start gap-1.5 text-xs"
+                style="color: var(--primary)"
+              >
+                <i class="pi pi-truck mt-0.5 shrink-0" />
+                <span class="min-w-0"
+                  >本筆為活動第一筆、需付運費，<span class="font-medium"
+                    >之後寄送同一地址即免運</span
+                  ></span
                 >
               </span>
               <!-- 全站首購後免運：已首購但配送與首筆不同 → 本筆照收運費 -->
