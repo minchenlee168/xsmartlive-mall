@@ -710,12 +710,16 @@ const showGroupCartLevelMismatchHint = (g: CheckoutGroup): boolean =>
 /** 是否顯示「偏遠地區不適用免運」提示（最優先，壓過其他免運提示）。 */
 const showGroupRemoteAreaHint = (g: CheckoutGroup): boolean =>
   groupHasShippingFee(g) && groupIsRemoteArea(g);
+/** 全站「期間首購後免運」活動是否進行中（不分首購與否）。 */
+const isSiteWideFPThenFree = computed(
+  () =>
+    isSiteWideFreeShippingOn.value &&
+    ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free',
+);
 /** 全站「期間首購後免運」是否進行中且已首購（有基準）。 */
 const isSiteWideFPThenFreeUnlocked = computed(
   () =>
-    isSiteWideFreeShippingOn.value &&
-    ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
-    ordersStore.siteWideBaselineKeys.length > 0,
+    isSiteWideFPThenFree.value && ordersStore.siteWideBaselineKeys.length > 0,
 );
 /** 已首購但本筆配送/地址與免運清單都不同 → 不享全站免運、照收運費的提示。 */
 const showGroupSiteWideMismatchHint = (g: CheckoutGroup): boolean =>
@@ -1849,9 +1853,9 @@ const handleConfirmPayWithoutFreeShip = () => {
             :severity="group.tempLayer === '常溫' ? 'secondary' : 'info'"
             class="!py-0.5 !text-xs"
           />
-          <!-- 指定購物車「期間首購後免運」：僅在該台訂單明細標題旁提示 -->
+          <!-- 期間首購後免運：全站活動每台都標、指定購物車僅該台標 -->
           <span
-            v-if="groupHasCartCampaign(group)"
+            v-if="isSiteWideFPThenFree || groupHasCartCampaign(group)"
             class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium"
             style="background: var(--primary-surface); color: var(--primary)"
           >
