@@ -758,30 +758,6 @@ const shipKeyLabel = (key: string): string => {
   }
   return method;
 };
-/** 全站「期間首購後免運」已啟用但本帳號尚未首購（本筆為第一筆、需付運費）。 */
-const isSiteWideReturnTeaser = computed(
-  () =>
-    isSiteWideFreeShippingOn.value &&
-    ordersStore.siteWideFreeShipping.type === 'first-purchase-then-free' &&
-    !isSiteWideFPThenFreeUnlocked.value,
-);
-/**
- * 配送資訊那一排是否顯示「期間首購後免運」提示：僅全站（未首購/已首購）。
- * 指定購物車（購物車級）不在此列提示。
- */
-const showReturnFreeShippingNote = computed(
-  () => isSiteWideFPThenFreeUnlocked.value || isSiteWideReturnTeaser.value,
-);
-/**
- * 配送資訊那一排的提示文案（全站期間首購後免運）：
- * - 未首購（第一筆）→ 預告第一筆付運費、之後免運。
- * - 已首購（第二筆起）→ 不代選，提示「選與首購相同的配送即免運」。
- */
-const returnFreeShippingNoteText = computed(() =>
-  isSiteWideReturnTeaser.value
-    ? '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運'
-    : '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費',
-);
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
   switch (groupFreeShippingReason(g)) {
@@ -1786,15 +1762,6 @@ const handleConfirmPayWithoutFreeShip = () => {
             role="button"
             aria-label="配送方式說明"
           />
-          <!-- 期間首購後免運：未首購預告 / 已自動選好免運配送 -->
-          <span
-            v-if="showReturnFreeShippingNote"
-            class="flex min-w-0 items-center gap-1 text-xs"
-            style="color: var(--primary)"
-          >
-            <i class="pi pi-truck shrink-0" />
-            <span class="min-w-0">{{ returnFreeShippingNoteText }}</span>
-          </span>
         </div>
         <div class="card-pad flex flex-col gap-2">
           <div class="flex flex-wrap items-center gap-3">
