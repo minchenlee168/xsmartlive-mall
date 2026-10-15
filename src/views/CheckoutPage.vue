@@ -1761,11 +1761,11 @@ const handleConfirmPayWithoutFreeShip = () => {
             class="!py-0.5 !text-xs"
           />
         </div>
-        <!-- 期間首購後免運：訂單明細下整條主色提示（全站每台、指定購物車僅該台） -->
+        <!-- 期間首購後免運：訂單明細下整條淺主色提示（全站每台、指定購物車僅該台） -->
         <div
           v-if="isSiteWideFPThenFree || groupHasCartCampaign(group)"
-          class="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white"
-          style="background: var(--primary)"
+          class="flex items-center gap-1.5 px-4 py-2 text-xs font-medium"
+          style="background: var(--primary-surface); color: var(--primary)"
         >
           <i class="pi pi-truck" />
           期間首購後免運
