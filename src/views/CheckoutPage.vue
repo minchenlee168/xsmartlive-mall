@@ -1810,7 +1810,7 @@ const handlePlaceOrder = () => {
         :key="group.id"
         class="shadow-card rounded-xl bg-white"
       >
-        <div class="cart-divider flex items-center gap-2 px-4 py-3">
+        <div class="cart-divider flex flex-wrap items-center gap-2 px-4 py-3">
           <span class="font-medium text-slate-700"
             >{{ group.sellerName }} 訂單明細</span
           >
@@ -1819,6 +1819,15 @@ const handlePlaceOrder = () => {
             :severity="group.tempLayer === '常溫' ? 'secondary' : 'info'"
             class="!py-0.5 !text-xs"
           />
+          <!-- 指定購物車「期間首購後免運」：僅在該台訂單明細標題旁提示 -->
+          <span
+            v-if="groupHasCartCampaign(group)"
+            class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium"
+            style="background: var(--primary-surface); color: var(--primary)"
+          >
+            <i class="pi pi-truck" />
+            期間首購後免運
+          </span>
         </div>
         <div
           v-for="(item, ii) in group.items"
