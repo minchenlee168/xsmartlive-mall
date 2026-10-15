@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import {
   FREE_SHIPPING_CAMPAIGN,
   isWithinCampaign,
-  isOrderDateInCampaign,
   campaignDaysLeft,
   campaignEndLabel,
   isReturnWindowActive,
@@ -12,6 +11,7 @@ import {
   returnWindowDaysLeft,
 } from '../data/freeShippingCampaign';
 import { useCartStore } from './cart';
+import type { SiteWideFreeShippingType } from '../data/siteWideFreeShipping';
 import type {
   OrderRecord,
   OrderItem,
@@ -61,6 +61,62 @@ export interface LastPaymentSummary {
 
 export const useOrdersStore = defineStore('orders', () => {
   const orders = ref<OrderRecord[]>([
+    // ── 合併訂單 demo：兩筆待出貨、同付款狀態(已付款)+同配送方式(宅配)+同地址(home|h1) ──
+    // 可於顯示設定的「合併訂單」工具選取合併成同一包裹；第一筆付運費(首購)、第二筆免運。
+    {
+      id: 'merge-ship-1',
+      date: '2026/09/28 15:20',
+      orderNo: '1000000041',
+      qty: 1,
+      total: 560, // 商品 480 + 運費 80（首購付運費）
+      amounts: { goodsTotal: 480, shippingFee: 80 },
+      payment: '線上信用卡',
+      delivery: '宅配',
+      invoice: '個人發票（紙本）',
+      invoiceStatus: 'pending',
+      status: 'to_ship',
+      payStatus: 'paid',
+      detailTab: 'progress',
+      expanded: false,
+      shipKey: 'home|h1',
+      items: [
+        {
+          image: IMG_HAT,
+          name: '北歐風棉麻抱枕套 45×45cm',
+          spec: '米白',
+          price: 480,
+          qty: 1,
+          packages: [{ no: 'F2026092801', qty: 1, currentStep: 'to_ship' }],
+        },
+      ],
+    },
+    {
+      id: 'merge-ship-2',
+      date: '2026/09/29 09:10',
+      orderNo: '1000000042',
+      qty: 1,
+      total: 349, // 商品 349，運費 80 全額折抵（期間首購後免運）
+      amounts: { goodsTotal: 349, shippingFee: 80, shippingDiscount: 80 },
+      payment: '線上信用卡',
+      delivery: '宅配',
+      invoice: '個人發票（紙本）',
+      invoiceStatus: 'pending',
+      status: 'to_ship',
+      payStatus: 'paid',
+      detailTab: 'progress',
+      expanded: false,
+      shipKey: 'home|h1',
+      items: [
+        {
+          image: IMG_BIB,
+          name: '冷萃咖啡濃縮液 6 入組',
+          spec: '預設',
+          price: 349,
+          qty: 1,
+          packages: [{ no: 'F2026092802', qty: 1, currentStep: 'to_ship' }],
+        },
+      ],
+    },
     {
       id: '25',
       date: '2026/02/03 14:20',
@@ -825,7 +881,8 @@ export const useOrdersStore = defineStore('orders', () => {
     },
   ]);
 
-  let seq = 20;
+  // 從 22 起算 → placeOrder 由 1000000043 開始，避開合併 demo 用掉的 1000000041/42。
+  let seq = 22;
   function pad2(n: number) {
     return String(n).padStart(2, '0');
   }
@@ -848,8 +905,10 @@ export const useOrdersStore = defineStore('orders', () => {
     /** 發票類型（結帳頁 INVOICE_TYPES 的 label）；未提供時用個人發票（紙本）。 */
     invoice?: string;
     buyerNote?: string;
-    /** 來源賣場 id（「賣場回購免運」逐台判定用）。 */
+    /** 來源賣場 id（「期間首購後免運」逐台判定用）。 */
     sellerId?: string;
+    /** 配送方式＋目的地 key（購物車級免運需與首筆相同才享免運）。 */
+    shipKey?: string;
     /** 金額明細（優惠券 / 紅利 / 運費折抵等）。 */
     amounts?: OrderAmountBreakdown;
   }): string {
@@ -899,6 +958,7 @@ export const useOrdersStore = defineStore('orders', () => {
       expanded: true,
       items,
       sellerId: input.sellerId,
+      shipKey: input.shipKey,
       buyerNote: input.buyerNote,
       amounts: input.amounts,
     });
@@ -915,7 +975,9 @@ export const useOrdersStore = defineStore('orders', () => {
   // 規則：付款成功才轉待出貨並清購物車；失敗 / 取消 / 離開一律把訂單標為「已取消」，
   //      購物車不動（本次結帳商品自然留在購物車，可重新結帳）。
   /** 目前開啟中的付款批次（付款層顯示中）；null = 未在付款。 */
-  const activePayment = ref<{ orderNos: string[]; amount: number } | null>(null);
+  const activePayment = ref<{ orderNos: string[]; amount: number } | null>(
+    null,
+  );
 
   /** 開啟付款層：結帳建單後呼叫。 */
   const startPayment = (orderNos: string[], amount: number): void => {
@@ -988,26 +1050,15 @@ export const useOrdersStore = defineStore('orders', () => {
     order.status = 'completed';
   }
 
-  // ── 期間首購後免運（帳號級）────────────────────────────────────────────────
-  /**
-   * 檔期內使用者是否已有過訂單（首購，下單就算、不要求實付運費）。
-   * 排除已取消的訂單——下單秒取消 / 付款失敗（cancelOrders 會標 overrideStatus:'cancelled'）
-   * 不算真正首購，否則「從未成立的購買」也能解鎖免運，有被鑽空間。
-   */
-  const hasCampaignOrder = computed(() =>
-    orders.value.some(
-      (o) =>
-        isOrderDateInCampaign(o.date) && o.overrideStatus !== 'cancelled',
-    ),
+  // ── 全站「期間免運」（帳號級）─────────────────────────────────────────────
+  // 規則：檔期內全站直接免運（不需首購、不限配送方式與地址、結帳即享）。
+  // 目前檔期休眠（見 FREE_SHIPPING_CAMPAIGN）→ 此值恆為 false、全站提示隱藏。
+  // 註：getter 仍沿用 isFirstPurchaseFreeShippingActive 舊名（各觸點引用），
+  //     待全站期間免運正式啟用時再一併改名與調整觸點文案。
+  const isFirstPurchaseFreeShippingActive = computed(() =>
+    isWithinCampaign(new Date()),
   );
-  /**
-   * 「下一筆免運」資格是否成立：檔期進行中、且已完成首購。
-   * 注意：結帳當下本次訂單尚未寫入 orders，故首筆結帳時仍為 false（正是首購那筆要付運費）。
-   */
-  const isFirstPurchaseFreeShippingActive = computed(
-    () => isWithinCampaign(new Date()) && hasCampaignOrder.value,
-  );
-  /** 檔期是否進行中（無論是否已首購）。 */
+  /** 檔期是否進行中。 */
   const isFreeShippingCampaignOngoing = computed(() =>
     isWithinCampaign(new Date()),
   );
@@ -1018,6 +1069,36 @@ export const useOrdersStore = defineStore('orders', () => {
   /** 檔期名稱與訖日（提醒文案用）。 */
   const freeShippingCampaignName = FREE_SHIPPING_CAMPAIGN.name;
   const freeShippingCampaignEndLabel = campaignEndLabel();
+
+  // ── 全站免運（demo 開關：模擬後台全站免運活動）────────────────────────────
+  // 開啟後購物車級「期間首購後免運」休眠；全站免運依選定類型於結帳套用。
+  const siteWideFreeShipping = ref<{
+    enabled: boolean;
+    type: SiteWideFreeShippingType;
+  }>({ enabled: false, type: 'period' });
+  /**
+   * 全站「首購」追蹤：檔期窗內是否已有過（非取消）訂單（不分賣場）。
+   * 全站「首購免運」/「期間首購後免運」用——以此判定「第一筆之後才生效」，
+   * 與購物車級同邏輯（seed 歷史訂單在檔期外 → 全新開始）。
+   */
+  const hasAnyReturnWindowOrder = computed(() =>
+    orders.value.some(
+      (o) =>
+        isOrderDateInReturnWindow(o.date) && o.overrideStatus !== 'cancelled',
+    ),
+  );
+  /**
+   * 全站「期間首購後免運」的配送基準：檔期窗內最早（非取消）訂單的 shipKey（不分賣場）。
+   * 後續訂單需與此相同配送方式＋地址才享全站免運。無訂單 / 未記 key → undefined。
+   */
+  const siteWideBaselineKey = computed<string | undefined>(() => {
+    const matches = orders.value.filter(
+      (o) =>
+        isOrderDateInReturnWindow(o.date) && o.overrideStatus !== 'cancelled',
+    );
+    if (matches.length === 0) return undefined;
+    return matches.reduce((a, b) => (a.date <= b.date ? a : b)).shipKey;
+  });
 
   // ── 購物車級「賣場回購免運」（參與與否由各購物車開關控制）────────────────────
   /** 該台是否開啟回購免運活動（讀購物車設定的每台開關）。 */
@@ -1031,7 +1112,11 @@ export const useOrdersStore = defineStore('orders', () => {
    * 同帳號級推理：結帳當下本次訂單尚未寫入，故該台首筆結帳仍需付運費。
    * 已取消訂單不算首購（同帳號級防鑽規則）。
    */
-  const isCartLevelFreeShippingActive = (sellerId: string | undefined): boolean =>
+  const isCartLevelFreeShippingActive = (
+    sellerId: string | undefined,
+  ): boolean =>
+    // 全站免運啟用時，指定購物車的「期間首購後免運」整個休眠
+    !siteWideFreeShipping.value.enabled &&
     isSellerReturnEnabled(sellerId) &&
     isReturnWindowActive(new Date()) &&
     orders.value.some(
@@ -1040,7 +1125,26 @@ export const useOrdersStore = defineStore('orders', () => {
         isOrderDateInReturnWindow(o.date) &&
         o.overrideStatus !== 'cancelled',
     );
-  /** 目前已解鎖「賣場回購免運」的賣場清單（會員中心 / 付款成功頁逐台列用）。 */
+  /**
+   * 該台「首筆」（檔期內最早、非取消）訂單的 shipKey（配送方式＋地址 key）。
+   * 購物車級免運的比對基準：後續訂單需與此相同才享免運。無首筆或首筆未記 key → undefined。
+   * 訂單日期為 'YYYY/MM/DD HH:mm' 零補格式，字串比較即等同時間先後。
+   */
+  const cartLevelBaselineKey = (
+    sellerId: string | undefined,
+  ): string | undefined => {
+    if (!sellerId) return undefined;
+    const matches = orders.value.filter(
+      (o) =>
+        o.sellerId === sellerId &&
+        isOrderDateInReturnWindow(o.date) &&
+        o.overrideStatus !== 'cancelled',
+    );
+    if (matches.length === 0) return undefined;
+    const first = matches.reduce((a, b) => (a.date <= b.date ? a : b));
+    return first.shipKey;
+  };
+  /** 目前已解鎖「期間首購後免運」的賣場清單（會員中心 / 付款成功頁逐台列用）。 */
   const cartLevelUnlockedSellers = computed(() => {
     const now = new Date();
     if (!isReturnWindowActive(now)) return [];
@@ -1048,7 +1152,10 @@ export const useOrdersStore = defineStore('orders', () => {
     const daysLeft = returnWindowDaysLeft(now);
     return useCartStore()
       .groups.filter(
-        (g) => g.sellerId && g.freeShippingReturn && isCartLevelFreeShippingActive(g.sellerId),
+        (g) =>
+          g.sellerId &&
+          g.freeShippingReturn &&
+          isCartLevelFreeShippingActive(g.sellerId),
       )
       .map((g) => ({
         sellerId: g.sellerId as string,
@@ -1058,9 +1165,43 @@ export const useOrdersStore = defineStore('orders', () => {
       }));
   });
 
+  // ── 合併訂單（demo：模擬後台把同條件的待出貨訂單合併成同一包裹出貨）──────────
+  /** 可合併的待出貨訂單組：同付款狀態 + 同配送方式 + 同地址(shipKey)，≥2 筆才成一組。 */
+  const mergeableOrderGroups = computed(() => {
+    const map = new Map<string, OrderRecord[]>();
+    for (const o of orders.value) {
+      if (o.status !== 'to_ship' || o.mergedOrderNos?.length) continue;
+      const key = `${o.payStatus ?? ''}|${o.delivery}|${o.shipKey ?? ''}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    }
+    return [...map.values()].filter((g) => g.length >= 2);
+  });
+  /** 合併訂單：互設 mergedOrderNos、共用一個新包裹編號、配箱（備貨中）。 */
+  const mergeOrders = (orderNos: string[]): void => {
+    if (orderNos.length < 2) return;
+    const now = new Date();
+    const pkgNo = `F${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}${pad2(now.getHours())}${pad2(now.getMinutes())}`;
+    const time = `${pad2(now.getMonth() + 1)}/${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+    orders.value
+      .filter((o) => orderNos.includes(o.orderNo))
+      .forEach((o) => {
+        o.mergedOrderNos = orderNos.filter((n) => n !== o.orderNo);
+        o.items.forEach((it) =>
+          it.packages.forEach((p) => {
+            p.no = pkgNo;
+            p.currentStep = 'to_receive';
+            p.stepTimes = { ...p.stepTimes, to_receive: time };
+          }),
+        );
+      });
+  };
+
   return {
     orders,
     transactions,
+    mergeableOrderGroups,
+    mergeOrders,
     placeOrder,
     completeOrder,
     isFirstPurchaseFreeShippingActive,
@@ -1069,7 +1210,11 @@ export const useOrdersStore = defineStore('orders', () => {
     freeShippingCampaignName,
     freeShippingCampaignEndLabel,
     isCartLevelFreeShippingActive,
+    cartLevelBaselineKey,
     cartLevelUnlockedSellers,
+    siteWideFreeShipping,
+    hasAnyReturnWindowOrder,
+    siteWideBaselineKey,
     lastPaymentSummary,
     setLastPaymentSummary,
     activePayment,

@@ -12,6 +12,8 @@ import {
   type BulkDiscountRule,
 } from '../pinia/cart';
 import { useAppModeStore } from '../pinia/appMode';
+import { useOrdersStore } from '../pinia/orders';
+import { SITE_WIDE_FREE_SHIPPING_TYPES } from '../data/siteWideFreeShipping';
 import { products } from '../data/products';
 
 declare const __BUILD_TIME__: string;
@@ -20,6 +22,19 @@ const themeStore = useThemeStore();
 const densityStore = useDensityStore();
 const cartStore = useCartStore();
 const appMode = useAppModeStore();
+const ordersStore = useOrdersStore();
+
+/** 付款狀態顯示文字（合併訂單工具用）。 */
+const PAY_STATUS_LABELS: Record<string, string> = {
+  unpaid: '待付款',
+  paying: '付款中',
+  paid: '已付款',
+  failed: '付款失敗',
+  refund_pending: '退款中',
+  refunded: '已退款',
+};
+const payStatusLabel = (s: string | undefined): string =>
+  PAY_STATUS_LABELS[s ?? 'unpaid'] ?? '—';
 
 // ---- 購物車設定 Dialog -----------------------------------------------------
 const isCartSettingsOpen = ref(false);
@@ -490,6 +505,72 @@ const buildTimeDisplay = (() => {
               class="mt-0.5 shrink-0"
               @update:model-value="appMode.setNoShopMode(!!$event)"
             />
+          </div>
+
+          <!-- 全站免運活動：開啟後購物車級「期間首購後免運」休眠；可選免運類型 -->
+          <div
+            class="mt-2 flex flex-col gap-2.5 rounded-xl border border-slate-200 px-3 py-2.5"
+          >
+            <div class="flex items-start gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-slate-700">全站免運活動</p>
+                <p class="mt-0.5 text-xs leading-snug text-slate-400">
+                  開啟後購物車級「期間首購後免運」休眠，改用下方全站活動
+                </p>
+              </div>
+              <ToggleSwitch
+                :model-value="ordersStore.siteWideFreeShipping.enabled"
+                class="mt-0.5 shrink-0"
+                @update:model-value="
+                  ordersStore.siteWideFreeShipping.enabled = !!$event
+                "
+              />
+            </div>
+            <SelectButton
+              v-if="ordersStore.siteWideFreeShipping.enabled"
+              :model-value="ordersStore.siteWideFreeShipping.type"
+              :options="SITE_WIDE_FREE_SHIPPING_TYPES"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+              size="small"
+              @update:model-value="
+                ordersStore.siteWideFreeShipping.type = $event
+              "
+            />
+          </div>
+
+          <!-- 合併訂單：把待出貨、同付款狀態+同配送方式+同地址的訂單合併成同一包裹 -->
+          <div
+            v-if="ordersStore.mergeableOrderGroups.length"
+            class="mt-2 flex flex-col gap-2 rounded-xl border border-slate-200 px-3 py-2.5"
+          >
+            <div>
+              <p class="text-sm font-medium text-slate-700">合併訂單</p>
+              <p class="mt-0.5 text-xs leading-snug text-slate-400">
+                同付款狀態 + 同配送方式 +
+                同地址的待出貨訂單，可合併成同一包裹出貨
+              </p>
+            </div>
+            <div
+              v-for="(grp, i) in ordersStore.mergeableOrderGroups"
+              :key="i"
+              class="flex flex-col gap-1.5 rounded-lg bg-slate-50 p-2.5"
+            >
+              <p class="text-xs text-slate-600">
+                {{ payStatusLabel(grp[0].payStatus) }} · {{ grp[0].delivery }} ·
+                同地址 · {{ grp.length }} 筆
+              </p>
+              <p class="text-xs text-slate-500">
+                {{ grp.map((o) => `#${o.orderNo}`).join('、') }}
+              </p>
+              <Button
+                label="合併這組"
+                size="small"
+                class="self-start"
+                @click="ordersStore.mergeOrders(grp.map((o) => o.orderNo))"
+              />
+            </div>
           </div>
         </div>
 

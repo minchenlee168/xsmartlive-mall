@@ -1,8 +1,18 @@
 export type TimelineStepKey =
-  'unpaid' | 'to_ship' | 'shipped' | 'to_receive' | 'delivered' | 'completed';
+  | 'unpaid'
+  | 'to_ship'
+  | 'shipped'
+  | 'to_receive'
+  | 'delivered'
+  | 'completed';
 
 export type DetailTab =
-  'progress' | 'cancel' | 'return' | 'inquiry' | 'address' | 'payment';
+  | 'progress'
+  | 'cancel'
+  | 'return'
+  | 'inquiry'
+  | 'address'
+  | 'payment';
 
 export type OrderStatus = 'unpaid' | 'to_ship' | 'completed';
 
@@ -15,11 +25,19 @@ export type OrderStatus = 'unpaid' | 'to_ship' | 'completed';
  * 有值時整筆訂單以此狀態呈現，不再依包裹階段推算。
  */
 export type OverrideStatus =
-  'returning' | 'returned' | 'exchanged' | 'cancelled';
+  | 'returning'
+  | 'returned'
+  | 'exchanged'
+  | 'cancelled';
 
 /** 付款狀態（與商家後台同一套用字，六值一一對應）。 */
 export type PayStatus =
-  'unpaid' | 'paying' | 'paid' | 'failed' | 'refund_pending' | 'refunded';
+  | 'unpaid'
+  | 'paying'
+  | 'paid'
+  | 'failed'
+  | 'refund_pending'
+  | 'refunded';
 
 /**
  * 發票狀態（對應後台分類）：
@@ -104,8 +122,13 @@ export interface OrderRecord {
   detailTab: DetailTab;
   expanded: boolean;
   items: OrderItem[];
-  /** 來源賣家 / 場次識別碼；用於「賣場回購免運」逐台判定（該台是否已下過首筆）。 */
+  /** 來源賣家 / 場次識別碼；用於「期間首購後免運」逐台判定（該台是否已下過首筆）。 */
   sellerId?: string;
+  /**
+   * 配送方式＋目的地識別（如 'home|h1'、'store|s2'、'pickup|p1'）。
+   * 購物車級免運的比對基準：後續訂單需與該台首筆的 shipKey 相同才享免運。
+   */
+  shipKey?: string;
   /** 買家對這筆訂單的備註（留言給賣家）；下單時從結帳頁帶入。 */
   buyerNote?: string;
   /** 金額明細（優惠券 / 紅利 / 運費折抵等）；下單時從結帳頁帶入，顯示於訂購/付款資訊。 */
@@ -118,6 +141,11 @@ export interface OrderRecord {
   cancelTime?: string;
   /** 已取消訂單：取消原因（由商家後台帶入）。 */
   cancelReason?: string;
+  /**
+   * 合併出貨：與本訂單共用同一包裹一起出貨的其他訂單編號（由商家後台合併後帶入）。
+   * 有值時前台在包裹標示「合併出貨」，配送狀態與對應訂單連動（同一實體包裹）。
+   */
+  mergedOrderNos?: string[];
 }
 
 export interface Transaction {

@@ -740,10 +740,7 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           <i class="pi pi-truck text-white" />
         </div>
         <div class="flex min-w-0 flex-col">
-          <span
-            class="text-sm font-semibold"
-            style="color: var(--primary)"
-          >
+          <span class="text-sm font-semibold" style="color: var(--primary)">
             {{ s.sellerName }}
           </span>
           <span class="text-xs text-slate-600">
@@ -1293,9 +1290,34 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                       :value="pkg.exchangeTag"
                       class="!border !border-emerald-300 !bg-emerald-50 !py-[1px] !text-xs !font-normal !text-emerald-700"
                     />
+                    <!-- 合併出貨：與其他訂單共用同一包裹 -->
+                    <Tag
+                      v-if="order.mergedOrderNos?.length"
+                      value="合併出貨"
+                      class="!py-[1px] !text-xs !font-normal"
+                      :pt="{
+                        root: {
+                          style:
+                            'background: var(--primary-surface); color: var(--primary)',
+                        },
+                      }"
+                    />
                   </div>
                   <span class="text-sm text-slate-700">{{ pkg.qty }}件</span>
                 </div>
+
+                <!-- 合併出貨說明：與哪些訂單共用同一包裹（配送狀態連動） -->
+                <p
+                  v-if="order.mergedOrderNos?.length"
+                  class="mb-1.5 flex items-center gap-1.5 text-xs text-slate-500"
+                >
+                  <i class="pi pi-link" style="color: var(--primary)" />
+                  與訂單
+                  <span class="font-medium text-slate-600">{{
+                    order.mergedOrderNos.map((n) => `#${n}`).join('、')
+                  }}</span>
+                  合併為同一包裹出貨，配送狀態一起更新
+                </p>
 
                 <!-- 手機版緊湊 -->
                 <div v-if="isMobile" class="rounded-md bg-white p-3">

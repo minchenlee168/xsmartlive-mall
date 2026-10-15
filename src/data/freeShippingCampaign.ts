@@ -7,16 +7,17 @@ import { parseDashDate, parseSlashDate, formatSlashDate } from '../utils/date';
  * - 觸發條件：檔期內只要下過一筆訂單（首購）就解鎖——不要求首筆實付運費。
  * - 免運範圍：解鎖後，檔期內後續每一筆訂單皆免運；檔期結束即失效。
  *
- * 檔期涵蓋今天（10 月）→ 檔期內下過一筆（首購）即解鎖「全站下一筆起免運」。
- * 與購物車級並存時擇優：帳號級解鎖後會壓過購物車級（見 CheckoutPage groupFreeShippingReason）。
+ * 全站「期間免運」：檔期內全站直接免運（不需首購、不限配送方式與地址、結帳即享）。
+ * 「期間首購後免運」（首購後才免、需同配送＋地址）是購物車級專屬，不走全站。
+ * 目前檔期設為已結束（9 月、休眠）→ 全站提示隱藏，讓購物車級為主；要啟用時改成涵蓋今天即可。
  */
 export const FREE_SHIPPING_CAMPAIGN = {
-  id: 'first-purchase-free-shipping-2026q4',
-  name: '期間首購後免運',
+  id: 'site-wide-free-shipping-2026q4',
+  name: '期間免運',
   /** 檔期起日（含當日）。 */
-  startDate: '2026-10-01',
+  startDate: '2026-09-01',
   /** 檔期訖日（含當日，到 23:59:59 仍有效）。 */
-  endDate: '2026-10-31',
+  endDate: '2026-09-30',
 } as const;
 
 const DAY_IN_MS = 86_400_000;
@@ -35,7 +36,8 @@ export const campaignEndDate = (): Date => {
 };
 
 /** 檔期訖日顯示字串（'YYYY/MM/DD'）。 */
-export const campaignEndLabel = (): string => formatSlashDate(campaignEndDate());
+export const campaignEndLabel = (): string =>
+  formatSlashDate(campaignEndDate());
 
 /** now 是否落在檔期內。 */
 export const isWithinCampaign = (now: Date): boolean =>
@@ -92,4 +94,7 @@ export const returnWindowEndLabel = (): string =>
 
 /** 回購免運檔期窗距結束剩餘天數（至少 0）。 */
 export const returnWindowDaysLeft = (now: Date): number =>
-  Math.max(0, Math.ceil((returnWindowEnd().getTime() - now.getTime()) / DAY_IN_MS));
+  Math.max(
+    0,
+    Math.ceil((returnWindowEnd().getTime() - now.getTime()) / DAY_IN_MS),
+  );

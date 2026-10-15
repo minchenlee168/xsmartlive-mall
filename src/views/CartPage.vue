@@ -265,7 +265,12 @@ const freeShippingHintByGroup = computed(() => {
         endLabel: ordersStore.freeShippingCampaignEndLabel,
         daysLeft: ordersStore.freeShippingCampaignDaysLeft,
       };
-    } else if (g.freeShippingReturn && isReturnWindowActive(now)) {
+    } else if (
+      !ordersStore.siteWideFreeShipping.enabled &&
+      g.freeShippingReturn &&
+      isReturnWindowActive(now)
+    ) {
+      // 全站免運啟用時，指定購物車的「期間首購後免運」休眠 → 不顯示本提示
       map[g.id] = {
         type: ordersStore.isCartLevelFreeShippingActive(g.sellerId)
           ? 'cart-unlocked'
@@ -342,10 +347,7 @@ interface BulkHint {
   discount: number;
   remaining: number;
 }
-const bulkHintForItem = (
-  group: CartGroup,
-  item: CartItem,
-): BulkHint | null => {
+const bulkHintForItem = (group: CartGroup, item: CartItem): BulkHint | null => {
   if (!item.checked || item.productId == null) return null;
   if (group.checkoutMode === 'default') return null;
   const rule = cart.findBulkRuleFor(item.productId);
@@ -1148,7 +1150,12 @@ const handleConfirmAddOn = (e: MouseEvent) => {
       cart.addItem(base, spec, addOnSpecQty.value[spec], opts);
     }
   } else {
-    cart.addItem(base, p.spec ?? '預設', Math.max(1, addOnDialogQty.value || 1), opts);
+    cart.addItem(
+      base,
+      p.spec ?? '預設',
+      Math.max(1, addOnDialogQty.value || 1),
+      opts,
+    );
   }
   burstAddToCartFromEvent(e);
   flashAddedFor(addOnKey(addOnDialogCartId.value ?? -1, p.id));
@@ -1373,7 +1380,9 @@ const handleGoProduct = (productId?: number) => {
             {{ freeShippingHintByGroup[group.id]!.daysLeft }} 天）
           </span>
           <span
-            v-else-if="freeShippingHintByGroup[group.id]!.type === 'cart-unlocked'"
+            v-else-if="
+              freeShippingHintByGroup[group.id]!.type === 'cart-unlocked'
+            "
           >
             期間首購後免運已啟用，本台結帳即享免運．檔期至
             {{ freeShippingHintByGroup[group.id]!.endLabel }}（剩
@@ -1399,458 +1408,482 @@ const handleGoProduct = (productId?: number) => {
             <span class="shrink-0">加購區</span>
             <span class="h-px flex-1 bg-slate-200"></span>
           </div>
-        <div
-          :class="[
-            ii !== orderedGroupItems[group.id].length - 1 &&
-            !(!item.isAddOn && orderedGroupItems[group.id][ii + 1]?.isAddOn)
-              ? 'cart-divider'
-              : '',
-            'transition-opacity',
-            item.isPreorder && isGroupAllChecked(group) ? 'opacity-50' : '',
-          ]"
-        >
-          <!-- Item row（有備註時收窄底內距，讓備註貼齊所屬商品；下方間距改由備註 mb 提供，統一節奏） -->
           <div
-            class="flex flex-wrap items-start gap-3 px-[var(--card-pad)] pt-[var(--card-pad)] @3xl:flex-nowrap @7xl:gap-4"
-            :class="item.note ? 'pb-2' : 'pb-[var(--card-pad)]'"
+            :class="[
+              ii !== orderedGroupItems[group.id].length - 1 &&
+              !(!item.isAddOn && orderedGroupItems[group.id][ii + 1]?.isAddOn)
+                ? 'cart-divider'
+                : '',
+              'transition-opacity',
+              item.isPreorder && isGroupAllChecked(group) ? 'opacity-50' : '',
+            ]"
           >
-            <!-- Checkbox + 圖片：default 是整台一起、paused 不能結帳，都不顯示 item 勾選；預購品停用勾選（到貨後才可結帳） -->
-            <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
-              <Checkbox
-                v-if="isItemCheckable(group)"
-                v-model="item.checked"
-                binary
-                :disabled="item.isPreorder"
-                :aria-label="item.isPreorder ? '預購商品，到貨後才可結帳' : undefined"
-              />
-              <button
-                type="button"
-                class="aspect-square w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-lg @3xl:w-20 @7xl:w-[100px]"
-                :aria-label="`放大圖片：${item.name}`"
-                @click="handleOpenImagePreview(item.image, item.name)"
-              >
-                <ProductImage :src="item.image" :alt="item.name" size="md" />
-              </button>
-            </div>
-
-            <!-- 批次下標：全寬兩排（名稱↔金額 / 數量↔挑選規格），左右邊界一致 -->
+            <!-- Item row（有備註時收窄底內距，讓備註貼齊所屬商品；下方間距改由備註 mb 提供，統一節奏） -->
             <div
-              v-if="item.isBidBatch"
-              class="flex min-w-0 flex-1 flex-col gap-1.5"
+              class="flex flex-wrap items-start gap-3 px-[var(--card-pad)] pt-[var(--card-pad)] @3xl:flex-nowrap @7xl:gap-4"
+              :class="item.note ? 'pb-2' : 'pb-[var(--card-pad)]'"
             >
-              <!-- 商品所屬直播場次：放在商品名稱上方（商城來源不顯示） -->
-              <p
-                v-if="sessionOfItem(group, item)"
-                class="flex items-center gap-1 text-xs text-slate-400"
-              >
-                <i
-                  :class="['pi', sessionIconOf(group, item)]"
-                  style="font-size: 11px"
-                ></i>
-                {{ sessionOfItem(group, item) }}
-              </p>
-              <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex min-w-0 flex-1 items-start gap-1.5">
-                  <span
-                    v-if="item.isPreorder"
-                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-xs text-white"
-                    style="background: var(--primary)"
-                    aria-label="預購商品"
-                    title="預購商品，到貨後才可結帳"
-                  >
-                    預
-                  </span>
-                  <p
-                    class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
-                    :class="
-                      item.productId != null
-                        ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
-                        : ''
-                    "
-                    @click="handleGoProduct(item.productId)"
-                  >
-                    {{ item.name }}
-                  </p>
-                </div>
-                <div class="flex shrink-0 items-center gap-1.5">
-                  <Tag
-                    v-if="bulkHintForItem(group, item)"
-                    :value="
-                      bulkHintForItem(group, item)!.reached
-                        ? '已達買多優惠'
-                        : '買多優惠'
-                    "
-                    :severity="
-                      bulkHintForItem(group, item)!.reached ? 'success' : 'warn'
-                    "
-                    class="!py-0.5 !text-[10px]"
-                  />
-                  <span
-                    class="text-base font-bold whitespace-nowrap @7xl:text-lg"
-                    style="color: var(--primary)"
-                  >
-                    {{ money(lineTotalOf(item)) }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- 後選規：金額為參考價，實際依所選規格結帳（靠右貼齊金額） -->
-              <p class="text-right text-xs leading-tight text-slate-500">
-                參考價，實際金額以選規格後結帳為準
-              </p>
-
-              <!-- 已挑選規格摘要（規格 ×數量，太多列可展開） -->
-              <div
-                v-if="bidAllocRows(item).length"
-                class="flex flex-col gap-0.5 text-sm text-slate-700"
-              >
-                <span v-for="row in visibleBidRows(item)" :key="row.skuId">
-                  {{ row.label }} ×{{ row.qty }}
-                </span>
+              <!-- Checkbox + 圖片：default 是整台一起、paused 不能結帳，都不顯示 item 勾選；預購品停用勾選（到貨後才可結帳） -->
+              <div class="flex shrink-0 items-center gap-3 @7xl:gap-4">
+                <Checkbox
+                  v-if="isItemCheckable(group)"
+                  v-model="item.checked"
+                  binary
+                  :disabled="item.isPreorder"
+                  :aria-label="
+                    item.isPreorder ? '預購商品，到貨後才可結帳' : undefined
+                  "
+                />
                 <button
-                  v-if="bidAllocRows(item).length > BID_SUMMARY_LIMIT"
                   type="button"
-                  class="flex w-fit items-center gap-1 text-xs text-slate-500 hover:text-[color:var(--primary)]"
-                  @click="toggleBidRows(item)"
+                  class="aspect-square w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-lg @3xl:w-20 @7xl:w-[100px]"
+                  :aria-label="`放大圖片：${item.name}`"
+                  @click="handleOpenImagePreview(item.image, item.name)"
                 >
-                  <span>{{
-                    bidRowsExpanded[item.id]
-                      ? '收合'
-                      : `查看更多（${bidAllocRows(item).length - BID_SUMMARY_LIMIT}）`
-                  }}</span>
-                  <i
-                    :class="[
-                      'pi text-[10px]',
-                      bidRowsExpanded[item.id]
-                        ? 'pi-chevron-up'
-                        : 'pi-chevron-down',
-                    ]"
-                  />
+                  <ProductImage :src="item.image" :alt="item.name" size="md" />
                 </button>
               </div>
 
-              <!-- 第 2 排：數量（左）… 挑選/修改規格（右，右緣對齊上方金額） -->
+              <!-- 批次下標：全寬兩排（名稱↔金額 / 數量↔挑選規格），左右邊界一致 -->
               <div
-                class="flex flex-wrap items-center justify-between gap-3 text-sm"
+                v-if="item.isBidBatch"
+                class="flex min-w-0 flex-1 flex-col gap-1.5"
               >
-                <div class="flex items-center gap-3">
-                  <span class="text-slate-600 max-md:hidden">數量</span>
-                  <InputNumber
-                    v-model="item.qty"
-                    :min="1"
-                    :max="itemStockMax(item)"
-                    :max-fraction-digits="0"
-                    :allow-empty="false"
-                    :disabled="(isQtyLocked(group) && !item.isAddOn) || item.isPreorder"
-                    show-buttons
-                    button-layout="horizontal"
-                    increment-button-icon="pi pi-plus"
-                    decrement-button-icon="pi pi-minus"
-                    class="qty-stepper qty-keep-stepper"
-                  />
+                <!-- 商品所屬直播場次：放在商品名稱上方（商城來源不顯示） -->
+                <p
+                  v-if="sessionOfItem(group, item)"
+                  class="flex items-center gap-1 text-xs text-slate-400"
+                >
+                  <i
+                    :class="['pi', sessionIconOf(group, item)]"
+                    style="font-size: 11px"
+                  ></i>
+                  {{ sessionOfItem(group, item) }}
+                </p>
+                <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex min-w-0 flex-1 items-start gap-1.5">
+                    <span
+                      v-if="item.isPreorder"
+                      class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-xs text-white"
+                      style="background: var(--primary)"
+                      aria-label="預購商品"
+                      title="預購商品，到貨後才可結帳"
+                    >
+                      預
+                    </span>
+                    <p
+                      class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
+                      :class="
+                        item.productId != null
+                          ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
+                          : ''
+                      "
+                      @click="handleGoProduct(item.productId)"
+                    >
+                      {{ item.name }}
+                    </p>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-1.5">
+                    <Tag
+                      v-if="bulkHintForItem(group, item)"
+                      :value="
+                        bulkHintForItem(group, item)!.reached
+                          ? '已達買多優惠'
+                          : '買多優惠'
+                      "
+                      :severity="
+                        bulkHintForItem(group, item)!.reached
+                          ? 'success'
+                          : 'warn'
+                      "
+                      class="!py-0.5 !text-[10px]"
+                    />
+                    <span
+                      class="text-base font-bold whitespace-nowrap @7xl:text-lg"
+                      style="color: var(--primary)"
+                    >
+                      {{ money(lineTotalOf(item)) }}
+                    </span>
+                  </div>
                 </div>
-                <Button
-                  :label="committedTotal(item) > 0 ? '修改規格' : '挑選規格'"
-                  icon="pi pi-sliders-h"
-                  severity="secondary"
-                  outlined
-                  size="small"
-                  class="!min-h-8"
-                  @click="openBidDialog(item)"
-                />
-              </div>
 
-              <!-- 待挑選規格 badge（緊接第 2 排下方） -->
-              <span
-                v-if="item.specPending"
-                class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
-              >
-                <i class="pi pi-exclamation-circle text-[10px]" />
-                待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
-              </span>
+                <!-- 後選規：金額為參考價，實際依所選規格結帳（靠右貼齊金額） -->
+                <p class="text-right text-xs leading-tight text-slate-500">
+                  參考價，實際金額以選規格後結帳為準
+                </p>
 
-            </div>
-
-            <!-- 非批次下標：全寬兩排（名稱↔金額 / 數量↔刪除），左右邊界一致 -->
-            <div v-else class="flex min-w-0 flex-1 flex-col gap-1.5">
-              <!-- 商品所屬直播場次：放在商品名稱上方（商城來源不顯示） -->
-              <p
-                v-if="sessionOfItem(group, item)"
-                class="flex items-center gap-1 text-xs text-slate-400"
-              >
-                <i
-                  :class="['pi', sessionIconOf(group, item)]"
-                  style="font-size: 11px"
-                ></i>
-                {{ sessionOfItem(group, item) }}
-              </p>
-              <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex min-w-0 flex-1 items-start gap-1.5">
-                  <span
-                    v-if="item.isPreorder"
-                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-xs text-white"
-                    style="background: var(--primary)"
-                    aria-label="預購商品"
-                    title="預購商品，到貨後才可結帳"
-                  >
-                    預
-                  </span>
-                  <p
-                    class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
-                    :class="
-                      item.productId != null
-                        ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
-                        : ''
-                    "
-                    @click="handleGoProduct(item.productId)"
-                  >
-                    {{ item.name }}
-                  </p>
-                </div>
-                <div class="flex shrink-0 items-center gap-1.5">
-                  <Tag
-                    v-if="bulkHintForItem(group, item)"
-                    :value="
-                      bulkHintForItem(group, item)!.reached
-                        ? '已達買多優惠'
-                        : '買多優惠'
-                    "
-                    :severity="
-                      bulkHintForItem(group, item)!.reached ? 'success' : 'warn'
-                    "
-                    class="!py-0.5 !text-[10px]"
-                  />
-                  <span
-                    class="text-base font-bold whitespace-nowrap @7xl:text-lg"
-                    style="color: var(--primary)"
-                  >
-                    {{ money(lineTotalOf(item)) }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- 規格：加入購物車前已選定，車內僅顯示文字。
-                   後選規（標單必結 / 批次下標）走上方 isBidBatch 分支的「挑選規格」按鈕，不在此處 -->
-              <div
-                v-if="item.spec && item.spec !== '預設'"
-                class="text-sm text-slate-600"
-              >
-                {{ item.spec }}
-              </div>
-
-              <!-- 預購提示：到貨前不可勾選結帳，到貨轉一般商品後才開放 -->
-              <p
-                v-if="item.isPreorder"
-                class="flex w-fit items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500"
-              >
-                <i class="pi pi-clock" style="font-size: 11px" />
-                預購商品，到貨後才可結帳
-</p>
-
-              <!-- 第 2 排：數量（左）… 刪除（右，右緣對齊上方金額） -->
-              <div
-                class="flex flex-wrap items-center justify-between gap-3 text-sm"
-              >
-                <div class="flex items-center gap-3">
-                  <span class="text-slate-600 max-md:hidden">數量</span>
-                  <InputNumber
-                    v-model="item.qty"
-                    :min="1"
-                    :max="itemStockMax(item)"
-                    :max-fraction-digits="0"
-                    :allow-empty="false"
-                    :disabled="(isQtyLocked(group) && !item.isAddOn) || item.isPreorder"
-                    show-buttons
-                    button-layout="horizontal"
-                    increment-button-icon="pi pi-plus"
-                    decrement-button-icon="pi pi-minus"
-                    class="qty-stepper qty-keep-stepper"
-                  />
-                </div>
-                <!-- 加購商品不受結帳模式限制：一律可刪除（禁止棄標車也能移除加購品） -->
-                <Button
-                  v-if="!isDefaultMode(group) || item.isAddOn"
-                  label="刪除"
-                  icon="pi pi-trash"
-                  severity="secondary"
-                  outlined
-                  size="small"
-                  class="!inline-flex !min-h-8 !px-2 !py-1"
-                  @click="removeItem(group, item.id)"
-                />
-              </div>
-
-              <!-- 買多優惠提示：達標綠底 + 已折抵；未達琥珀底 + 再買幾件（跨規格合計，只在第一列顯示） -->
-              <div
-                v-if="bulkHintForItem(group, item)"
-                class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
-                :class="
-                  bulkHintForItem(group, item)!.reached
-                    ? 'bg-green-50 text-green-700'
-                    : 'bg-amber-50 text-amber-700'
-                "
-              >
-                <i class="pi pi-tag text-[10px]" />
-                <template v-if="bulkHintForItem(group, item)!.reached">
-                  <span>
-                    買 {{ bulkHintForItem(group, item)!.minQty }} 件以上折扣
-                    {{ money(bulkHintForItem(group, item)!.tierDiscount) }}
-                  </span>
-                  <span class="font-medium">
-                    · 已折抵 -{{ money(bulkHintForItem(group, item)!.discount) }}
-                  </span>
-                </template>
-                <span v-else>
-                  買 {{ bulkHintForItem(group, item)!.minQty }} 件以上折扣
-                  {{ money(bulkHintForItem(group, item)!.tierDiscount) }}，再買
-                  {{ bulkHintForItem(group, item)!.remaining }} 件即享
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 商品備註：緊接商品列下方；mb 統一為 card-pad，讓「備註→分隔線 / 組合 / 小計」間距與無備註列一致 -->
-          <div
-            v-if="item.note"
-            class="mx-[var(--card-pad)] mb-[var(--card-pad)] flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"
-          >
-            <i class="pi pi-info-circle mt-0.5 shrink-0" />
-            <span class="min-w-0">
-              <span class="font-medium">商品備註：</span>{{ item.note }}
-            </span>
-          </div>
-
-          <!-- Bundle 組合商品 -->
-          <div v-if="item.isBundle" class="px-[var(--card-pad)] pt-2 pb-4 pl-9">
-            <div
-              class="relative rounded-lg border border-slate-200 bg-slate-50 p-4"
-            >
-              <!-- 標題：靠左 -->
-              <button
-                class="absolute top-0 left-3 flex -translate-y-1/2 items-center gap-1.5 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 transition-colors hover:text-[var(--primary)]"
-                @click="item.bundleExpanded = !item.bundleExpanded"
-              >
-                <i
-                  class="pi text-[10px]"
-                  :class="item.bundleExpanded ? 'pi-minus' : 'pi-plus'"
-                />
-                <span>組合商品</span>
-              </button>
-
-              <!-- 未選 / 超選提示 banner：訊息由 bundleWarningMessage() 依情境給 -->
-              <div
-                v-if="item.bundleExpanded && bundleWarningMessage(item)"
-                class="mb-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-500"
-              >
-                <i class="pi pi-exclamation-triangle text-base" />
-                <span>{{ bundleWarningMessage(item) }}</span>
-              </div>
-
-              <!-- 任選組合：已選摘要清單 + 挑選內容按鈕（比照批次下標挑選規格）-->
-              <div
-                v-if="item.bundleExpanded && isPickBundleItem(item)"
-                class="flex flex-col gap-2"
-              >
+                <!-- 已挑選規格摘要（規格 ×數量，太多列可展開） -->
                 <div
-                  v-if="item.bundleItems?.length"
+                  v-if="bidAllocRows(item).length"
                   class="flex flex-col gap-0.5 text-sm text-slate-700"
                 >
-                  <span v-for="(sub, si) in item.bundleItems" :key="si">
-                    {{ sub.name
-                    }}<span
-                      v-if="sub.spec && sub.spec !== '預設'"
-                      class="text-slate-500"
-                    >
-                      / {{ sub.spec }}</span
-                    >
-                    ×{{ sub.qty }}
+                  <span v-for="row in visibleBidRows(item)" :key="row.skuId">
+                    {{ row.label }} ×{{ row.qty }}
                   </span>
+                  <button
+                    v-if="bidAllocRows(item).length > BID_SUMMARY_LIMIT"
+                    type="button"
+                    class="flex w-fit items-center gap-1 text-xs text-slate-500 hover:text-[color:var(--primary)]"
+                    @click="toggleBidRows(item)"
+                  >
+                    <span>{{
+                      bidRowsExpanded[item.id]
+                        ? '收合'
+                        : `查看更多（${bidAllocRows(item).length - BID_SUMMARY_LIMIT}）`
+                    }}</span>
+                    <i
+                      :class="[
+                        'pi text-[10px]',
+                        bidRowsExpanded[item.id]
+                          ? 'pi-chevron-up'
+                          : 'pi-chevron-down',
+                      ]"
+                    />
+                  </button>
                 </div>
-                <Button
-                  :label="pickedTotalOf(item) > 0 ? '修改內容' : '挑選內容'"
-                  icon="pi pi-sliders-h"
-                  severity="secondary"
-                  outlined
-                  size="small"
-                  class="!min-h-8 w-fit"
-                  @click="openPickDialog(item)"
-                />
+
+                <!-- 第 2 排：數量（左）… 挑選/修改規格（右，右緣對齊上方金額） -->
+                <div
+                  class="flex flex-wrap items-center justify-between gap-3 text-sm"
+                >
+                  <div class="flex items-center gap-3">
+                    <span class="text-slate-600 max-md:hidden">數量</span>
+                    <InputNumber
+                      v-model="item.qty"
+                      :min="1"
+                      :max="itemStockMax(item)"
+                      :max-fraction-digits="0"
+                      :allow-empty="false"
+                      :disabled="
+                        (isQtyLocked(group) && !item.isAddOn) || item.isPreorder
+                      "
+                      show-buttons
+                      button-layout="horizontal"
+                      increment-button-icon="pi pi-plus"
+                      decrement-button-icon="pi pi-minus"
+                      class="qty-stepper qty-keep-stepper"
+                    />
+                  </div>
+                  <Button
+                    :label="committedTotal(item) > 0 ? '修改規格' : '挑選規格'"
+                    icon="pi pi-sliders-h"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    class="!min-h-8"
+                    @click="openBidDialog(item)"
+                  />
+                </div>
+
+                <!-- 待挑選規格 badge（緊接第 2 排下方） -->
+                <span
+                  v-if="item.specPending"
+                  class="flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700"
+                >
+                  <i class="pi pi-exclamation-circle text-[10px]" />
+                  待挑選規格（尚缺 {{ item.qty - committedTotal(item) }}）
+                </span>
               </div>
 
-              <!-- 固定組合(有可選規格)：收合摘要（子品 + 已選規格 / 待選規格）+ 選擇規格按鈕（規格改用彈窗選）-->
-              <div
-                v-else-if="item.bundleExpanded && fixedBundleHasSpec(item)"
-                class="flex flex-col gap-2"
-              >
-                <div
-                  v-if="item.bundleItems?.length"
-                  class="flex flex-col gap-1.5 text-sm text-slate-700"
+              <!-- 非批次下標：全寬兩排（名稱↔金額 / 數量↔刪除），左右邊界一致 -->
+              <div v-else class="flex min-w-0 flex-1 flex-col gap-1.5">
+                <!-- 商品所屬直播場次：放在商品名稱上方（商城來源不顯示） -->
+                <p
+                  v-if="sessionOfItem(group, item)"
+                  class="flex items-center gap-1 text-xs text-slate-400"
                 >
-                  <template v-for="(sub, si) in item.bundleItems" :key="si">
-                    <!-- 已選規格：商品名稱（換行）規格 ×數量 -->
-                    <div
-                      v-if="sub.spec && sub.spec !== '預設'"
-                      class="flex flex-col"
+                  <i
+                    :class="['pi', sessionIconOf(group, item)]"
+                    style="font-size: 11px"
+                  ></i>
+                  {{ sessionOfItem(group, item) }}
+                </p>
+                <!-- 第 1 排：名稱（左）… 金額（右，含買多優惠 Tag / 劃線原價） -->
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex min-w-0 flex-1 items-start gap-1.5">
+                    <span
+                      v-if="item.isPreorder"
+                      class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-xs text-white"
+                      style="background: var(--primary)"
+                      aria-label="預購商品"
+                      title="預購商品，到貨後才可結帳"
                     >
-                      <span>{{ sub.name }}</span>
-                      <span class="text-slate-500"
-                        >{{ sub.spec }} ×{{ (sub.qty || 0) * item.qty }}</span
-                      >
-                    </div>
-                    <!-- 待選規格：商品名稱 ×數量 / 待選規格 -->
-                    <span v-else>
-                      {{ sub.name }} ×{{ (sub.qty || 0) * item.qty }}
-                      <span class="text-red-500">/ 待選規格</span>
+                      預
+                    </span>
+                    <p
+                      class="line-clamp-2 min-w-0 flex-1 text-base font-bold text-slate-950"
+                      :class="
+                        item.productId != null
+                          ? 'cursor-pointer transition-colors hover:text-[color:var(--primary)]'
+                          : ''
+                      "
+                      @click="handleGoProduct(item.productId)"
+                    >
+                      {{ item.name }}
+                    </p>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-1.5">
+                    <Tag
+                      v-if="bulkHintForItem(group, item)"
+                      :value="
+                        bulkHintForItem(group, item)!.reached
+                          ? '已達買多優惠'
+                          : '買多優惠'
+                      "
+                      :severity="
+                        bulkHintForItem(group, item)!.reached
+                          ? 'success'
+                          : 'warn'
+                      "
+                      class="!py-0.5 !text-[10px]"
+                    />
+                    <span
+                      class="text-base font-bold whitespace-nowrap @7xl:text-lg"
+                      style="color: var(--primary)"
+                    >
+                      {{ money(lineTotalOf(item)) }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 規格：加入購物車前已選定，車內僅顯示文字。
+                   後選規（標單必結 / 批次下標）走上方 isBidBatch 分支的「挑選規格」按鈕，不在此處 -->
+                <div
+                  v-if="item.spec && item.spec !== '預設'"
+                  class="text-sm text-slate-600"
+                >
+                  {{ item.spec }}
+                </div>
+
+                <!-- 預購提示：到貨前不可勾選結帳，到貨轉一般商品後才開放 -->
+                <p
+                  v-if="item.isPreorder"
+                  class="flex w-fit items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500"
+                >
+                  <i class="pi pi-clock" style="font-size: 11px" />
+                  預購商品，到貨後才可結帳
+                </p>
+
+                <!-- 第 2 排：數量（左）… 刪除（右，右緣對齊上方金額） -->
+                <div
+                  class="flex flex-wrap items-center justify-between gap-3 text-sm"
+                >
+                  <div class="flex items-center gap-3">
+                    <span class="text-slate-600 max-md:hidden">數量</span>
+                    <InputNumber
+                      v-model="item.qty"
+                      :min="1"
+                      :max="itemStockMax(item)"
+                      :max-fraction-digits="0"
+                      :allow-empty="false"
+                      :disabled="
+                        (isQtyLocked(group) && !item.isAddOn) || item.isPreorder
+                      "
+                      show-buttons
+                      button-layout="horizontal"
+                      increment-button-icon="pi pi-plus"
+                      decrement-button-icon="pi pi-minus"
+                      class="qty-stepper qty-keep-stepper"
+                    />
+                  </div>
+                  <!-- 加購商品不受結帳模式限制：一律可刪除（禁止棄標車也能移除加購品） -->
+                  <Button
+                    v-if="!isDefaultMode(group) || item.isAddOn"
+                    label="刪除"
+                    icon="pi pi-trash"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    class="!inline-flex !min-h-8 !px-2 !py-1"
+                    @click="removeItem(group, item.id)"
+                  />
+                </div>
+
+                <!-- 買多優惠提示：達標綠底 + 已折抵；未達琥珀底 + 再買幾件（跨規格合計，只在第一列顯示） -->
+                <div
+                  v-if="bulkHintForItem(group, item)"
+                  class="flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                  :class="
+                    bulkHintForItem(group, item)!.reached
+                      ? 'bg-green-50 text-green-700'
+                      : 'bg-amber-50 text-amber-700'
+                  "
+                >
+                  <i class="pi pi-tag text-[10px]" />
+                  <template v-if="bulkHintForItem(group, item)!.reached">
+                    <span>
+                      買 {{ bulkHintForItem(group, item)!.minQty }} 件以上折扣
+                      {{ money(bulkHintForItem(group, item)!.tierDiscount) }}
+                    </span>
+                    <span class="font-medium">
+                      · 已折抵 -{{
+                        money(bulkHintForItem(group, item)!.discount)
+                      }}
                     </span>
                   </template>
+                  <span v-else>
+                    買 {{ bulkHintForItem(group, item)!.minQty }} 件以上折扣
+                    {{
+                      money(bulkHintForItem(group, item)!.tierDiscount)
+                    }}，再買
+                    {{ bulkHintForItem(group, item)!.remaining }} 件即享
+                  </span>
                 </div>
-                <Button
-                  :label="fixedBundleAllChosen(item) ? '修改規格' : '選擇規格'"
-                  icon="pi pi-sliders-h"
-                  severity="secondary"
-                  outlined
-                  size="small"
-                  class="!min-h-8 w-fit"
-                  @click="openFixedDialog(item)"
-                />
               </div>
+            </div>
 
-              <!-- 固定組合(規格固定，無可選規格)：子品內嵌顯示（圖 + 名 + 規格文字 + 數量），維持原樣 -->
+            <!-- 商品備註：緊接商品列下方；mb 統一為 card-pad，讓「備註→分隔線 / 組合 / 小計」間距與無備註列一致 -->
+            <div
+              v-if="item.note"
+              class="mx-[var(--card-pad)] mb-[var(--card-pad)] flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"
+            >
+              <i class="pi pi-info-circle mt-0.5 shrink-0" />
+              <span class="min-w-0">
+                <span class="font-medium">商品備註：</span>{{ item.note }}
+              </span>
+            </div>
+
+            <!-- Bundle 組合商品 -->
+            <div
+              v-if="item.isBundle"
+              class="px-[var(--card-pad)] pt-2 pb-4 pl-9"
+            >
               <div
-                v-else-if="item.bundleExpanded"
-                class="grid grid-cols-1 gap-3 @3xl:grid-cols-2"
+                class="relative rounded-lg border border-slate-200 bg-slate-50 p-4"
               >
-                <div
-                  v-for="(sub, si) in item.bundleItems"
-                  :key="si"
-                  class="flex items-start gap-3"
+                <!-- 標題：靠左 -->
+                <button
+                  class="absolute top-0 left-3 flex -translate-y-1/2 items-center gap-1.5 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 transition-colors hover:text-[var(--primary)]"
+                  @click="item.bundleExpanded = !item.bundleExpanded"
                 >
-                  <button
-                    type="button"
-                    class="aspect-square w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-lg bg-slate-200 @3xl:w-20 @7xl:w-[100px]"
-                    :aria-label="`放大圖片：${sub.name}`"
-                    @click="handleOpenImagePreview(sub.image, sub.name)"
+                  <i
+                    class="pi text-[10px]"
+                    :class="item.bundleExpanded ? 'pi-minus' : 'pi-plus'"
+                  />
+                  <span>組合商品</span>
+                </button>
+
+                <!-- 未選 / 超選提示 banner：訊息由 bundleWarningMessage() 依情境給 -->
+                <div
+                  v-if="item.bundleExpanded && bundleWarningMessage(item)"
+                  class="mb-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-500"
+                >
+                  <i class="pi pi-exclamation-triangle text-base" />
+                  <span>{{ bundleWarningMessage(item) }}</span>
+                </div>
+
+                <!-- 任選組合：已選摘要清單 + 挑選內容按鈕（比照批次下標挑選規格）-->
+                <div
+                  v-if="item.bundleExpanded && isPickBundleItem(item)"
+                  class="flex flex-col gap-2"
+                >
+                  <div
+                    v-if="item.bundleItems?.length"
+                    class="flex flex-col gap-0.5 text-sm text-slate-700"
                   >
-                    <ProductImage :src="sub.image" :alt="sub.name" size="md" />
-                  </button>
-                  <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p class="truncate text-base font-semibold text-slate-700">
-                      {{ sub.name }}
-                    </p>
-                    <!-- 商品名稱（換行）規格 ×數量，不顯示「數量」label -->
-                    <p class="text-sm text-slate-500">
-                      <template v-if="sub.spec && sub.spec !== '預設'"
-                        >{{ sub.spec }} </template
-                      >×{{ (sub.qty || 0) * item.qty }}
-                    </p>
+                    <span v-for="(sub, si) in item.bundleItems" :key="si">
+                      {{ sub.name
+                      }}<span
+                        v-if="sub.spec && sub.spec !== '預設'"
+                        class="text-slate-500"
+                      >
+                        / {{ sub.spec }}</span
+                      >
+                      ×{{ sub.qty }}
+                    </span>
+                  </div>
+                  <Button
+                    :label="pickedTotalOf(item) > 0 ? '修改內容' : '挑選內容'"
+                    icon="pi pi-sliders-h"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    class="!min-h-8 w-fit"
+                    @click="openPickDialog(item)"
+                  />
+                </div>
+
+                <!-- 固定組合(有可選規格)：收合摘要（子品 + 已選規格 / 待選規格）+ 選擇規格按鈕（規格改用彈窗選）-->
+                <div
+                  v-else-if="item.bundleExpanded && fixedBundleHasSpec(item)"
+                  class="flex flex-col gap-2"
+                >
+                  <div
+                    v-if="item.bundleItems?.length"
+                    class="flex flex-col gap-1.5 text-sm text-slate-700"
+                  >
+                    <template v-for="(sub, si) in item.bundleItems" :key="si">
+                      <!-- 已選規格：商品名稱（換行）規格 ×數量 -->
+                      <div
+                        v-if="sub.spec && sub.spec !== '預設'"
+                        class="flex flex-col"
+                      >
+                        <span>{{ sub.name }}</span>
+                        <span class="text-slate-500"
+                          >{{ sub.spec }} ×{{ (sub.qty || 0) * item.qty }}</span
+                        >
+                      </div>
+                      <!-- 待選規格：商品名稱 ×數量 / 待選規格 -->
+                      <span v-else>
+                        {{ sub.name }} ×{{ (sub.qty || 0) * item.qty }}
+                        <span class="text-red-500">/ 待選規格</span>
+                      </span>
+                    </template>
+                  </div>
+                  <Button
+                    :label="
+                      fixedBundleAllChosen(item) ? '修改規格' : '選擇規格'
+                    "
+                    icon="pi pi-sliders-h"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    class="!min-h-8 w-fit"
+                    @click="openFixedDialog(item)"
+                  />
+                </div>
+
+                <!-- 固定組合(規格固定，無可選規格)：子品內嵌顯示（圖 + 名 + 規格文字 + 數量），維持原樣 -->
+                <div
+                  v-else-if="item.bundleExpanded"
+                  class="grid grid-cols-1 gap-3 @3xl:grid-cols-2"
+                >
+                  <div
+                    v-for="(sub, si) in item.bundleItems"
+                    :key="si"
+                    class="flex items-start gap-3"
+                  >
+                    <button
+                      type="button"
+                      class="aspect-square w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-lg bg-slate-200 @3xl:w-20 @7xl:w-[100px]"
+                      :aria-label="`放大圖片：${sub.name}`"
+                      @click="handleOpenImagePreview(sub.image, sub.name)"
+                    >
+                      <ProductImage
+                        :src="sub.image"
+                        :alt="sub.name"
+                        size="md"
+                      />
+                    </button>
+                    <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <p
+                        class="truncate text-base font-semibold text-slate-700"
+                      >
+                        {{ sub.name }}
+                      </p>
+                      <!-- 商品名稱（換行）規格 ×數量，不顯示「數量」label -->
+                      <p class="text-sm text-slate-500">
+                        <template v-if="sub.spec && sub.spec !== '預設'"
+                          >{{ sub.spec }} </template
+                        >×{{ (sub.qty || 0) * item.qty }}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
         </template>
 
         <!-- Group subtotal -->
@@ -2167,7 +2200,9 @@ const handleGoProduct = (productId?: number) => {
               />
             </div>
           </div>
-          <span class="text-xs text-slate-500">庫存 {{ addOnDialog.stock }} 件</span>
+          <span class="text-xs text-slate-500"
+            >庫存 {{ addOnDialog.stock }} 件</span
+          >
         </div>
 
         <!-- 無規格：單一數量 -->

@@ -34,7 +34,9 @@ const freeShippingEndLabel = ordersStore.freeShippingCampaignEndLabel;
 /** 本次結帳中、剛解鎖「首購後免運」的賣場（僅限本次下單涉及的台）。 */
 const unlockedCartSellers = computed(() => {
   const ids = new Set(summary.value?.sellerIds ?? []);
-  return ordersStore.cartLevelUnlockedSellers.filter((s) => ids.has(s.sellerId));
+  return ordersStore.cartLevelUnlockedSellers.filter((s) =>
+    ids.has(s.sellerId),
+  );
 });
 /** 購物車級附註文案（帳號級已啟用時，購物車級降為一行）。 */
 const cartSellersNote = computed(() => {
