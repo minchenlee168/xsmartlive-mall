@@ -1772,7 +1772,7 @@ const handleConfirmPayWithoutFreeShip = () => {
             <i class="pi pi-truck mt-0.5 shrink-0" />
             <span class="min-w-0"
               ><span class="font-semibold">期間首購後免運</span
-              >：配送選擇與活動首購相同地點享免運</span
+              >：配送選擇與期間首購相同地點享免運</span
             >
           </div>
         </div>
