@@ -1030,86 +1030,6 @@ const drawerGroups = computed(() =>
     ? checkoutGroups.value.filter((g) => g.id === shipDrawerGroupId.value)
     : checkoutGroups.value,
 );
-/**
- * 抽屜內：給定「方式＋目的地」的 shipKey，該組是否可享免運（純預覽，不改狀態）。
- * 期間首購後免運看方式＋地址；門檻型（滿額/滿件/單品/滿千）與方式/地址無關；偏遠一律不免。
- */
-const shipKeyFreeForGroup = (
-  g: CheckoutGroup,
-  method: ShippingMethodId,
-  destId: string,
-  destAddress: string,
-): boolean => {
-  if (destAddress && isRemoteArea(destAddress)) return false;
-  const shipKey = `${method}|${destId}`;
-  if (isSiteWideFreeShippingOn.value) {
-    switch (ordersStore.siteWideFreeShipping.type) {
-      case 'period':
-        return true;
-      case 'first-purchase':
-        return !ordersStore.hasAnyReturnWindowOrder;
-      case 'first-purchase-then-free':
-        return (
-          ordersStore.hasAnyReturnWindowOrder &&
-          ordersStore.siteWideBaselineKeys.includes(shipKey)
-        );
-      case 'min-amount':
-        return groupAfterBulk(g) >= SITE_WIDE_MIN_AMOUNT;
-      case 'min-qty':
-        return g.items.reduce((s, i) => s + i.qty, 0) >= SITE_WIDE_MIN_QTY;
-      case 'single-item':
-        return g.items.some(
-          (i) =>
-            i.productId != null &&
-            SITE_WIDE_FREE_SHIPPING_PRODUCT_IDS.includes(i.productId),
-        );
-      default:
-        return false;
-    }
-  }
-  if (isFirstPurchaseFreeShipping.value) return true;
-  // 指定購物車（購物車級）期間首購後免運：抽屜不提示免運（依使用者需求）；
-  // 其掛活動的台一律不在抽屜標免運，實際免運仍由費用列呈現。
-  if (groupHasCartCampaign(g)) return false;
-  return isGroupFreeShipping(g);
-};
-/** 宅配類某地址對抽屜範圍所有訂單是否皆免運（不可配送地址不算、符合才標「免運」）。 */
-const drawerHomeAddrFree = (m: ShippingMethodId, addr: HomeAddress): boolean =>
-  !addr.unavailable &&
-  drawerGroups.value.length > 0 &&
-  drawerGroups.value.every((g) =>
-    shipKeyFreeForGroup(g, m, addr.id, addr.address),
-  );
-/** 超商某門市對該組是否免運（店址缺省不做偏遠判定）。 */
-const drawerStoreFree = (g: CheckoutGroup, storeId: string): boolean =>
-  shipKeyFreeForGroup(g, 'store', storeId, '');
-/**
- * 方式層級免運程度：
- * - 'all'：該方式底下所有可選地址/門市都免運 → 標「免運」。
- * - 'some'：只有部分地址/門市免運（如期間首購後免運只符合首購那一個地址）→ 標「部分免運」。
- * - 'none'：都不免運 → 不標。
- */
-const drawerMethodFreeLevel = (
-  m: ShippingMethodId,
-): 'all' | 'some' | 'none' => {
-  if (drawerGroups.value.length === 0) return 'none';
-  let options: boolean[];
-  if (m === 'home' || m === 'post' || m === 'cross-border') {
-    // 只看可配送的地址：不可配送地址無法選、不計入全部/部分判定
-    options = homeAddresses.value
-      .filter((addr) => !addr.unavailable)
-      .map((addr) => drawerHomeAddrFree(m, addr));
-  } else if (m === 'store') {
-    options = cvsStoreList.value.map((s) =>
-      drawerGroups.value.every((g) => drawerStoreFree(g, s.id)),
-    );
-  } else {
-    return 'none';
-  }
-  const freeCount = options.filter(Boolean).length;
-  if (options.length === 0 || freeCount === 0) return 'none';
-  return freeCount === options.length ? 'all' : 'some';
-};
 /** 抽屜可選的運送方式：個別訂單 → 該訂單支援的；套用全部 → 各車交集。 */
 const drawerMethods = computed<ShippingMethodId[]>(() => {
   if (shipDrawerGroupId.value == null) return supportedShippingMethods.value;
@@ -2880,23 +2800,10 @@ const handleConfirmPayWithoutFreeShip = () => {
                     <span class="font-medium">{{
                       SHIPPING_METHOD_LABELS[m]
                     }}</span>
-                    <span class="flex items-center gap-2">
-                      <span
-                        v-if="drawerMethodFreeLevel(m) === 'all'"
-                        class="text-xs font-medium"
-                        style="color: var(--primary)"
-                        >免運</span
-                      >
-                      <span
-                        v-else-if="drawerMethodFreeLevel(m) === 'some'"
-                        class="text-xs font-medium text-red-500"
-                        >部分免運</span
-                      >
-                      <i
-                        v-if="drawerSelectedMethod === m"
-                        class="pi pi-check text-green-600"
-                      />
-                    </span>
+                    <i
+                      v-if="drawerSelectedMethod === m"
+                      class="pi pi-check text-green-600"
+                    />
                   </Button>
 
                   <!-- 宅配 / 郵局宅配 / 跨境：共用收件地址清單 -->
@@ -2937,15 +2844,6 @@ const handleConfirmPayWithoutFreeShip = () => {
                               class="rounded px-1.5 py-0.5 text-xs font-medium text-white"
                               style="background: var(--primary)"
                               >預設</span
-                            >
-                            <span
-                              v-if="drawerHomeAddrFree(m, addr)"
-                              class="rounded px-1.5 py-0.5 text-xs font-medium"
-                              style="
-                                background: var(--primary-surface);
-                                color: var(--primary);
-                              "
-                              >免運</span
                             >
                           </div>
                           <div
@@ -3140,15 +3038,6 @@ const handleConfirmPayWithoutFreeShip = () => {
                               class="h-5 w-5 shrink-0 object-contain"
                             />
                             <span>{{ s.storeName }}</span>
-                            <span
-                              v-if="drawerStoreFree(g, s.id)"
-                              class="rounded px-1.5 py-0.5 text-xs font-medium"
-                              style="
-                                background: var(--primary-surface);
-                                color: var(--primary);
-                              "
-                              >免運</span
-                            >
                           </span>
                         </button>
                       </div>
