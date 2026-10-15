@@ -98,10 +98,3 @@ export const returnWindowDaysLeft = (now: Date): number =>
     0,
     Math.ceil((returnWindowEnd().getTime() - now.getTime()) / DAY_IN_MS),
   );
-
-/** 'M/D'（不補零），供提示列的短日期用。 */
-const shortLabel = (d: Date): string => `${d.getMonth() + 1}/${d.getDate()}`;
-
-/** 回購免運檔期窗訖日短字串（'M/D'），活動截止日。 */
-export const returnWindowEndShortLabel = (): string =>
-  shortLabel(parseDashDate(CART_RETURN_FREE_SHIPPING_WINDOW.endDate));
