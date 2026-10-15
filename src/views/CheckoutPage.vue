@@ -785,65 +785,6 @@ const shipKeyLabel = (key: string): string => {
   }
   return method;
 };
-/** 本次結帳中、有購物車級首購基準、且目前配送與首購不同的賣場（可一鍵套用）。 */
-const cartLevelBaselineGroups = computed(() =>
-  checkoutGroups.value.filter(
-    (g) =>
-      groupCartLevelUnlocked(g) &&
-      !!ordersStore.cartLevelBaselineKey(g.sellerId) &&
-      !groupShipKeyMatchesBaseline(g),
-  ),
-);
-/** 逐組套用購物車級首購基準配送（設方式＋地址），使其符合免運。 */
-const applyBaselineShipping = () => {
-  for (const g of cartLevelBaselineGroups.value) {
-    const key = ordersStore.cartLevelBaselineKey(g.sellerId);
-    if (!key) continue;
-    const [method, destId] = key.split('|');
-    shipMethodByGroup.value = {
-      ...shipMethodByGroup.value,
-      [g.id]: method as ShippingMethodId,
-    };
-    if (method === 'home' || method === 'post' || method === 'cross-border') {
-      selectedHomeId.value = destId;
-    } else if (method === 'store') {
-      cvsStoreByGroup.value = { ...cvsStoreByGroup.value, [g.id]: destId };
-    } else if (method === 'pickup') {
-      selectedPickupId.value = destId;
-    }
-  }
-};
-
-// ── 全站「期間首購後免運」：自動套用可享免運的配送 ─────────────────────────
-/**
- * 逐組挑「該組支援的免運基準配送」並套上。
- * - 該組已符合免運清單 → 不動（保留已選的有效基準）。
- * - 該組不支援任何免運基準配送方式 → 跳過（照收運費，不硬套不支援的方式）。
- */
-const applySiteWideBaselineShipping = () => {
-  const keys = ordersStore.siteWideBaselineKeys;
-  if (keys.length === 0) return;
-  for (const g of checkoutGroups.value) {
-    if (keys.includes(groupShipKey(g))) continue;
-    const supported = groupSupportedMethods(g);
-    const key = keys.find((k) =>
-      supported.includes(k.split('|')[0] as ShippingMethodId),
-    );
-    if (!key) continue;
-    const [method, destId] = key.split('|');
-    shipMethodByGroup.value = {
-      ...shipMethodByGroup.value,
-      [g.id]: method as ShippingMethodId,
-    };
-    if (method === 'home' || method === 'post' || method === 'cross-border') {
-      selectedHomeId.value = destId;
-    } else if (method === 'store') {
-      cvsStoreByGroup.value = { ...cvsStoreByGroup.value, [g.id]: destId };
-    } else if (method === 'pickup') {
-      selectedPickupId.value = destId;
-    }
-  }
-};
 /** 全站「期間首購後免運」已啟用但本帳號尚未首購（本筆為第一筆、需付運費）。 */
 const isSiteWideReturnTeaser = computed(
   () =>
@@ -858,23 +799,16 @@ const showReturnFreeShippingNote = computed(
     isSiteWideReturnTeaser.value ||
     checkoutGroups.value.some((g) => groupCartLevelUnlocked(g)),
 );
-/** 配送資訊那一排的提示文案：未首購預告 vs 已選好免運配送。 */
+/**
+ * 配送資訊那一排的提示文案：
+ * - 未首購（第一筆）→ 預告第一筆付運費、之後免運。
+ * - 已首購（第二筆起）→ 不代選，只提示「選與首購相同的配送即免運」，由使用者自行選。
+ */
 const returnFreeShippingNoteText = computed(() =>
   isSiteWideReturnTeaser.value
     ? '本次為活動第一筆、需支付運費；完成付款後，之後寄送到同一地址的訂單即免運'
-    : '已選可享「期間首購後免運」的配送，改寄其他地址或改用其他方式需另外付運費',
+    : '選擇與首購相同的配送方式與地址，本次即可免運；改用其他地址或方式需另外付運費',
 );
-/**
- * 進結帳頁時，自動把各組配送選到可享「期間首購後免運」的預設配送，
- * 省去使用者手動套用（全站與購物車級擇一生效；全站啟用時購物車級休眠）。
- */
-onMounted(() => {
-  if (isSiteWideFPThenFreeUnlocked.value) {
-    applySiteWideBaselineShipping();
-  } else if (cartLevelBaselineGroups.value.length > 0) {
-    applyBaselineShipping();
-  }
-});
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
   switch (groupFreeShippingReason(g)) {
