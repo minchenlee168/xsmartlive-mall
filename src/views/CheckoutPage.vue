@@ -1751,35 +1751,38 @@ const handleConfirmPayWithoutFreeShip = () => {
         :key="group.id"
         class="shadow-card rounded-xl bg-white"
       >
-        <div class="cart-divider flex flex-wrap items-center gap-2 px-4 py-3">
-          <span class="font-medium text-slate-700"
-            >{{ group.sellerName }} 訂單明細</span
+        <!-- 標題 + 期間首購後免運提示列同屬一個區塊，分隔線在最下方（提示列在分隔線上方） -->
+        <div class="cart-divider">
+          <div class="flex flex-wrap items-center gap-2 px-4 py-3">
+            <span class="font-medium text-slate-700"
+              >{{ group.sellerName }} 訂單明細</span
+            >
+            <Tag
+              :value="group.tempLayer"
+              :severity="group.tempLayer === '常溫' ? 'secondary' : 'info'"
+              class="!py-0.5 !text-xs"
+            />
+          </div>
+          <!-- 期間首購後免運：整條淺主色提示（全站每台、指定購物車僅該台） -->
+          <div
+            v-if="isSiteWideFPThenFree || groupHasCartCampaign(group)"
+            class="flex items-center gap-1.5 px-4 py-2 text-xs font-medium"
+            style="background: var(--primary-surface); color: var(--primary)"
           >
-          <Tag
-            :value="group.tempLayer"
-            :severity="group.tempLayer === '常溫' ? 'secondary' : 'info'"
-            class="!py-0.5 !text-xs"
-          />
-        </div>
-        <!-- 期間首購後免運：訂單明細下整條淺主色提示（全站每台、指定購物車僅該台） -->
-        <div
-          v-if="isSiteWideFPThenFree || groupHasCartCampaign(group)"
-          class="flex items-center gap-1.5 px-4 py-2 text-xs font-medium"
-          style="background: var(--primary-surface); color: var(--primary)"
-        >
-          <i class="pi pi-truck" />
-          期間首購後免運
-          <i
-            v-tooltip.top="{
-              value:
-                '活動期間，寄送到與首購相同的配送方式與地址即免運；改用其他配送方式或地址則照收運費。',
-              event: 'focus',
-            }"
-            class="pi pi-info-circle cursor-pointer"
-            tabindex="0"
-            role="button"
-            aria-label="期間首購後免運說明"
-          />
+            <i class="pi pi-truck" />
+            期間首購後免運
+            <i
+              v-tooltip.top="{
+                value:
+                  '活動期間，寄送到與首購相同的配送方式與地址即免運；改用其他配送方式或地址則照收運費。',
+                event: 'focus',
+              }"
+              class="pi pi-info-circle cursor-pointer"
+              tabindex="0"
+              role="button"
+              aria-label="期間首購後免運說明"
+            />
+          </div>
         </div>
         <div
           v-for="(item, ii) in group.items"
