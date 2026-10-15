@@ -702,51 +702,6 @@ const groupShippingDiscount = (g: CheckoutGroup): number => {
   return isGroupFreeShipping(g) ? fee : 0;
 };
 /**
- * 預測：若該組改選 method m，是否即可享免運。供運送方式抽屜內劃掉運費、顯示「免運」用。
- * 方式相依的免運（全站/購物車「期間首購後」）需 method 與首筆基準相同；
- * 門檻型（滿額/滿件/單品/滿千）與全站期間/首購則與 method 無關。
- */
-const groupMethodFreeShipping = (
-  g: CheckoutGroup,
-  m: ShippingMethodId,
-): boolean => {
-  if (groupIsRemoteArea(g)) return false;
-  if (isSiteWideFreeShippingOn.value) {
-    switch (ordersStore.siteWideFreeShipping.type) {
-      case 'period':
-        return true;
-      case 'first-purchase':
-        return !ordersStore.hasAnyReturnWindowOrder;
-      case 'first-purchase-then-free':
-        // 方式＋地址需與檔期內用過的任一配送相同才免運；選到不同地址 → 照收運費
-        return (
-          ordersStore.hasAnyReturnWindowOrder &&
-          ordersStore.siteWideBaselineKeys.includes(methodShipKey(m, g))
-        );
-      case 'min-amount':
-        return groupAfterBulk(g) >= SITE_WIDE_MIN_AMOUNT;
-      case 'min-qty':
-        return g.items.reduce((s, i) => s + i.qty, 0) >= SITE_WIDE_MIN_QTY;
-      case 'single-item':
-        return g.items.some(
-          (i) =>
-            i.productId != null &&
-            SITE_WIDE_FREE_SHIPPING_PRODUCT_IDS.includes(i.productId),
-        );
-      default:
-        return false;
-    }
-  }
-  if (isFirstPurchaseFreeShipping.value) return true;
-  if (groupCartLevelUnlocked(g)) {
-    // 方式＋地址都需與該台首筆相同才免運；選到不同地址 → 照收運費
-    const base = ordersStore.cartLevelBaselineKey(g.sellerId);
-    return !!base && methodShipKey(m, g) === base;
-  }
-  if (groupHasCartCampaign(g)) return false;
-  return isGroupFreeShipping(g);
-};
-/**
  * 該組免運的原因（驅動折抵列標籤）；擇優：帳號級 ＞ 購物車級 ＞ 滿千。無折抵回 null。
  */
 const groupFreeShippingReason = (
@@ -963,7 +918,6 @@ const groupShippingLabel = (g: CheckoutGroup): string => {
   }
 };
 
-/** 運送方式選單 header 顯示的「$X 起」；依抽屜範圍（單一訂單 / 全部）估算。 */
 /** 頂部摘要用：不帶溫層的方式標籤；超商直接顯示「7-11 XX門市」。 */
 const groupShipSummaryLabel = (g: CheckoutGroup): string => {
   const m = groupShipMethod(g);
@@ -1028,20 +982,6 @@ const groupRecipient = (
     return pick ? { name: pick.store.name, phone: pick.store.phone } : null;
   }
   return null;
-};
-
-const shippingMethodFeeHint = (
-  m: ShippingMethodId,
-  groups: CheckoutGroup[],
-): string => {
-  if (m === 'pickup') return '$0';
-  const fees = groups.map((g) => {
-    if (m === 'home') return HOME_FEES[g.tempLayer];
-    if (m === 'post') return POST_FEES[g.tempLayer];
-    if (m === 'cross-border') return CROSS_BORDER_FEES[g.tempLayer];
-    return Math.min(...Object.values(CVS_FEES).map((f) => f[g.tempLayer]));
-  });
-  return fees.length ? `$${Math.min(...fees)} 起` : '';
 };
 
 // ---- 宅配 / 郵局宅配共用的收件地址 ------------------------------------------
@@ -1213,10 +1153,6 @@ const drawerMethods = computed<ShippingMethodId[]>(() => {
   const g = checkoutGroups.value.find((x) => x.id === shipDrawerGroupId.value);
   return g ? groupSupportedMethods(g) : [];
 });
-/** 抽屜內 method m 是否可享免運（作用範圍所有訂單皆免運才顯示劃掉）。 */
-const drawerMethodFreeShipping = (m: ShippingMethodId): boolean =>
-  drawerGroups.value.length > 0 &&
-  drawerGroups.value.every((g) => groupMethodFreeShipping(g, m));
 /** 抽屜目前反白的方式：個別訂單 → 該訂單的方式；套用全部 → 共同方式。 */
 const drawerSelectedMethod = computed<ShippingMethodId | null>(() =>
   shipDrawerGroupId.value != null
@@ -2981,26 +2917,10 @@ const handlePlaceOrder = () => {
                     <span class="font-medium">{{
                       SHIPPING_METHOD_LABELS[m]
                     }}</span>
-                    <span class="flex items-center gap-2">
-                      <template
-                        v-if="
-                          drawerMethodFreeShipping(m) &&
-                          shippingMethodFeeHint(m, drawerGroups)
-                        "
-                      >
-                        <span class="text-slate-400 line-through">{{
-                          shippingMethodFeeHint(m, drawerGroups)
-                        }}</span>
-                        <span class="font-medium text-red-500">免運</span>
-                      </template>
-                      <template v-else>
-                        {{ shippingMethodFeeHint(m, drawerGroups) }}
-                      </template>
-                      <i
-                        v-if="drawerSelectedMethod === m"
-                        class="pi pi-check text-green-600"
-                      />
-                    </span>
+                    <i
+                      v-if="drawerSelectedMethod === m"
+                      class="pi pi-check text-green-600"
+                    />
                   </Button>
 
                   <!-- 宅配 / 郵局宅配 / 跨境：共用收件地址清單 -->
