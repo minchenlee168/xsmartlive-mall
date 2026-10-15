@@ -1999,11 +1999,11 @@ const handlePlaceOrder = () => {
               <!-- 全站首購後免運：已首購但配送與首筆不同 → 本筆照收運費 -->
               <span
                 v-else-if="showGroupSiteWideMismatchHint(group)"
-                class="flex w-full items-start gap-1.5 text-xs text-slate-500"
+                class="flex w-full items-start gap-1.5 text-xs text-amber-600"
               >
-                <i class="pi pi-info-circle mt-0.5 shrink-0 text-slate-400" />
+                <i class="pi pi-info-circle mt-0.5 shrink-0 text-amber-500" />
                 <span class="min-w-0"
-                  >本筆免運需與<span class="font-medium text-slate-600"
+                  >本筆免運需與<span class="font-medium"
                     >首購相同的配送方式與地址</span
                   >，本次不同故照收運費</span
                 >
@@ -2011,11 +2011,11 @@ const handlePlaceOrder = () => {
               <!-- 已首購但配送方式／地址與首筆不同 → 本筆不免運，誠實說明 -->
               <span
                 v-else-if="showGroupCartLevelMismatchHint(group)"
-                class="flex w-full items-start gap-1.5 text-xs text-slate-500"
+                class="flex w-full items-start gap-1.5 text-xs text-amber-600"
               >
-                <i class="pi pi-info-circle mt-0.5 shrink-0 text-slate-400" />
+                <i class="pi pi-info-circle mt-0.5 shrink-0 text-amber-500" />
                 <span class="min-w-0"
-                  >本筆免運需與<span class="font-medium text-slate-600"
+                  >本筆免運需與<span class="font-medium"
                     >首購相同的配送方式與地址</span
                   >，本次不同故照收運費</span
                 >
