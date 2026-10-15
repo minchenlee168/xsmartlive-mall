@@ -17,6 +17,8 @@ import {
   isReturnWindowActive,
   returnWindowEndLabel,
   returnWindowDaysLeft,
+  returnWindowEndShortLabel,
+  returnWindowShipShortLabel,
 } from '../data/freeShippingCampaign';
 import { products, type PickOption } from '../data/products';
 import { burstAddToCartFromEvent } from '../utils/cart-burst';
@@ -283,6 +285,28 @@ const freeShippingHintByGroup = computed(() => {
     }
   }
   return map;
+});
+
+/**
+ * 全站「期間首購後免運」在購物車頁的提示（放在第一台上方）：
+ * - 尚未首購 → 預告「第一筆付運費，之後每筆免運」
+ * - 已首購（檔期窗內已有訂單）→ 告知已解鎖，結帳時與首筆相同配送方式即免運
+ * 僅在全站免運啟用且類型為「期間首購後免運」時顯示；其餘類型不在此預告。
+ */
+const siteWideReturnHint = computed(() => {
+  const siteWide = ordersStore.siteWideFreeShipping;
+  if (
+    !siteWide.enabled ||
+    siteWide.type !== 'first-purchase-then-free' ||
+    !isReturnWindowActive(new Date())
+  ) {
+    return null;
+  }
+  return {
+    unlocked: ordersStore.hasAnyReturnWindowOrder,
+    endShort: returnWindowEndShortLabel(),
+    shipShort: returnWindowShipShortLabel(),
+  };
 });
 
 const groups = computed(() => cart.groups);
@@ -1301,6 +1325,76 @@ const handleGoProduct = (productId?: number) => {
       class="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--page-pad-x)] pb-[var(--page-pad-y)] @7xl:px-0"
       style="gap: var(--stack-gap)"
     >
+      <!-- 全站「期間首購後免運」提示（放在第一台上方） -->
+      <div
+        v-if="siteWideReturnHint"
+        class="rounded-xl border p-4 @3xl:p-5"
+        style="
+          background: var(--primary-surface);
+          border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+        "
+      >
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-base font-bold text-slate-900 @3xl:text-[17.5px]"
+              >期間首購後免運</span
+            >
+            <span
+              class="rounded px-2 py-0.5 text-xs font-medium text-white"
+              style="background: var(--primary)"
+              >免運進行中</span
+            >
+          </div>
+          <span class="text-xs text-slate-500"
+            >{{ siteWideReturnHint.endShort }} 截止 ·
+            {{ siteWideReturnHint.shipShort }} 一起寄出</span
+          >
+        </div>
+
+        <!-- 兩階段進度：第一筆付運費 → 之後的訂單免運 -->
+        <div class="mt-3 flex items-center gap-2 text-sm">
+          <span class="flex shrink-0 items-center gap-1.5">
+            <span
+              class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium text-white"
+              style="background: var(--primary)"
+              >1</span
+            >
+            <span class="font-medium text-slate-700">第一筆付運費</span>
+          </span>
+          <span class="h-px w-6 shrink-0 bg-slate-300 @3xl:w-10" />
+          <span class="flex shrink-0 items-center gap-1.5">
+            <span
+              class="flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium"
+              :class="
+                siteWideReturnHint.unlocked
+                  ? 'text-white'
+                  : 'bg-slate-200 text-slate-400'
+              "
+              :style="
+                siteWideReturnHint.unlocked ? 'background: var(--primary)' : ''
+              "
+              >2</span
+            >
+            <span
+              :class="
+                siteWideReturnHint.unlocked
+                  ? 'font-medium text-slate-700'
+                  : 'text-slate-400'
+              "
+              >之後的訂單免運</span
+            >
+          </span>
+        </div>
+
+        <p class="mt-3 text-sm text-slate-600">
+          {{
+            siteWideReturnHint.unlocked
+              ? '已完成第一筆訂單，活動期間之後寄送到同一地址的訂單都免運（貨到付款下單即可）。'
+              : '本次活動第一筆訂單需支付運費，完成付款後，之後寄送到同一地址的訂單都免運（貨到付款下單即可）。'
+          }}
+        </p>
+      </div>
+
       <div
         v-for="group in visibleGroups"
         :key="group.id"
