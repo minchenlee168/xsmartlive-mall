@@ -1096,6 +1096,28 @@ const drawerGroups = computed(() =>
     ? checkoutGroups.value.filter((g) => g.id === shipDrawerGroupId.value)
     : checkoutGroups.value,
 );
+/**
+ * 抽屜內各方式的標準運費提示：
+ * - 自取 → 免費。
+ * - 宅配 / 郵局 / 跨境 → 依溫層的標準運費；多台金額不同 → 顯示「最低 起」，相同 → 直接顯示金額。
+ * - 超商 → 取最便宜鏈別運費，門市/鏈別未定故顯示「起」。
+ */
+const shippingMethodFeeHint = (
+  m: ShippingMethodId,
+  groups: CheckoutGroup[],
+): string => {
+  if (m === 'pickup') return '免費';
+  const fees = groups.map((g) => {
+    if (m === 'home') return HOME_FEES[g.tempLayer];
+    if (m === 'post') return POST_FEES[g.tempLayer];
+    if (m === 'cross-border') return CROSS_BORDER_FEES[g.tempLayer];
+    return Math.min(...Object.values(CVS_FEES).map((f) => f[g.tempLayer]));
+  });
+  if (!fees.length) return '';
+  const min = Math.min(...fees);
+  const max = Math.max(...fees);
+  return m === 'store' || min !== max ? `${money(min)} 起` : money(min);
+};
 /** 抽屜可選的運送方式：個別訂單 → 該訂單支援的；套用全部 → 各車交集。 */
 const drawerMethods = computed<ShippingMethodId[]>(() => {
   if (shipDrawerGroupId.value == null) return supportedShippingMethods.value;
@@ -2891,10 +2913,13 @@ const handleConfirmPayWithoutFreeShip = () => {
                     <span class="font-medium">{{
                       SHIPPING_METHOD_LABELS[m]
                     }}</span>
-                    <i
-                      v-if="drawerSelectedMethod === m"
-                      class="pi pi-check text-green-600"
-                    />
+                    <span class="flex items-center gap-2 text-slate-500">
+                      {{ shippingMethodFeeHint(m, drawerGroups) }}
+                      <i
+                        v-if="drawerSelectedMethod === m"
+                        class="pi pi-check text-green-600"
+                      />
+                    </span>
                   </Button>
 
                   <!-- 宅配 / 郵局宅配 / 跨境：共用收件地址清單 -->
@@ -3129,6 +3154,9 @@ const handleConfirmPayWithoutFreeShip = () => {
                               class="h-5 w-5 shrink-0 object-contain"
                             />
                             <span>{{ s.storeName }}</span>
+                            <span v-if="s.chain" class="text-slate-500">{{
+                              money(CVS_FEES[s.chain][g.tempLayer])
+                            }}</span>
                           </span>
                         </button>
                       </div>
