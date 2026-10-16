@@ -1106,7 +1106,7 @@ const shippingMethodFeeHint = (
   m: ShippingMethodId,
   groups: CheckoutGroup[],
 ): string => {
-  if (m === 'pickup') return '免費';
+  if (m === 'pickup') return money(0);
   const fees = groups.map((g) => {
     if (m === 'home') return HOME_FEES[g.tempLayer];
     if (m === 'post') return POST_FEES[g.tempLayer];
