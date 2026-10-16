@@ -1096,7 +1096,6 @@ const handleSaveAddr = () => {
                     <span class="flex items-center gap-1"
                       ><i class="pi pi-calendar text-xs" />{{ h.date }}</span
                     >
-                    <span>有效期限至 {{ h.expiry }}</span>
                   </div>
                 </div>
                 <div class="shrink-0 text-right">
