@@ -790,6 +790,20 @@ const shipKeyLabel = (key: string): string => {
   }
   return method;
 };
+/** 該台「期間首購後免運」是否已解鎖（已首購、第二次結帳起）：全站已首購 或 該台購物車級已首購。 */
+const isGroupReturnUnlocked = (g: CheckoutGroup): boolean =>
+  isSiteWideFPThenFreeUnlocked.value || groupCartLevelUnlocked(g);
+/** 該台可享免運的首購配送清單（可讀：配送方式 · 地址/門市）：全站多筆、購物車級單筆。 */
+const groupReturnBaselineLabels = (g: CheckoutGroup): string[] => {
+  if (isSiteWideFPThenFreeUnlocked.value) {
+    return ordersStore.siteWideBaselineKeys.map((k) => shipKeyLabel(k));
+  }
+  if (groupCartLevelUnlocked(g)) {
+    const key = ordersStore.cartLevelBaselineKey(g.sellerId);
+    return key ? [shipKeyLabel(key)] : [];
+  }
+  return [];
+};
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
   switch (groupFreeShippingReason(g)) {
@@ -1782,7 +1796,16 @@ const handleConfirmPayWithoutFreeShip = () => {
             style="background: var(--primary-surface); color: var(--primary)"
           >
             <i class="pi pi-truck mt-0.5 shrink-0" />
-            <span class="min-w-0"
+            <span v-if="isGroupReturnUnlocked(group)" class="min-w-0"
+              ><span class="font-semibold">已符合期間首購後免運</span
+              >，請選擇相同配送方式與地點享免運<template
+                v-if="groupReturnBaselineLabels(group).length"
+                >：<span class="font-medium">{{
+                  groupReturnBaselineLabels(group).join('、')
+                }}</span></template
+              ></span
+            >
+            <span v-else class="min-w-0"
               ><span class="font-semibold">期間首購後免運</span
               >：配送選擇與期間首購相同地點享免運</span
             >
