@@ -793,16 +793,36 @@ const shipKeyLabel = (key: string): string => {
 /** 該台「期間首購後免運」是否已解鎖（已首購、第二次結帳起）：全站已首購 或 該台購物車級已首購。 */
 const isGroupReturnUnlocked = (g: CheckoutGroup): boolean =>
   isSiteWideFPThenFreeUnlocked.value || groupCartLevelUnlocked(g);
-/** 該台可享免運的首購配送清單（可讀：配送方式 · 地址/門市）：全站多筆、購物車級單筆。 */
-const groupReturnBaselineLabels = (g: CheckoutGroup): string[] => {
-  if (isSiteWideFPThenFreeUnlocked.value) {
-    return ordersStore.siteWideBaselineKeys.map((k) => shipKeyLabel(k));
-  }
-  if (groupCartLevelUnlocked(g)) {
-    const key = ordersStore.cartLevelBaselineKey(g.sellerId);
-    return key ? [shipKeyLabel(key)] : [];
-  }
-  return [];
+/** 該台可享免運的首購配送清單（配送方式 / 地點 分開）：全站多筆、購物車級單筆。 */
+const groupReturnBaselineOptions = (
+  g: CheckoutGroup,
+): { method: string; dest: string }[] => {
+  const keys = isSiteWideFPThenFreeUnlocked.value
+    ? ordersStore.siteWideBaselineKeys
+    : groupCartLevelUnlocked(g)
+      ? [ordersStore.cartLevelBaselineKey(g.sellerId)].filter(
+          (k): k is string => !!k,
+        )
+      : [];
+  return keys.map((key) => {
+    const [method, destId] = key.split('|');
+    if (method === 'home' || method === 'post' || method === 'cross-border') {
+      const addr = addressStore.homeAddrs.find((a) => a.id === destId);
+      return {
+        method: SHIPPING_METHOD_LABELS[method as ShippingMethodId],
+        dest: addr?.address ?? '',
+      };
+    }
+    if (method === 'store') {
+      const s = addressStore.storeAddrs.find((a) => a.id === destId);
+      return { method: '超商取貨', dest: s?.storeName ?? '' };
+    }
+    if (method === 'pickup') {
+      const p = PICKUP_LOCATIONS.find((x) => x.id === destId);
+      return { method: '自取', dest: p?.name ?? '' };
+    }
+    return { method, dest: '' };
+  });
 };
 /** 免運活動 Tag 文案（依來源）。 */
 const groupFreeShippingLabel = (g: CheckoutGroup): string => {
@@ -1792,23 +1812,44 @@ const handleConfirmPayWithoutFreeShip = () => {
           <!-- 期間首購後免運：整條淺主色提示（全站每台、指定購物車僅該台） -->
           <div
             v-if="isSiteWideFPThenFree || groupHasCartCampaign(group)"
-            class="flex items-start gap-1.5 px-4 py-2 text-xs"
+            class="px-4 py-2 text-xs"
             style="background: var(--primary-surface); color: var(--primary)"
           >
-            <i class="pi pi-truck mt-0.5 shrink-0" />
-            <span v-if="isGroupReturnUnlocked(group)" class="min-w-0"
-              ><span class="font-semibold">已符合期間首購後免運</span
-              >，請選擇相同配送方式與地點享免運<template
-                v-if="groupReturnBaselineLabels(group).length"
-                >：<span class="font-medium">{{
-                  groupReturnBaselineLabels(group).join('、')
-                }}</span></template
-              ></span
-            >
-            <span v-else class="min-w-0"
-              ><span class="font-semibold">期間首購後免運</span
-              >：配送選擇與期間首購相同地點享免運</span
-            >
+            <!-- 已首購（第二次起）：訊息 + 白底條列可享免運的配送方式／地點 -->
+            <template v-if="isGroupReturnUnlocked(group)">
+              <div class="flex items-start gap-1.5">
+                <i class="pi pi-truck mt-0.5 shrink-0" />
+                <span class="min-w-0"
+                  ><span class="font-semibold">已符合期間首購後免運</span
+                  >，請選擇相同配送方式與地點享免運：</span
+                >
+              </div>
+              <ul class="mt-1.5 flex flex-col gap-1.5">
+                <li
+                  v-for="(opt, i) in groupReturnBaselineOptions(group)"
+                  :key="i"
+                  class="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg bg-white px-2.5 py-1.5"
+                >
+                  <span
+                    class="flex items-center gap-1.5 font-medium text-slate-700"
+                  >
+                    <i class="pi pi-truck shrink-0 text-slate-400" />
+                    {{ opt.method }}
+                  </span>
+                  <span v-if="opt.dest" class="min-w-0 text-slate-500">{{
+                    opt.dest
+                  }}</span>
+                </li>
+              </ul>
+            </template>
+            <!-- 未首購（第一次）：單行訊息 -->
+            <div v-else class="flex items-start gap-1.5">
+              <i class="pi pi-truck mt-0.5 shrink-0" />
+              <span class="min-w-0"
+                ><span class="font-semibold">期間首購後免運</span
+                >：配送選擇與期間首購相同地點享免運</span
+              >
+            </div>
           </div>
         </div>
         <div
