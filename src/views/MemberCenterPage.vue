@@ -95,6 +95,30 @@ const COUPON_STATUS_TEXT: Record<string, string> = {
 const POINTS_HISTORY: PointRecord[] = [
   {
     type: 'earn',
+    title: '運費補點（訂單 #1000000043）',
+    date: '2026.10.15 14:20',
+    expiry: '2027.10.15 24:00',
+    amount: 60,
+    status: '已入帳',
+  },
+  {
+    type: 'earn',
+    title: '運費補點（訂單 #1000000041）',
+    date: '2026.10.12 11:05',
+    expiry: '2027.10.12 24:00',
+    amount: 80,
+    status: '已入帳',
+  },
+  {
+    type: 'earn',
+    title: '運費補點（期間首購後免運補償）',
+    date: '2026.10.08 09:30',
+    expiry: '2027.10.08 24:00',
+    amount: 120,
+    status: '已入帳',
+  },
+  {
+    type: 'earn',
     title: '雙 11 限時活動贈送',
     date: '2026.01.20 23:00',
     expiry: '2026.01.20 23:00',
