@@ -69,6 +69,52 @@ const ACCOUNT_SUB_ITEMS = [
 ];
 const VALID_NAVS = new Set(['orders', 'points', 'account', 'coupons']);
 const PHONE_CODES = ['+886', '+852'];
+// 宅配地址國別：台灣沿用縣市/區連動下拉，其餘國家改為郵遞區號 / 城市 / 州省地區 手填
+const TAIWAN = '台灣';
+// 菲律賓採專屬行政區層級：郵遞區號 + 大區 → 省 → 市 → 村里(Barangay) 連動下拉
+const PHILIPPINES = '菲律賓';
+const COUNTRIES = ['台灣', '馬來西亞', '新加坡', '菲律賓'];
+// 菲律賓行政區假資料（原型用），大區 → 省 → 市 → 村里 逐層連動
+const PH_REGIONS = ['Metro Manila', 'Calabarzon', 'Central Luzon'];
+const PH_PROVINCE_MAP: Record<string, string[]> = {
+  'Metro Manila': ['METRO-MANILA'],
+  Calabarzon: ['CAVITE', 'LAGUNA', 'BATANGAS'],
+  'Central Luzon': ['BULACAN', 'PAMPANGA'],
+};
+const PH_CITY_MAP: Record<string, string[]> = {
+  'METRO-MANILA': ['BINONDO', 'MAKATI', 'QUEZON CITY'],
+  CAVITE: ['BACOOR', 'IMUS'],
+  LAGUNA: ['CALAMBA', 'SANTA ROSA'],
+  BATANGAS: ['BATANGAS CITY', 'LIPA'],
+  BULACAN: ['MALOLOS', 'MEYCAUAYAN'],
+  PAMPANGA: ['ANGELES', 'SAN FERNANDO'],
+};
+const PH_BARANGAY_MAP: Record<string, string[]> = {
+  BINONDO: ['BARANGAY 287', 'BARANGAY 288', 'BARANGAY 289'],
+};
+const PH_DEFAULT_BARANGAYS = ['BARANGAY 1', 'BARANGAY 2', 'BARANGAY 3'];
+// 新加坡採精簡欄位：僅郵遞區號 + 詳細收件地址
+const SINGAPORE = '新加坡';
+// 馬來西亞採專屬欄位：洲別（州屬）+ 郵遞區號 + 詳細收件地址
+const MALAYSIA = '馬來西亞';
+const MY_STATES = [
+  'Johor',
+  'Kedah',
+  'Kelantan',
+  'Melaka',
+  'Negeri Sembilan',
+  'Pahang',
+  'Perak',
+  'Perlis',
+  'Pulau Pinang',
+  'Sabah',
+  'Sarawak',
+  'Selangor',
+  'Terengganu',
+  'Kuala Lumpur',
+  'Labuan',
+  'Putrajaya',
+];
 const CITIES = ['台北市', '新北市', '桃園市', '台中市', '高雄市'];
 const DISTRICT_MAP: Record<string, string[]> = {
   台北市: ['信義區', '大安區', '中山區', '內湖區'],
@@ -639,13 +685,55 @@ const form = reactive({
   name: '',
   countryCode: '+886',
   phone: '',
+  country: TAIWAN,
   city: '台北市',
   district: '信義區',
+  // 海外國家欄位（國別非台灣時使用）
+  postalCode: '',
+  overseaCity: '',
+  state: '',
+  // 菲律賓專屬：大區 / 省 / 市 / 村里
+  phRegion: '',
+  phProvince: '',
+  phCity: '',
+  phBarangay: '',
   detail: '',
   chain: '7-11' as '7-11' | 'FamilyMart',
   storeName: '',
 });
 const districts = computed(() => DISTRICT_MAP[form.city] ?? []);
+const isOverseas = computed(() => form.country !== TAIWAN);
+const isPhilippines = computed(() => form.country === PHILIPPINES);
+const isMalaysia = computed(() => form.country === MALAYSIA);
+const isSingapore = computed(() => form.country === SINGAPORE);
+// 菲律賓逐層連動選項
+const phProvinces = computed(() => PH_PROVINCE_MAP[form.phRegion] ?? []);
+const phCities = computed(() => PH_CITY_MAP[form.phProvince] ?? []);
+const phBarangays = computed(
+  () => PH_BARANGAY_MAP[form.phCity] ?? PH_DEFAULT_BARANGAYS,
+);
+// 上層變動時清空下層選擇
+watch(
+  () => form.phRegion,
+  () => {
+    form.phProvince = '';
+    form.phCity = '';
+    form.phBarangay = '';
+  },
+);
+watch(
+  () => form.phProvince,
+  () => {
+    form.phCity = '';
+    form.phBarangay = '';
+  },
+);
+watch(
+  () => form.phCity,
+  () => {
+    form.phBarangay = '';
+  },
+);
 
 // 超商電子地圖選門市
 const isStoreMapVisible = ref(false);
@@ -667,8 +755,16 @@ const resetForm = () => {
   form.name = '';
   form.countryCode = '+886';
   form.phone = '';
+  form.country = TAIWAN;
   form.city = '台北市';
   form.district = '信義區';
+  form.postalCode = '';
+  form.overseaCity = '';
+  form.state = '';
+  form.phRegion = '';
+  form.phProvince = '';
+  form.phCity = '';
+  form.phBarangay = '';
   form.detail = '';
   form.chain = '7-11';
   form.storeName = '';
@@ -692,7 +788,33 @@ const handleOpenEditAddr = (addr: Address) => {
 };
 const isFormValid = computed(() => {
   if (!form.name.trim() || !form.phone.trim()) return false;
-  if (addressTab.value === 'home') return !!form.detail.trim();
+  if (addressTab.value === 'home') {
+    // 菲律賓郵遞區號選填，其餘國家（含台灣）郵遞區號必填
+    if (isPhilippines.value) {
+      return !!(
+        form.phRegion &&
+        form.phProvince &&
+        form.phCity &&
+        form.phBarangay &&
+        form.detail.trim()
+      );
+    }
+    if (!form.postalCode.trim()) return false;
+    if (isMalaysia.value) {
+      return !!(form.state && form.detail.trim());
+    }
+    if (isSingapore.value) {
+      return !!form.detail.trim();
+    }
+    if (isOverseas.value) {
+      return !!(
+        form.overseaCity.trim() &&
+        form.state.trim() &&
+        form.detail.trim()
+      );
+    }
+    return !!form.detail.trim();
+  }
   return (
     !!form.storeName.trim() &&
     !!form.detail.trim() &&
@@ -700,6 +822,42 @@ const isFormValid = computed(() => {
     !!form.phone.trim()
   );
 });
+/** 組合宅配完整地址字串：台灣用縣市/區，海外用國別＋州省＋城市＋郵遞區號。 */
+const composeHomeAddress = (): string => {
+  if (isPhilippines.value) {
+    return [
+      form.country,
+      form.phRegion,
+      form.phProvince,
+      form.phCity,
+      form.phBarangay,
+      form.postalCode,
+      form.detail,
+    ]
+      .filter((part) => part.trim())
+      .join(' ');
+  }
+  if (isMalaysia.value) {
+    return [form.country, form.state, form.postalCode, form.detail]
+      .filter((part) => part.trim())
+      .join(' ');
+  }
+  if (isOverseas.value) {
+    return [
+      form.country,
+      form.state,
+      form.overseaCity,
+      form.postalCode,
+      form.detail,
+    ]
+      .filter((part) => part.trim())
+      .join(' ');
+  }
+  return [form.postalCode, `${form.city}${form.district}`, form.detail]
+    .filter((part) => part.trim())
+    .join(' ');
+};
+
 const handleSaveAddr = () => {
   if (!isFormValid.value) return;
   const list = addressTab.value === 'home' ? homeAddrs : storeAddrs;
@@ -709,7 +867,8 @@ const handleSaveAddr = () => {
     if (target) {
       target.name = form.name;
       target.phone = phoneFull;
-      target.address = form.detail;
+      target.address =
+        addressTab.value === 'home' ? composeHomeAddress() : form.detail;
       if (addressTab.value === 'store') {
         target.chain = form.chain;
         target.storeName = form.storeName;
@@ -720,10 +879,7 @@ const handleSaveAddr = () => {
       id: `${addressTab.value === 'home' ? 'h' : 's'}_${Date.now()}`,
       name: form.name,
       phone: phoneFull,
-      address:
-        addressTab.value === 'home'
-          ? `${form.city}${form.district} ${form.detail}`
-          : form.detail,
+      address: addressTab.value === 'home' ? composeHomeAddress() : form.detail,
       isDefault: list.value.length === 0,
     };
     if (addressTab.value === 'store') {
@@ -1842,8 +1998,27 @@ const handleSaveAddr = () => {
           </div>
         </div>
 
-        <!-- Home: city/district -->
+        <!-- Home: 國別（台灣沿用縣市/區下拉，海外改手填欄位） -->
         <div v-if="addressTab === 'home'" class="flex flex-col gap-1.5">
+          <label class="text-sm text-slate-700">國別</label>
+          <Select v-model="form.country" :options="COUNTRIES" class="w-full" />
+        </div>
+
+        <!-- Home：郵遞區號（所有國別共用，固定為國別下第一欄；菲律賓選填，其餘必填） -->
+        <div v-if="addressTab === 'home'" class="flex flex-col gap-1.5">
+          <label class="text-sm text-slate-700"
+            >郵遞區號<span v-if="!isPhilippines" class="text-red-500">
+              *</span
+            ></label
+          >
+          <InputText v-model="form.postalCode" class="w-full" />
+        </div>
+
+        <!-- Home 台灣：city/district 連動下拉 -->
+        <div
+          v-if="addressTab === 'home' && !isOverseas"
+          class="flex flex-col gap-1.5"
+        >
           <label class="text-sm text-slate-700">城市 / 區</label>
           <div class="flex gap-2">
             <Select v-model="form.city" :options="CITIES" class="flex-1" />
@@ -1855,13 +2030,109 @@ const handleSaveAddr = () => {
           </div>
         </div>
 
+        <!-- Home 馬來西亞：洲別（州屬） -->
+        <template v-if="addressTab === 'home' && isMalaysia">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-slate-700"
+              >洲別<span class="text-red-500"> *</span></label
+            >
+            <Select
+              v-model="form.state"
+              :options="MY_STATES"
+              show-clear
+              filter
+              placeholder="請選擇"
+              class="w-full"
+            />
+          </div>
+        </template>
+
+        <!-- Home 海外（非菲律賓、非馬來西亞、非新加坡）：城市 / 州省地區 手填 -->
+        <template
+          v-if="
+            addressTab === 'home' &&
+            isOverseas &&
+            !isPhilippines &&
+            !isMalaysia &&
+            !isSingapore
+          "
+        >
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-slate-700"
+              >城市<span class="text-red-500"> *</span></label
+            >
+            <InputText v-model="form.overseaCity" class="w-full" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-slate-700"
+              >州/省/地區<span class="text-red-500"> *</span></label
+            >
+            <InputText v-model="form.state" class="w-full" />
+          </div>
+        </template>
+
+        <!-- Home 菲律賓：大區/省/市/村里 連動下拉 -->
+        <template v-if="addressTab === 'home' && isPhilippines">
+          <div class="grid grid-cols-1 gap-x-3 gap-y-4 sm:grid-cols-2">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm text-slate-700"
+                >大區<span class="text-red-500"> *</span></label
+              >
+              <Select
+                v-model="form.phRegion"
+                :options="PH_REGIONS"
+                show-clear
+                filter
+                placeholder="請選擇"
+                class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm text-slate-700"
+                >省<span class="text-red-500"> *</span></label
+              >
+              <Select
+                v-model="form.phProvince"
+                :options="phProvinces"
+                :disabled="!form.phRegion"
+                placeholder="請選擇"
+                class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm text-slate-700"
+                >市<span class="text-red-500"> *</span></label
+              >
+              <Select
+                v-model="form.phCity"
+                :options="phCities"
+                :disabled="!form.phProvince"
+                placeholder="請選擇"
+                class="w-full"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm text-slate-700"
+                >村里（Barangay）<span class="text-red-500"> *</span></label
+              >
+              <Select
+                v-model="form.phBarangay"
+                :options="phBarangays"
+                :disabled="!form.phCity"
+                placeholder="請選擇"
+                class="w-full"
+              />
+            </div>
+          </div>
+        </template>
+
         <div v-if="addressTab === 'home'" class="flex flex-col gap-1.5">
           <label class="text-sm text-slate-700">
             詳細收件地址<span class="text-red-500"> *</span>
           </label>
           <InputText
             v-model="form.detail"
-            placeholder="街道、門牌、樓層"
+            :placeholder="isOverseas ? '' : '街道、門牌、樓層'"
             class="w-full"
           />
         </div>
