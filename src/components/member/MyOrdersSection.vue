@@ -31,6 +31,16 @@ const isMobile = computed(() => vp.value === 'mobile');
 const ordersStore = useOrdersStore();
 const ui = useUiStore();
 
+/** 複製文字到剪貼簿並提示（訂單編號 / 包裹編號共用）。 */
+const handleCopy = async (text: string, label: string): Promise<void> => {
+  try {
+    await navigator.clipboard.writeText(text);
+    ui.toast(`已複製${label}`);
+  } catch {
+    ui.toast('複製失敗，請手動複製');
+  }
+};
+
 // 主 tab（退貨 / 退款相關 tab 已移除）
 /**
  * 頁籤狀態：除了 OrderStatus 之外，再加 timeline 階段 key（shipped / to_receive / delivered）。
@@ -743,7 +753,18 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
           </div>
           <div>
             <p class="text-xs text-slate-500">訂單編號</p>
-            <p class="font-medium text-slate-700">{{ order.orderNo }}</p>
+            <div class="flex items-center gap-1">
+              <p class="font-medium text-slate-700">{{ order.orderNo }}</p>
+              <Button
+                icon="pi pi-copy"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                aria-label="複製訂單編號"
+                @click="handleCopy(order.orderNo, '訂單編號')"
+              />
+            </div>
           </div>
           <div>
             <p class="text-xs text-slate-500">數量</p>
@@ -861,7 +882,20 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
             <tbody>
               <tr>
                 <td class="py-3 pr-3 pl-4 text-slate-700">{{ order.date }}</td>
-                <td class="px-3 py-3 text-slate-700">{{ order.orderNo }}</td>
+                <td class="px-3 py-3 text-slate-700">
+                  <div class="flex items-center gap-1">
+                    <span>{{ order.orderNo }}</span>
+                    <Button
+                      icon="pi pi-copy"
+                      text
+                      rounded
+                      size="small"
+                      severity="secondary"
+                      aria-label="複製訂單編號"
+                      @click="handleCopy(order.orderNo, '訂單編號')"
+                    />
+                  </div>
+                </td>
                 <td class="px-3 py-3 text-slate-700">{{ order.qty }}</td>
                 <td class="px-3 py-3">
                   <div class="flex items-center gap-1">
@@ -1187,9 +1221,18 @@ const handleSelectDetailTab = (order: OrderRecord, key: DetailTab): void => {
                 <div class="mb-1.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5 text-sm text-slate-700">
                     <i class="pi pi-box" style="font-size: 14px"></i>
-                    <span v-if="isBoxed(pkg)" class="font-medium"
-                      >包裹編號：{{ pkg.no }}</span
-                    >
+                    <template v-if="isBoxed(pkg)">
+                      <span class="font-medium">包裹編號：{{ pkg.no }}</span>
+                      <Button
+                        icon="pi pi-copy"
+                        text
+                        rounded
+                        size="small"
+                        severity="secondary"
+                        aria-label="複製包裹編號"
+                        @click="handleCopy(pkg.no, '包裹編號')"
+                      />
+                    </template>
                     <span v-else class="text-slate-500">尚未配箱</span>
                     <!-- 換貨後的第二次出貨標籤 -->
                     <Tag
