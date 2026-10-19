@@ -31,6 +31,7 @@ import {
 } from '../data/siteWideFreeShipping';
 import { products } from '../data/products';
 import { useAuthStore } from '../pinia/auth';
+import { storeToRefs } from 'pinia';
 import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
 import { useCountdown } from '../composables/useCountdown';
 import { useMoney } from '../composables/useMoney';
@@ -64,11 +65,6 @@ interface Coupon {
   // 由輸入優惠碼 / QR 掃描兌換而來 → 列表置頂，方便使用者辨識
   redeemed?: boolean;
 }
-interface HomeAddress extends Address {
-  /** 目前不提供配送至此地區（灰底 + 不可選）。 */
-  unavailable?: boolean;
-}
-
 type ShipDrawerView = 'list' | 'add-home' | 'add-store';
 
 const INVOICE_TYPES = [
@@ -933,27 +929,44 @@ const groupRecipient = (
   return null;
 };
 
-// ---- 宅配 / 郵局宅配共用的收件地址 ------------------------------------------
-const homeAddresses = ref<HomeAddress[]>([
-  {
-    id: 'h1',
-    name: '王小明',
-    phone: '+886 912****56',
-    address: '台北市信義區忠孝東路五段 100 號 10 樓',
-    isDefault: true,
-  },
-  {
-    id: 'h2',
-    name: '王小明',
-    phone: '+886 912****56',
-    address: '高雄市前鎮區中山路一段 50 號 8 樓',
-    isDefault: false,
-    unavailable: true,
-  },
-]);
-const selectedHomeId = ref<string | null>('h1');
+// ---- 宅配 / 郵局宅配共用的收件地址（接共用 address store，與會員中心同步）------
+const { homeAddrs: homeAddresses } = storeToRefs(addressStore);
+/**
+ * 宅配地址是否可配送（依國別推導，不存欄位）。跨境目前休眠（方案 A）：
+ * 宅配 / 郵局僅台灣可配送；跨境方式反之僅非台灣。無 country 視為台灣。
+ */
+const DELIVERABLE_HOME_COUNTRY = '台灣';
+const isHomeAddrDeliverable = (
+  addr: Address,
+  method: ShippingMethodId,
+): boolean => {
+  const country = addr.country ?? DELIVERABLE_HOME_COUNTRY;
+  if (method === 'cross-border') return country !== DELIVERABLE_HOME_COUNTRY;
+  return country === DELIVERABLE_HOME_COUNTRY;
+};
+/** 台灣可配送（宅配 / 郵局語意；跨境休眠時用此挑預設 / 守衛選取）。 */
+const isTwDeliverable = (addr: Address): boolean =>
+  !addr.country || addr.country === DELIVERABLE_HOME_COUNTRY;
+/** 挑初始 / fallback 的宅配地址：優先預設，其次第一筆可配送。 */
+const pickDeliverableHomeId = (): string | null => {
+  const def = addressStore.defaultHomeAddr;
+  if (def && isTwDeliverable(def)) return def.id;
+  return homeAddresses.value.find(isTwDeliverable)?.id ?? def?.id ?? null;
+};
+const selectedHomeId = ref<string | null>(pickDeliverableHomeId());
 const selectedHome = computed(() =>
   homeAddresses.value.find((a) => a.id === selectedHomeId.value),
+);
+// 守衛：所選地址若變成不可配送（被編輯成海外 / 被刪）→ 自動改挑可配送地址
+watch(
+  [homeAddresses, selectedHomeId],
+  () => {
+    const addr = selectedHome.value;
+    if (addr && !isTwDeliverable(addr)) {
+      selectedHomeId.value = pickDeliverableHomeId();
+    }
+  },
+  { deep: true },
 );
 
 const handleSetDefaultHome = (id: string) => {
@@ -1021,7 +1034,7 @@ const handleSubmitAddHome = () => {
         postalCode: newHomePostal.value,
       };
   homeAddresses.value.push({
-    id: 'h' + (homeAddresses.value.length + 1),
+    id: `h_${Date.now()}`,
     name: newHomeName.value,
     phone: `${newHomeCountryCode.value} ${newHomePhone.value || '000****00'}`,
     address,
@@ -1580,6 +1593,21 @@ const handlePlaceOrder = () => {
     !selectedHome.value
   ) {
     ui.toast('請選擇配送地址');
+    handleOpenShipDrawer();
+    return;
+  }
+  // 所選配送地址在該訂單的配送方式下不可配送（如非台灣走宅配）→ 擋下並要求改選
+  if (
+    selectedHome.value &&
+    checkoutGroups.value.some((g) => {
+      const m = groupShipMethod(g);
+      return (
+        (m === 'home' || m === 'post' || m === 'cross-border') &&
+        !isHomeAddrDeliverable(selectedHome.value!, m)
+      );
+    })
+  ) {
+    ui.toast('所選配送地址目前不提供配送，請改選其他地址');
     handleOpenShipDrawer();
     return;
   }
@@ -2945,8 +2973,11 @@ const handleConfirmPayWithoutFreeShip = () => {
                           ? 'background: var(--primary-surface)'
                           : ''
                       "
-                      :disabled="addr.unavailable"
-                      @click="!addr.unavailable && (selectedHomeId = addr.id)"
+                      :disabled="!isHomeAddrDeliverable(addr, m)"
+                      @click="
+                        isHomeAddrDeliverable(addr, m) &&
+                        (selectedHomeId = addr.id)
+                      "
                     >
                       <div class="flex gap-3">
                         <div class="min-w-0 flex-1">
@@ -2969,7 +3000,7 @@ const handleConfirmPayWithoutFreeShip = () => {
                             <span>{{ addr.address }}</span>
                           </div>
                           <p
-                            v-if="addr.unavailable"
+                            v-if="!isHomeAddrDeliverable(addr, m)"
                             class="mt-1 text-xs text-red-500"
                           >
                             目前不提供配送至此地區
