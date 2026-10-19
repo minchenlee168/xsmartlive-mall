@@ -73,6 +73,7 @@ const PHONE_CODES = ['+886', '+852'];
 const TAIWAN = '台灣';
 // 菲律賓採專屬行政區層級：郵遞區號 + 大區 → 省 → 市 → 村里(Barangay) 連動下拉
 const PHILIPPINES = '菲律賓';
+// 註：此國別清單為原型展示用。實際上非台灣的跨境國別，須待系統支援跨境配送後才會出現。
 const COUNTRIES = ['台灣', '馬來西亞', '新加坡', '菲律賓'];
 // 菲律賓行政區假資料（原型用），大區 → 省 → 市 → 村里 逐層連動
 const PH_REGIONS = ['Metro Manila', 'Calabarzon', 'Central Luzon'];
@@ -782,6 +783,8 @@ const handleOpenEditAddr = (addr: Address) => {
   form.name = addr.name;
   form.phone = addr.phone.replace(/^\+\d+\s*/, '');
   form.detail = addr.address;
+  // 載回國別（無值視為台灣），確保編輯時顯示正確的國別版型
+  if (addressTab.value === 'home') form.country = addr.country ?? TAIWAN;
   if (addr.chain) form.chain = addr.chain;
   if (addr.storeName) form.storeName = addr.storeName;
   isAddrDialogVisible.value = true;
@@ -869,6 +872,10 @@ const handleSaveAddr = () => {
       target.phone = phoneFull;
       target.address =
         addressTab.value === 'home' ? composeHomeAddress() : form.detail;
+      if (addressTab.value === 'home') {
+        // 保留國別，供結帳頁判斷是否可配送
+        target.country = form.country;
+      }
       if (addressTab.value === 'store') {
         target.chain = form.chain;
         target.storeName = form.storeName;
@@ -882,6 +889,10 @@ const handleSaveAddr = () => {
       address: addressTab.value === 'home' ? composeHomeAddress() : form.detail,
       isDefault: list.value.length === 0,
     };
+    if (addressTab.value === 'home') {
+      // 保留國別，供結帳頁判斷是否可配送
+      base.country = form.country;
+    }
     if (addressTab.value === 'store') {
       base.chain = form.chain;
       base.storeName = form.storeName;
@@ -1999,6 +2010,7 @@ const handleSaveAddr = () => {
         </div>
 
         <!-- Home: 國別（台灣沿用縣市/區下拉，海外改手填欄位） -->
+        <!-- 註：非台灣的跨境國別選項為原型展示，須待系統支援跨境配送時才會出現 -->
         <div v-if="addressTab === 'home'" class="flex flex-col gap-1.5">
           <label class="text-sm text-slate-700">國別</label>
           <Select v-model="form.country" :options="COUNTRIES" class="w-full" />
