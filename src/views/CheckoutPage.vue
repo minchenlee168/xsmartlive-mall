@@ -33,6 +33,25 @@ import { products } from '../data/products';
 import { useAuthStore } from '../pinia/auth';
 import { storeToRefs } from 'pinia';
 import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
+import {
+  TAIWAN,
+  MALAYSIA,
+  PHILIPPINES,
+  COUNTRIES,
+  COUNTRY_DIAL_CODES,
+  CITIES,
+  DISTRICT_MAP,
+  MY_STATES,
+  PH_REGIONS,
+  PH_PROVINCE_MAP,
+  PH_CITY_MAP,
+  PH_BARANGAY_MAP,
+  PH_DEFAULT_BARANGAYS,
+  POSTAL_LENGTH,
+  TW_DISTRICT_POSTAL,
+  composeHomeAddress,
+  isHomeAddressComplete,
+} from '../constants/address';
 import { useCountdown } from '../composables/useCountdown';
 import { useMoney } from '../composables/useMoney';
 
@@ -104,24 +123,10 @@ const PAYMENT_METHODS: { label: string; value: PaymentMethodId }[] = [
 ];
 const BANK_TRANSFER_INFO = ['銀行：台新008', '分行：13456-111333'];
 const DRAWER_COUNTRY_CODES = ['+886', '+852'];
-/** 國別 → 電話國碼對照（新增宅配地址：選國別自動帶入國碼）。 */
-const COUNTRY_DIAL_CODES: Record<string, string> = {
-  台灣: '+886',
-  香港: '+852',
-  中國大陸: '+86',
-  日本: '+81',
-  韓國: '+82',
-  新加坡: '+65',
-  馬來西亞: '+60',
-  美國: '+1',
-  加拿大: '+1',
-  澳洲: '+61',
-  英國: '+44',
-};
-const DRAWER_COUNTRIES = Object.keys(COUNTRY_DIAL_CODES);
+const DRAWER_COUNTRIES = COUNTRIES;
 /**
- * 新增宅配地址的國碼下拉選項：數字在前、國名注記在後（如「+82 韓國」）。
- * 同一國碼對應多國時合併注記（如「+1 美國/加拿大」）；value 只存純國碼。
+ * 新增宅配地址的國碼下拉選項：數字在前、國名注記在後（如「+886 台灣」）。
+ * 同一國碼對應多國時合併注記；value 只存純國碼。
  */
 const DRAWER_HOME_COUNTRY_CODES = (() => {
   const countriesByCode = new Map<string, string[]>();
@@ -133,8 +138,6 @@ const DRAWER_HOME_COUNTRY_CODES = (() => {
     value: code,
   }));
 })();
-const DRAWER_CITIES = ['高雄市', '台北市', '桃園市'];
-const DRAWER_DISTRICTS = ['前鎮區', '三民區', '信義區'];
 
 // 收據式明細的網格版型（僅版面結構）：手機三欄（標籤｜操作｜金額）、
 // @3xl 四欄插入說明欄；操作欄固定 132px 讓按鈕 / stepper 左右對齊。
@@ -998,34 +1001,102 @@ watch(newHomeCountry, (c) => {
   const code = COUNTRY_DIAL_CODES[c];
   if (code) newHomeCountryCode.value = code;
 });
-const newHomeCity = ref('高雄市');
-const newHomeDistrict = ref('前鎮區');
+const newHomeCity = ref(CITIES[0]);
+const newHomeDistrict = ref(DISTRICT_MAP[CITIES[0]][0]);
 const newHomeAddress = ref('');
-// 海外地址額外欄位（國別非台灣時填寫）
+// 海外地址額外欄位：馬來西亞城市（文字）沿用 overseaCity、州 / 省 / 地區沿用 state
 const newHomeOverseasCity = ref('');
 const newHomeState = ref('');
 const newHomePostal = ref('');
+// 菲律賓逐層：大區 → 省 → 市 → 村里
+const newHomePhRegion = ref('');
+const newHomePhProvince = ref('');
+const newHomePhCity = ref('');
+const newHomePhBarangay = ref('');
+
+const newHomeIsMalaysia = computed(() => newHomeCountry.value === MALAYSIA);
+const newHomeIsPhilippines = computed(
+  () => newHomeCountry.value === PHILIPPINES,
+);
+const newHomeDistricts = computed(() => DISTRICT_MAP[newHomeCity.value] ?? []);
+const newHomePhProvinces = computed(
+  () => PH_PROVINCE_MAP[newHomePhRegion.value] ?? [],
+);
+const newHomePhCities = computed(
+  () => PH_CITY_MAP[newHomePhProvince.value] ?? [],
+);
+const newHomePhBarangays = computed(
+  () => PH_BARANGAY_MAP[newHomePhCity.value] ?? PH_DEFAULT_BARANGAYS,
+);
+// 郵遞區號碼數上限（台 6 / 新 6 / 馬 5 / 菲 4）
+const newHomePostalMaxLength = computed(
+  () => POSTAL_LENGTH[newHomeCountry.value] ?? 10,
+);
+// 台灣城市變更 → 區重設為該城市第一個選項
+watch(newHomeCity, (c) => {
+  newHomeDistrict.value = DISTRICT_MAP[c]?.[0] ?? '';
+});
+// 台灣選定城市 / 區後自動帶入該區 3 碼郵遞（使用者可續補成 6 碼）；
+// 切換至非台灣國別時清空郵遞
+watch(
+  [newHomeCountry, newHomeDistrict],
+  () => {
+    if (newHomeCountry.value === TAIWAN) {
+      newHomePostal.value = TW_DISTRICT_POSTAL[newHomeDistrict.value] ?? '';
+    } else {
+      newHomePostal.value = '';
+    }
+  },
+  { immediate: true },
+);
+// 菲律賓上層變動時清空下層選擇
+watch(newHomePhRegion, () => {
+  newHomePhProvince.value = '';
+  newHomePhCity.value = '';
+  newHomePhBarangay.value = '';
+});
+watch(newHomePhProvince, () => {
+  newHomePhCity.value = '';
+  newHomePhBarangay.value = '';
+});
+watch(newHomePhCity, () => {
+  newHomePhBarangay.value = '';
+});
+/** 蒐集宅配地址欄位（馬來西亞城市沿用 overseaCity 欄）。 */
+const newHomeParts = computed(() => ({
+  country: newHomeCountry.value,
+  city: newHomeIsMalaysia.value ? newHomeOverseasCity.value : newHomeCity.value,
+  district: newHomeDistrict.value,
+  state: newHomeState.value,
+  postalCode: newHomePostal.value,
+  detail: newHomeAddress.value,
+  phRegion: newHomePhRegion.value,
+  phProvince: newHomePhProvince.value,
+  phCity: newHomePhCity.value,
+  phBarangay: newHomePhBarangay.value,
+}));
+const isAddHomeValid = computed(
+  () => !!newHomeName.value.trim() && isHomeAddressComplete(newHomeParts.value),
+);
 const resetAddHomeForm = () => {
   newHomeName.value = '';
   newHomePhone.value = '';
   newHomeAddress.value = '';
   newHomeOverseasCity.value = '';
   newHomeState.value = '';
-  newHomePostal.value = '';
+  newHomePostal.value =
+    newHomeCountry.value === TAIWAN
+      ? (TW_DISTRICT_POSTAL[newHomeDistrict.value] ?? '')
+      : '';
+  newHomePhRegion.value = '';
+  newHomePhProvince.value = '';
+  newHomePhCity.value = '';
+  newHomePhBarangay.value = '';
 };
 const handleSubmitAddHome = () => {
-  if (!newHomeName.value.trim()) return;
-  const isTW = newHomeCountry.value === '台灣';
-  const overseasParts = [
-    newHomePostal.value,
-    newHomeState.value,
-    newHomeOverseasCity.value,
-    newHomeAddress.value,
-  ].filter((part) => part.trim());
-  const address = isTW
-    ? `${newHomeCity.value}${newHomeDistrict.value} ${newHomeAddress.value}`
-    : `${newHomeCountry.value} ${overseasParts.join(' ')}`;
-  // 台灣：city / district；海外：city / state / postalCode。詳細地址一律存 address。
+  if (!isAddHomeValid.value) return;
+  const isTW = newHomeCountry.value === TAIWAN;
+  // 台灣：city / district；海外：city / state / postalCode。詳細地址依該國格式組合存 address。
   const structured = isTW
     ? { city: newHomeCity.value, district: newHomeDistrict.value }
     : {
@@ -1037,7 +1108,7 @@ const handleSubmitAddHome = () => {
     id: `h_${Date.now()}`,
     name: newHomeName.value,
     phone: `${newHomeCountryCode.value} ${newHomePhone.value || '000****00'}`,
-    address,
+    address: composeHomeAddress(newHomeParts.value),
     isDefault: false,
     country: newHomeCountry.value,
     ...structured,
@@ -3277,42 +3348,123 @@ const handleConfirmPayWithoutFreeShip = () => {
                     class="w-full"
                   />
                 </div>
+                <!-- 郵遞區號（所有國別共用，國別下第一欄；菲律賓選填，其餘必填） -->
+                <div class="flex flex-col gap-1">
+                  <label class="text-sm text-slate-700"
+                    >郵遞區號<span
+                      v-if="!newHomeIsPhilippines"
+                      class="text-red-500"
+                    >
+                      *</span
+                    ></label
+                  >
+                  <InputText
+                    v-model="newHomePostal"
+                    :maxlength="newHomePostalMaxLength"
+                    inputmode="numeric"
+                    class="w-full"
+                  />
+                </div>
+                <!-- 台灣：城市 / 區 連動下拉 -->
                 <div
-                  v-if="newHomeCountry === '台灣'"
+                  v-if="newHomeCountry === TAIWAN"
                   class="flex flex-col gap-1"
                 >
-                  <label class="text-sm text-slate-700">城市/區</label>
+                  <label class="text-sm text-slate-700">城市 / 區</label>
                   <div class="flex gap-2">
                     <Select
                       v-model="newHomeCity"
-                      :options="DRAWER_CITIES"
+                      :options="CITIES"
                       class="flex-1"
                     />
                     <Select
                       v-model="newHomeDistrict"
-                      :options="DRAWER_DISTRICTS"
+                      :options="newHomeDistricts"
                       class="flex-1"
                     />
                   </div>
                 </div>
-                <!-- 海外地址額外欄位：國別非台灣時顯示（郵遞區號 → 城市 → 州/省/地區） -->
-                <template v-if="newHomeCountry !== '台灣'">
+                <!-- 馬來西亞：城市（文字）→ 州 / 省 / 地區（下拉） -->
+                <template v-if="newHomeIsMalaysia">
                   <div class="flex flex-col gap-1">
-                    <label class="text-sm text-slate-700">郵遞區號</label>
-                    <InputText v-model="newHomePostal" class="w-full" />
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <label class="text-sm text-slate-700">城市</label>
+                    <label class="text-sm text-slate-700"
+                      >城市<span class="text-red-500"> *</span></label
+                    >
                     <InputText v-model="newHomeOverseasCity" class="w-full" />
                   </div>
                   <div class="flex flex-col gap-1">
-                    <label class="text-sm text-slate-700">州/省/地區</label>
-                    <InputText v-model="newHomeState" class="w-full" />
+                    <label class="text-sm text-slate-700"
+                      >州 / 省 / 地區<span class="text-red-500"> *</span></label
+                    >
+                    <Select
+                      v-model="newHomeState"
+                      :options="MY_STATES"
+                      show-clear
+                      filter
+                      placeholder="請選擇"
+                      class="w-full"
+                    />
                   </div>
                 </template>
-                <!-- 詳細收件地址：兩種國別都放最下方 -->
+                <!-- 菲律賓：大區 / 省 / 市 / 村里 連動下拉 -->
+                <template v-if="newHomeIsPhilippines">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-sm text-slate-700"
+                      >大區<span class="text-red-500"> *</span></label
+                    >
+                    <Select
+                      v-model="newHomePhRegion"
+                      :options="PH_REGIONS"
+                      show-clear
+                      filter
+                      placeholder="請選擇"
+                      class="w-full"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-sm text-slate-700"
+                      >省<span class="text-red-500"> *</span></label
+                    >
+                    <Select
+                      v-model="newHomePhProvince"
+                      :options="newHomePhProvinces"
+                      :disabled="!newHomePhRegion"
+                      placeholder="請選擇"
+                      class="w-full"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-sm text-slate-700"
+                      >市<span class="text-red-500"> *</span></label
+                    >
+                    <Select
+                      v-model="newHomePhCity"
+                      :options="newHomePhCities"
+                      :disabled="!newHomePhProvince"
+                      placeholder="請選擇"
+                      class="w-full"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="text-sm text-slate-700"
+                      >村里（Barangay）<span class="text-red-500">
+                        *</span
+                      ></label
+                    >
+                    <Select
+                      v-model="newHomePhBarangay"
+                      :options="newHomePhBarangays"
+                      :disabled="!newHomePhCity"
+                      placeholder="請選擇"
+                      class="w-full"
+                    />
+                  </div>
+                </template>
+                <!-- 詳細收件地址：所有國別皆放最下方 -->
                 <div class="flex flex-col gap-1">
-                  <label class="text-sm text-slate-700">詳細收件地址</label>
+                  <label class="text-sm text-slate-700"
+                    >詳細收件地址<span class="text-red-500"> *</span></label
+                  >
                   <InputText v-model="newHomeAddress" class="w-full" />
                 </div>
               </div>
@@ -3324,7 +3476,11 @@ const handleConfirmPayWithoutFreeShip = () => {
                   outlined
                   @click="shipDrawerView = 'list'"
                 />
-                <Button label="確認新增" @click="handleSubmitAddHome" />
+                <Button
+                  label="確認新增"
+                  :disabled="!isAddHomeValid"
+                  @click="handleSubmitAddHome"
+                />
               </div>
             </template>
 

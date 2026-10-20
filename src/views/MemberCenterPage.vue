@@ -15,6 +15,25 @@ import { useCountdown } from '../composables/useCountdown';
 import { SOCIAL_BRAND_COLORS } from '../utils/brand-colors';
 import { storeToRefs } from 'pinia';
 import { useAddressStore, type Address, type CvsChain } from '../pinia/address';
+import {
+  TAIWAN,
+  MALAYSIA,
+  SINGAPORE,
+  PHILIPPINES,
+  COUNTRIES,
+  CITIES,
+  DISTRICT_MAP,
+  MY_STATES,
+  PH_REGIONS,
+  PH_PROVINCE_MAP,
+  PH_CITY_MAP,
+  PH_BARANGAY_MAP,
+  PH_DEFAULT_BARANGAYS,
+  POSTAL_LENGTH,
+  TW_DISTRICT_POSTAL,
+  composeHomeAddress as composeHomeAddressShared,
+  isHomeAddressComplete,
+} from '../constants/address';
 
 interface SocialAccount {
   key: string;
@@ -69,61 +88,6 @@ const ACCOUNT_SUB_ITEMS = [
 ];
 const VALID_NAVS = new Set(['orders', 'points', 'account', 'coupons']);
 const PHONE_CODES = ['+886', '+852'];
-// 宅配地址國別：台灣沿用縣市/區連動下拉，其餘國家改為郵遞區號 / 城市 / 州省地區 手填
-const TAIWAN = '台灣';
-// 菲律賓採專屬行政區層級：郵遞區號 + 大區 → 省 → 市 → 村里(Barangay) 連動下拉
-const PHILIPPINES = '菲律賓';
-// 註：此國別清單為原型展示用。實際上非台灣的跨境國別，須待系統支援跨境配送後才會出現。
-const COUNTRIES = ['台灣', '馬來西亞', '新加坡', '菲律賓'];
-// 菲律賓行政區假資料（原型用），大區 → 省 → 市 → 村里 逐層連動
-const PH_REGIONS = ['Metro Manila', 'Calabarzon', 'Central Luzon'];
-const PH_PROVINCE_MAP: Record<string, string[]> = {
-  'Metro Manila': ['METRO-MANILA'],
-  Calabarzon: ['CAVITE', 'LAGUNA', 'BATANGAS'],
-  'Central Luzon': ['BULACAN', 'PAMPANGA'],
-};
-const PH_CITY_MAP: Record<string, string[]> = {
-  'METRO-MANILA': ['BINONDO', 'MAKATI', 'QUEZON CITY'],
-  CAVITE: ['BACOOR', 'IMUS'],
-  LAGUNA: ['CALAMBA', 'SANTA ROSA'],
-  BATANGAS: ['BATANGAS CITY', 'LIPA'],
-  BULACAN: ['MALOLOS', 'MEYCAUAYAN'],
-  PAMPANGA: ['ANGELES', 'SAN FERNANDO'],
-};
-const PH_BARANGAY_MAP: Record<string, string[]> = {
-  BINONDO: ['BARANGAY 287', 'BARANGAY 288', 'BARANGAY 289'],
-};
-const PH_DEFAULT_BARANGAYS = ['BARANGAY 1', 'BARANGAY 2', 'BARANGAY 3'];
-// 新加坡採精簡欄位：僅郵遞區號 + 詳細收件地址
-const SINGAPORE = '新加坡';
-// 馬來西亞採專屬欄位：洲別（州屬）+ 郵遞區號 + 詳細收件地址
-const MALAYSIA = '馬來西亞';
-const MY_STATES = [
-  'Johor',
-  'Kedah',
-  'Kelantan',
-  'Melaka',
-  'Negeri Sembilan',
-  'Pahang',
-  'Perak',
-  'Perlis',
-  'Pulau Pinang',
-  'Sabah',
-  'Sarawak',
-  'Selangor',
-  'Terengganu',
-  'Kuala Lumpur',
-  'Labuan',
-  'Putrajaya',
-];
-const CITIES = ['台北市', '新北市', '桃園市', '台中市', '高雄市'];
-const DISTRICT_MAP: Record<string, string[]> = {
-  台北市: ['信義區', '大安區', '中山區', '內湖區'],
-  新北市: ['板橋區', '新莊區', '三重區', '中和區'],
-  桃園市: ['桃園區', '中壢區', '平鎮區', '龜山區'],
-  台中市: ['西屯區', '北屯區', '南屯區', '大里區'],
-  高雄市: ['三民區', '前鎮區', '左營區', '鳳山區'],
-};
 const POINTS_TABS = [
   { key: 'all', label: '全部明細' },
   { key: 'earn', label: '獲得紀錄' },
@@ -707,6 +671,21 @@ const isOverseas = computed(() => form.country !== TAIWAN);
 const isPhilippines = computed(() => form.country === PHILIPPINES);
 const isMalaysia = computed(() => form.country === MALAYSIA);
 const isSingapore = computed(() => form.country === SINGAPORE);
+// 郵遞區號碼數上限（依國別：台 6 / 新 6 / 馬 5 / 菲 4）
+const postalMaxLength = computed(() => POSTAL_LENGTH[form.country] ?? 10);
+// 台灣選定城市 / 區後自動帶入該區 3 碼郵遞（使用者可續補成 6 碼）；
+// 切換至非台灣國別時清空郵遞，交由該國規則填寫
+watch(
+  [() => form.country, () => form.district],
+  () => {
+    if (form.country === TAIWAN) {
+      form.postalCode = TW_DISTRICT_POSTAL[form.district] ?? '';
+    } else {
+      form.postalCode = '';
+    }
+  },
+  { immediate: true },
+);
 // 菲律賓逐層連動選項
 const phProvinces = computed(() => PH_PROVINCE_MAP[form.phRegion] ?? []);
 const phCities = computed(() => PH_CITY_MAP[form.phProvince] ?? []);
@@ -759,7 +738,7 @@ const resetForm = () => {
   form.country = TAIWAN;
   form.city = '台北市';
   form.district = '信義區';
-  form.postalCode = '';
+  form.postalCode = TW_DISTRICT_POSTAL[form.district] ?? '';
   form.overseaCity = '';
   form.state = '';
   form.phRegion = '';
@@ -789,77 +768,29 @@ const handleOpenEditAddr = (addr: Address) => {
   if (addr.storeName) form.storeName = addr.storeName;
   isAddrDialogVisible.value = true;
 };
+/** 以共用 helper 蒐集宅配地址欄位（馬來西亞城市沿用 overseaCity 欄）。 */
+const homeAddressParts = computed(() => ({
+  country: form.country,
+  city: isMalaysia.value ? form.overseaCity : form.city,
+  district: form.district,
+  state: form.state,
+  postalCode: form.postalCode,
+  detail: form.detail,
+  phRegion: form.phRegion,
+  phProvince: form.phProvince,
+  phCity: form.phCity,
+  phBarangay: form.phBarangay,
+}));
 const isFormValid = computed(() => {
   if (!form.name.trim() || !form.phone.trim()) return false;
   if (addressTab.value === 'home') {
-    // 菲律賓郵遞區號選填，其餘國家（含台灣）郵遞區號必填
-    if (isPhilippines.value) {
-      return !!(
-        form.phRegion &&
-        form.phProvince &&
-        form.phCity &&
-        form.phBarangay &&
-        form.detail.trim()
-      );
-    }
-    if (!form.postalCode.trim()) return false;
-    if (isMalaysia.value) {
-      return !!(form.state && form.detail.trim());
-    }
-    if (isSingapore.value) {
-      return !!form.detail.trim();
-    }
-    if (isOverseas.value) {
-      return !!(
-        form.overseaCity.trim() &&
-        form.state.trim() &&
-        form.detail.trim()
-      );
-    }
-    return !!form.detail.trim();
+    return isHomeAddressComplete(homeAddressParts.value);
   }
-  return (
-    !!form.storeName.trim() &&
-    !!form.detail.trim() &&
-    !!form.name.trim() &&
-    !!form.phone.trim()
-  );
+  return !!(form.storeName.trim() && form.detail.trim());
 });
-/** 組合宅配完整地址字串：台灣用縣市/區，海外用國別＋州省＋城市＋郵遞區號。 */
-const composeHomeAddress = (): string => {
-  if (isPhilippines.value) {
-    return [
-      form.country,
-      form.phRegion,
-      form.phProvince,
-      form.phCity,
-      form.phBarangay,
-      form.postalCode,
-      form.detail,
-    ]
-      .filter((part) => part.trim())
-      .join(' ');
-  }
-  if (isMalaysia.value) {
-    return [form.country, form.state, form.postalCode, form.detail]
-      .filter((part) => part.trim())
-      .join(' ');
-  }
-  if (isOverseas.value) {
-    return [
-      form.country,
-      form.state,
-      form.overseaCity,
-      form.postalCode,
-      form.detail,
-    ]
-      .filter((part) => part.trim())
-      .join(' ');
-  }
-  return [form.postalCode, `${form.city}${form.district}`, form.detail]
-    .filter((part) => part.trim())
-    .join(' ');
-};
+/** 依該國標準地址格式組出顯示字串（共用 helper）。 */
+const composeHomeAddress = (): string =>
+  composeHomeAddressShared(homeAddressParts.value);
 
 const handleSaveAddr = () => {
   if (!isFormValid.value) return;
@@ -2023,7 +1954,12 @@ const handleSaveAddr = () => {
               *</span
             ></label
           >
-          <InputText v-model="form.postalCode" class="w-full" />
+          <InputText
+            v-model="form.postalCode"
+            :maxlength="postalMaxLength"
+            inputmode="numeric"
+            class="w-full"
+          />
         </div>
 
         <!-- Home 台灣：city/district 連動下拉 -->
@@ -2042,11 +1978,17 @@ const handleSaveAddr = () => {
           </div>
         </div>
 
-        <!-- Home 馬來西亞：洲別（州屬） -->
+        <!-- Home 馬來西亞：城市（文字）→ 州 / 省 / 地區（下拉） -->
         <template v-if="addressTab === 'home' && isMalaysia">
           <div class="flex flex-col gap-1.5">
             <label class="text-sm text-slate-700"
-              >洲別<span class="text-red-500"> *</span></label
+              >城市<span class="text-red-500"> *</span></label
+            >
+            <InputText v-model="form.overseaCity" class="w-full" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm text-slate-700"
+              >州 / 省 / 地區<span class="text-red-500"> *</span></label
             >
             <Select
               v-model="form.state"
